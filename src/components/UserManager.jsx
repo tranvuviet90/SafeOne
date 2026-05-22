@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useI18n } from '../i18n/I18nProvider';
 import { db, functions } from '../firebase';
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, doc, getDoc, setDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { useToast } from './LightboxSwipeOnly';
 
@@ -36,6 +36,14 @@ export default function UserManager({ user, isMobile }) {
   const [createAccountModal, setCreateAccountModal] = useState(false);
   const [newAccountData, setNewAccountData] = useState({ name: '', email: '', password: '', role: 'Nhà Ăn', customRole: '' });
 
+  // Tab API Key Config
+  const [aiProvider, setAiProvider] = useState('google');
+  const [aiModel, setAiModel] = useState('gemini-2.0-flash');
+  const [apiKey, setApiKey] = useState('');
+  const [hasSavedKey, setHasSavedKey] = useState(false);
+  const [saveStatus, setSaveStatus] = useState('');
+  const [isSavingKey, setIsSavingKey] = useState(false);
+
   const fetchUsers = async () => {
     setLoading(true);
     try {
@@ -68,10 +76,79 @@ export default function UserManager({ user, isMobile }) {
     }
   };
 
+  const fetchAIConfig = async () => {
+    setLoading(true);
+    try {
+      const docRef = doc(db, 'settings', 'ai_config');
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setAiProvider(data.provider || 'google');
+        setAiModel(data.model || 'gemini-2.0-flash');
+        if (data.apiKey) {
+          setApiKey('MOCKED_SAVED_KEY');
+          setHasSavedKey(true);
+        } else {
+          setApiKey('');
+          setHasSavedKey(false);
+        }
+      } else {
+        setAiProvider('google');
+        setAiModel('gemini-2.0-flash');
+        setApiKey('');
+        setHasSavedKey(false);
+      }
+    } catch (err) {
+      console.error("Error fetching AI config:", err);
+      pushToast('Lỗi khi tải cấu hình AI.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveAIConfig = async (e) => {
+    e.preventDefault();
+    setIsSavingKey(true);
+    setSaveStatus('Đang lưu...');
+    try {
+      const docRef = doc(db, 'settings', 'ai_config');
+      const docSnap = await getDoc(docRef);
+      
+      let finalKey = apiKey;
+      if (apiKey === 'MOCKED_SAVED_KEY' && docSnap.exists()) {
+        finalKey = docSnap.data().apiKey || '';
+      }
+
+      await setDoc(docRef, {
+        provider: aiProvider,
+        model: aiModel,
+        apiKey: finalKey,
+        updatedAt: new Date()
+      }, { merge: true });
+
+      setSaveStatus('Lưu thành công!');
+      pushToast('Cấu hình AI đã được cập nhật!', 'success');
+      if (finalKey) {
+        setApiKey('MOCKED_SAVED_KEY');
+        setHasSavedKey(true);
+      } else {
+        setApiKey('');
+        setHasSavedKey(false);
+      }
+    } catch (err) {
+      console.error("Error saving AI config:", err);
+      setSaveStatus('Lỗi khi lưu cấu hình.');
+      pushToast(err.message || 'Lỗi khi lưu cấu hình.', 'error');
+    } finally {
+      setIsSavingKey(false);
+    }
+  };
+
   useEffect(() => {
     fetchRequests(); // Luôn load requests khi mount để hiện badge số lượng
     if (activeTab === 'users') fetchUsers();
     else if (activeTab === 'requests') fetchRequests();
+    else if (activeTab === 'apikey') fetchAIConfig();
   }, [activeTab]);
 
   const handleAdminAction = async (action, targetUid, data = {}) => {
@@ -110,8 +187,8 @@ export default function UserManager({ user, isMobile }) {
       <h2 style={{ color: '#222', marginTop: 0, borderBottom: '2px solid #E88E2E', paddingBottom: 10 }}>{t('manager.title')}</h2>
       
       {/* Tabs Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <div style={{ display: 'flex', gap: 10 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 10 }}>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <button 
             onClick={() => setActiveTab('users')}
             style={{ padding: '8px 16px', background: activeTab === 'users' ? '#E88E2E' : '#f0f0f0', color: activeTab === 'users' ? 'white' : '#333', border: 'none', borderRadius: 20, cursor: 'pointer', fontWeight: 600 }}
@@ -125,13 +202,21 @@ export default function UserManager({ user, isMobile }) {
             {t('manager.tab.requests')}
             {requests.length > 0 && <span style={{ background: 'red', color: 'white', borderRadius: 10, padding: '2px 6px', fontSize: 12, marginLeft: 6 }}>{requests.length}</span>}
           </button>
+          <button 
+            onClick={() => setActiveTab('apikey')}
+            style={{ padding: '8px 16px', background: activeTab === 'apikey' ? '#E88E2E' : '#f0f0f0', color: activeTab === 'apikey' ? 'white' : '#333', border: 'none', borderRadius: 20, cursor: 'pointer', fontWeight: 600 }}
+          >
+            🔑 API Key
+          </button>
         </div>
-        <button
-          onClick={() => setCreateAccountModal(true)}
-          style={{ padding: '8px 16px', background: '#10b981', color: 'white', border: 'none', borderRadius: 20, cursor: 'pointer', fontWeight: 600 }}
-        >
-          + Tạo tài khoản
-        </button>
+        {activeTab === 'users' && (
+          <button
+            onClick={() => setCreateAccountModal(true)}
+            style={{ padding: '8px 16px', background: '#10b981', color: 'white', border: 'none', borderRadius: 20, cursor: 'pointer', fontWeight: 600 }}
+          >
+            + Tạo tài khoản
+          </button>
+        )}
       </div>
 
       {loading && <div style={{ textAlign: 'center', padding: 20, color: '#888' }}>{t('common.loading')}...</div>}
@@ -233,6 +318,120 @@ export default function UserManager({ user, isMobile }) {
             </table>
           )}
         </div>
+      )}
+
+      {/* Tab: API KEY */}
+      {!loading && activeTab === 'apikey' && (
+        <form onSubmit={handleSaveAIConfig} style={{ background: '#fafafa', border: '1px solid #e0e0e0', borderRadius: 12, padding: 24, marginTop: 10 }}>
+          <h3 style={{ marginTop: 0, color: '#E88E2E', borderBottom: '1px solid #eee', paddingBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+            🔑 Cấu hình Dịch vụ AI (Spellcheck)
+          </h3>
+          
+          <div style={{ marginBottom: 18 }}>
+            <label style={{ display: 'block', fontWeight: 'bold', marginBottom: 6, fontSize: 14, color: '#333' }}>
+              Nhà cung cấp dịch vụ AI:
+            </label>
+            <select 
+              value={aiProvider} 
+              onChange={e => {
+                const prov = e.target.value;
+                setAiProvider(prov);
+                setAiModel(prov === 'google' ? 'gemini-2.0-flash' : 'gpt-4o-mini');
+              }} 
+              style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #ccc', boxSizing: 'border-box', background: 'white' }}
+            >
+              <option value="google">Google Gemini</option>
+              <option value="openai">OpenAI</option>
+            </select>
+          </div>
+
+          <div style={{ marginBottom: 18 }}>
+            <label style={{ display: 'block', fontWeight: 'bold', marginBottom: 6, fontSize: 14, color: '#333' }}>
+              Mô hình AI sử dụng:
+            </label>
+            <select 
+              value={aiModel} 
+              onChange={e => setAiModel(e.target.value)} 
+              style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #ccc', boxSizing: 'border-box', background: 'white' }}
+            >
+              {aiProvider === 'google' ? (
+                <>
+                  <option value="gemini-2.0-flash">Gemini 2.0 Flash (Khuyên dùng)</option>
+                  <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+                  <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                </>
+              ) : (
+                <>
+                  <option value="gpt-4o-mini">GPT-4o Mini (Khuyên dùng)</option>
+                  <option value="gpt-4o">GPT-4o</option>
+                  <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                </>
+              )}
+            </select>
+          </div>
+
+          <div style={{ marginBottom: 22 }}>
+            <label style={{ display: 'block', fontWeight: 'bold', marginBottom: 6, fontSize: 14, color: '#333' }}>
+              API Key cá nhân:
+            </label>
+            <input 
+              type="password" 
+              value={apiKey} 
+              onChange={e => setApiKey(e.target.value)}
+              placeholder={hasSavedKey ? "••••••••••••••••" : "Nhập API Key để kích hoạt kết nối trực tiếp..."}
+              style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #ccc', boxSizing: 'border-box' }}
+            />
+            {hasSavedKey && (
+              <p style={{ margin: '5px 0 0', fontSize: 12, color: '#2e7d32', fontWeight: 600 }}>
+                ✓ Hệ thống đã lưu trữ và bảo mật API Key của bạn. Bạn vẫn có thể ghi đè khóa mới nếu cần.
+              </p>
+            )}
+            {!hasSavedKey && (
+              <p style={{ margin: '5px 0 0', fontSize: 12, color: '#666' }}>
+                * Nếu không có API Key, tính năng tự sửa lỗi chính tả sẽ tự động chuyển tiếp qua Cloud Function fallback.
+              </p>
+            )}
+          </div>
+
+          {saveStatus && (
+            <div style={{ 
+              marginBottom: 18, 
+              padding: '8px 12px', 
+              borderRadius: 6, 
+              background: saveStatus.includes('thành công') ? '#e8f5e9' : '#fff3e0',
+              color: saveStatus.includes('thành công') ? '#2e7d32' : '#e65100',
+              fontSize: 14,
+              fontWeight: 600
+            }}>
+              {saveStatus}
+            </div>
+          )}
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+            {hasSavedKey && (
+              <button
+                type="button"
+                onClick={async () => {
+                  if (window.confirm("Bạn có chắc chắn muốn XÓA API Key đã lưu?")) {
+                    setApiKey('');
+                    setHasSavedKey(false);
+                    setSaveStatus('Chưa lưu thay đổi.');
+                  }
+                }}
+                style={{ padding: '10px 20px', borderRadius: 8, border: '1.5px solid #d32f2f', background: 'transparent', color: '#d32f2f', cursor: 'pointer', fontWeight: 600 }}
+              >
+                Xóa Key cũ
+              </button>
+            )}
+            <button 
+              type="submit" 
+              disabled={isSavingKey} 
+              style={{ padding: '10px 24px', borderRadius: 8, border: 'none', background: '#E88E2E', color: 'white', fontWeight: 'bold', cursor: 'pointer', opacity: isSavingKey ? 0.6 : 1 }}
+            >
+              {isSavingKey ? 'Đang lưu...' : 'Lưu cấu hình'}
+            </button>
+          </div>
+        </form>
       )}
 
       {/* MODALS */}

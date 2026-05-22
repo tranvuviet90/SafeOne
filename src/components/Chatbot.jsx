@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import './Chatbot.css';
 import chatIcon from '../assets/favicon.png'; // <-- 1. Import icon
 import { useI18n } from '../i18n/I18nProvider';
+import { callAIService } from '../utils/aiAdapter';
 
 function Chatbot() {
     const { t } = useI18n();
@@ -37,15 +38,7 @@ function Chatbot() {
         }));
 
         try {
-            const response = await fetch(CLOUD_FUNCTION_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt: inputValue, history: history }),
-            });
-
-            if (!response.ok) throw new Error('Network response was not ok');
-
-            const data = await response.json();
+            const data = await callAIService(inputValue, history, CLOUD_FUNCTION_URL);
             setMessages(prev => [...prev, { text: data.response, type: 'ai' }]);
         } catch (error) {
             console.error('Error:', error);

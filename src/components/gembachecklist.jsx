@@ -15,6 +15,7 @@ import "react-datepicker/dist/react-datepicker.css";
 import { colors } from "../theme";
 import { useI18n } from "../i18n/I18nProvider";
 import LightboxSwipeOnly from "./LightboxSwipeOnly";
+import { callAIService } from "../utils/aiAdapter";
 
 /* ====================== BIỂU TƯỢNG (ICON) ====================== */
 function ImprovementIcon({ color = 'currentColor', size = 18 }) {
@@ -523,7 +524,7 @@ function GembaCheckList({ user, isMobile, newErrorCounts, setGembaNotifCounts })
   const userRole = (user && user.role) ? user.role.toLowerCase() : "";
 
   // === Tự sửa chính tả ===
-  const CLOUD_FUNCTION_URL = 'https://askai-zvblqnzy1q-as.a.run.app';
+  const CLOUD_FUNCTION_URL = 'https://askai-zvblqnzylq-as.a.run.app';
   const [autoCorrect, setAutoCorrect] = useState(true);
   const [isReminder, setIsReminder] = useState(false);
   const [isCorrecting, setIsCorrecting] = useState(false);
@@ -655,17 +656,13 @@ function GembaCheckList({ user, isMobile, newErrorCounts, setGembaNotifCounts })
     if (autoCorrect && note.trim()) {
       setIsCorrecting(true);
       try {
-        const response = await fetch(CLOUD_FUNCTION_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            prompt: `Sửa lỗi chính tả, câu cú và dấu câu cho đoạn văn tiếng Việt sau. Chỉ trả về đoạn văn đã sửa, không giải thích, không thêm nội dung nào khác:\n${note.trim()}`,
-            history: []
-          }),
-        });
-        if (response.ok) {
-          const data = await response.json();
-          const corrected = (data.response || "").trim();
+        const data = await callAIService(
+          `Sửa lỗi chính tả, câu cú và dấu câu cho đoạn văn tiếng Việt sau. Chỉ trả về đoạn văn đã sửa, không giải thích, không thêm nội dung nào khác:\n${note.trim()}`,
+          [],
+          CLOUD_FUNCTION_URL
+        );
+        const corrected = (data.response || "").trim();
+        if (corrected) {
           setCorrectedNote(corrected);
           setShowCorrectModal(true);
           setIsCorrecting(false);
@@ -673,6 +670,7 @@ function GembaCheckList({ user, isMobile, newErrorCounts, setGembaNotifCounts })
         }
       } catch (e) {
         console.error("Lỗi sửa chính tả:", e);
+        alert("Không thể kết nối dịch vụ AI để tự động sửa chính tả. Hệ thống sẽ tiếp tục lưu với ghi chú gốc của bạn.");
       }
       setIsCorrecting(false);
     }

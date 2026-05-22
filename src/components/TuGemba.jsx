@@ -13,6 +13,7 @@ import "react-datepicker/dist/react-datepicker.css";
 import { colors } from "../theme";
 import LightboxSwipeOnly from "./LightboxSwipeOnly";
 import { useI18n } from "../i18n/I18nProvider";
+import { callAIService } from "../utils/aiAdapter";
 
 /* ====================== BIỂU TƯỢNG (ICON) ====================== */
 function ImprovementIcon({ color = 'currentColor', size = 18 }) {
@@ -354,6 +355,13 @@ function TuGemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
   const fileRef = useRef();
   const [thumbMap, setThumbMap] = useState({});
   const [improvementModal, setImprovementModal] = useState({ isOpen: false, log: null });
+
+  // === Tự sửa chính tả ===
+  const CLOUD_FUNCTION_URL = 'https://askai-zvblqnzylq-as.a.run.app';
+  const [autoCorrect, setAutoCorrect] = useState(true);
+  const [isCorrecting, setIsCorrecting] = useState(false);
+  const [showCorrectModal, setShowCorrectModal] = useState(false);
+  const [correctedNote, setCorrectedNote] = useState("");
   
   const dep = departments[depIndex];
   const userRole = (user && user.role) ? user.role.toLowerCase() : "";
@@ -436,8 +444,36 @@ function TuGemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
         alert("Vui lòng tải lên ảnh bằng chứng khi đã chọn lỗi cụ thể.");
         return;
     }
-    
+
+    // Nếu bật tự sửa và có ghi chú, gọi Gemini/AI để sửa trước
+    if (autoCorrect && note.trim()) {
+      setIsCorrecting(true);
+      try {
+        const data = await callAIService(
+          `Sửa lỗi chính tả, câu cú và dấu câu cho đoạn văn tiếng Việt sau. Chỉ trả về đoạn văn đã sửa, không giải thích, không thêm nội dung nào khác:\n${note.trim()}`,
+          [],
+          CLOUD_FUNCTION_URL
+        );
+        const corrected = (data.response || "").trim();
+        if (corrected) {
+          setCorrectedNote(corrected);
+          setShowCorrectModal(true);
+          setIsCorrecting(false);
+          return; // dừng ở đây, chờ người dùng xác nhận trong popup
+        }
+      } catch (e) {
+        console.error("Lỗi sửa chính tả:", e);
+        alert("Không thể kết nối dịch vụ AI để tự động sửa chính tả. Hệ thống sẽ tiếp tục lưu với ghi chú gốc của bạn.");
+      }
+      setIsCorrecting(false);
+    }
+
+    await doSaveLog(note);
+  }
+
+  async function doSaveLog(noteToUse) {
     setIsUploading(true);
+    const hasImages = imageFiles.length > 0;
     let urls = [];
     if (hasImages) {
         try {
@@ -459,8 +495,8 @@ function TuGemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
     const logData = { 
       department: dep.name, 
       group: selectedGroup || "Khác", 
-      description: selectedError || note, 
-      note: note, 
+      description: selectedError || noteToUse, 
+      note: noteToUse, 
       imageUrls: urls, 
       addedBy: user.name, 
       userId: user.uid, 
@@ -471,7 +507,7 @@ function TuGemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
     try {
       await addDoc(collection(db, "notifications"), {
         type: "new_tu_gemba_error",
-        message: `${user.name} đã thêm lỗi mới tại ${dep.name} (Tự Gemba): ${selectedError || note}`,
+        message: `${user.name} đã thêm lỗi mới tại ${dep.name} (Tự Gemba): ${selectedError || noteToUse}`,
         targetRoles: ["ehs", "admin", "ehs committee"],
         createdBy: user.uid,
         readBy: [],
@@ -559,6 +595,39 @@ function TuGemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
         {showExportModal && <ExportModal onClose={() => setShowExportModal(false)} departments={departments} />}
         {improvementModal.isOpen && <ImprovementModal modalData={improvementModal} onClose={() => setImprovementModal({ isOpen: false, log: null })} onSave={handleSaveImprovement} />}
         
+        {/* Popup xác nhận sửa chính tả */}
+        {showCorrectModal && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1002 }}>
+            <div style={{ background: '#fff', padding: 26, borderRadius: 16, width: '92%', maxWidth: 540, boxShadow: '0 6px 32px rgba(0,0,0,.25)' }}>
+              <h3 style={{ marginTop: 0, color: colors.primary, display: 'flex', alignItems: 'center', gap: 8 }}>
+                ✍️ Đề xuất sửa ghi chú
+              </h3>
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontWeight: 600, color: '#888', marginBottom: 6, fontSize: 13 }}>Bản gốc:</div>
+                <div style={{ background: '#fff8e1', border: '1px solid #ffe082', borderRadius: 8, padding: '10px 14px', fontSize: 14, lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{note}</div>
+              </div>
+              <div style={{ marginBottom: 22 }}>
+                <div style={{ fontWeight: 600, color: '#2e7d32', marginBottom: 6, fontSize: 13 }}>✨ Đã sửa:</div>
+                <div style={{ background: '#f1f8e9', border: '1px solid #a5d6a7', borderRadius: 8, padding: '10px 14px', fontSize: 14, lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{correctedNote}</div>
+              </div>
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                <button
+                  onClick={async () => { setShowCorrectModal(false); await doSaveLog(note); }}
+                  style={{ padding: '8px 18px', borderRadius: 8, border: `1px solid ${colors.border}`, background: '#f5f5f5', cursor: 'pointer', fontWeight: 600, fontSize: 14 }}
+                >
+                  Dùng bản gốc
+                </button>
+                <button
+                  onClick={async () => { setShowCorrectModal(false); await doSaveLog(correctedNote); }}
+                  style={{ padding: '8px 22px', borderRadius: 8, border: 'none', background: '#2e7d32', color: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: 14 }}
+                >
+                  ✓ Dùng bản đã sửa
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* SỬ DỤNG LIGHTBOX MỚI */}
         <LightboxSwipeOnly
             open={viewer.open}
@@ -592,9 +661,24 @@ function TuGemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
                     </select>
                 </div>
             )}
-            <div style={{ marginBottom: 15 }}>
+            <div style={{ marginBottom: 8 }}>
                  <div style={{ fontSize: 15, color: colors.textPrimary, marginBottom: 5 }}>{t("gemba.note.label")}</div>
                 <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder={t("gemba.note.custom.placeholder")} style={{ width: "100%", minHeight: 60, boxSizing: "border-box", padding: "8px 12px", borderRadius: 8, border: `1.5px solid ${colors.primaryLight}`, fontSize: 15, fontFamily: "sans-serif" }} />
+            </div>
+
+            {/* Checkbox tự sửa chính tả */}
+            <div style={{ display: 'flex', gap: 20, marginBottom: 18, flexWrap: 'wrap' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' }}>
+                <input
+                  type="checkbox"
+                  checked={autoCorrect}
+                  onChange={e => setAutoCorrect(e.target.checked)}
+                  style={{ width: 16, height: 16, accentColor: colors.primary, cursor: 'pointer' }}
+                />
+                <span style={{ fontSize: 14, color: colors.textPrimary, fontWeight: 500 }}>
+                  {t("gemba.autoCorrect") || "Tự sửa lỗi chính tả bằng AI"}
+                </span>
+              </label>
             </div>
             
             <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 24, flexWrap: "wrap" }}>
@@ -605,8 +689,8 @@ function TuGemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
                 <span style={{fontStyle: 'italic', fontSize: 14, color: '#555', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
                     {imageFileNames.length > 0 ? imageFileNames.join(', ') : t("common.noImage")}
                 </span>
-                <button onClick={handleAddLog} disabled={isUploading} style={{ marginLeft: 'auto', height: 38, background: colors.primary, color: colors.white, borderRadius: 9, border: "none", padding: "0 26px", fontWeight: 700, fontSize: 16, cursor: "pointer", opacity: isUploading ? 0.6 : 1 }}>
-                     {isUploading ? t("gemba.uploading") : t("gemba.add")}
+                <button onClick={handleAddLog} disabled={isUploading || isCorrecting} style={{ marginLeft: 'auto', height: 38, background: isCorrecting ? '#888' : colors.primary, color: colors.white, borderRadius: 9, border: "none", padding: "0 26px", fontWeight: 700, fontSize: 16, cursor: "pointer", opacity: (isUploading || isCorrecting) ? 0.6 : 1 }}>
+                     {isCorrecting ? (t("gemba.correcting") || "Đang sửa...") : isUploading ? t("gemba.uploading") : t("gemba.add")}
                 </button>
             </div>
 
