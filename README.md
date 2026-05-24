@@ -1,4 +1,4 @@
-# SafeOne 🛡️ (Formerly ACP360)
+# SafeOne 🛡️
 
 **SafeOne** là hệ thống quản lý vận hành số hóa nhà xưởng toàn diện, tập trung vào công tác Giám sát An toàn, Sức khỏe, Môi trường (EHS), đánh giá Gemba, và quản lý quy trình hành chính (Báo cơm, Lịch làm việc) theo thời gian thực. Dự án được tối ưu hóa giao diện trực quan cao cấp, hiệu ứng mượt mà và tích hợp Trợ lý ảo AI EHS thông minh.
 
