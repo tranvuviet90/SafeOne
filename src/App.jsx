@@ -25,7 +25,6 @@ import { colors } from "./theme";
 import { ToastProvider, useToast } from "./components/LightboxSwipeOnly";
 
 import { useI18n } from "./i18n/I18nProvider";
-import LanguageSwitcher from "./components/LanguageSwitcher";
 
 const departments = [
   { name: "Cutting" }, { name: "Rolling" }, { name: "Finishing" }, { name: "Dipping" },
@@ -244,29 +243,7 @@ export default function App() {
             </span>
 
             <NotificationBell user={user} setActiveTab={setTab} />
-            <UserSettings user={user} />
-            <LanguageSwitcher />
-
-            <button
-              onClick={handleLogout}
-              title={t("logout")}
-              className="btn-logout"
-              style={{
-                color: colors.primary,
-                borderColor: colors.primaryLight,
-                padding: "6px 12px",
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.background = colors.backgroundLight;
-                e.target.style.borderColor = colors.primary;
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.background = "transparent";
-                e.target.style.borderColor = colors.primaryLight;
-              }}
-            >
-              {t("logout")}
-            </button>
+            <UserSettings user={user} onLogout={handleLogout} />
           </div>
         </div>
 

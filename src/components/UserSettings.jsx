@@ -5,6 +5,7 @@ import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 
 import { httpsCallable } from 'firebase/functions';
 import { IoSettingsOutline } from 'react-icons/io5';
 import { useToast } from './LightboxSwipeOnly';
+import LanguageSwitcher from './LanguageSwitcher';
 
 const ALL_ROLES = [
   "admin", "ehs", "ehs committee", "manager", "Nhà Ăn",
@@ -14,7 +15,7 @@ const ALL_ROLES = [
   "Engineering","MFG","Bảo Vệ","Tạp Vụ","Office"
 ];
 
-export default function UserSettings({ user }) {
+export default function UserSettings({ user, onLogout }) {
   const { t } = useI18n();
   const { pushToast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
@@ -135,6 +136,33 @@ export default function UserSettings({ user }) {
             onMouseOut={(e) => e.target.style.background = 'none'}
           >
             {t('settings.requestRole')}
+          </button>
+          
+          <hr style={{ border: 'none', borderTop: '1px solid #eee', margin: '6px 0' }} />
+          
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '6px 16px' }}>
+            <LanguageSwitcher />
+          </div>
+          
+          <hr style={{ border: 'none', borderTop: '1px solid #eee', margin: '6px 0' }} />
+          
+          <button 
+            onClick={() => { onLogout && onLogout(); setIsOpen(false); }}
+            style={{ 
+              width: '100%', 
+              padding: '10px 16px', 
+              background: 'none', 
+              border: 'none', 
+              textAlign: 'left', 
+              cursor: 'pointer', 
+              fontSize: 14, 
+              color: '#ef4444', 
+              fontWeight: '600' 
+            }}
+            onMouseOver={(e) => e.target.style.background = '#fee2e2'}
+            onMouseOut={(e) => e.target.style.background = 'none'}
+          >
+            {t('logout')}
           </button>
         </div>
       )}
