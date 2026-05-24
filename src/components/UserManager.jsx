@@ -277,94 +277,128 @@ export default function UserManager({ user, isMobile }) {
             <div style={{ fontSize: 14, color: '#666', fontWeight: 600 }}>Tổng: {filteredUsers.length} / {users.length} users</div>
           </div>
 
-          <div style={{ overflowX: 'auto', maxHeight: '60vh' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
-              <thead>
-                <tr>
-                  <th style={thStyle}>{t('manager.table.email')}</th>
-                  <th style={thStyle}>{t('manager.table.name')}</th>
-                  <th style={thStyle}>{t('manager.table.role')}</th>
-                  <th style={thStyle}>{t('manager.table.status')}</th>
-                  <th style={thStyle}>{t('manager.table.action')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {currentUsers.map(u => (
-                  <tr key={u.uid} style={{ background: u.disabled ? '#fff0f0' : 'inherit' }}>
-                    <td style={tdStyle}>{u.email}</td>
-                    <td style={tdStyle}>{u.name}</td>
-                    <td style={tdStyle}><strong>{u.role}</strong></td>
-                    <td style={tdStyle}>
-                      <span style={{ color: u.disabled ? 'red' : 'green', fontWeight: 600 }}>
-                        {u.disabled ? t('manager.status.disabled') : t('manager.status.active')}
-                      </span>
-                    </td>
-                    <td style={tdStyle}>
-                      {isMobile ? (
-                        <select
-                          onChange={(e) => {
-                            const act = e.target.value;
-                            if (!act) return;
-                            if (act === 'rename') {
-                              setRenameModal({ uid: u.uid, currentName: u.name });
-                              setNewName(u.name || '');
-                            } else if (act === 'resetPass') {
-                              setResetPassModal(u.uid);
-                            } else if (act === 'changeRole') {
-                              setRoleModal({ uid: u.uid, currentRoles: u.role });
-                              setSelectedRoles(u.role ? (Array.isArray(u.role) ? u.role : [u.role]) : []);
-                            } else if (act === 'enable') {
-                              handleAdminAction('enable', u.uid);
-                            } else if (act === 'disable') {
-                              handleAdminAction('disable', u.uid);
-                            } else if (act === 'delete') {
-                              handleAdminAction('delete', u.uid);
-                            }
-                            e.target.value = ''; // reset selection
-                          }}
-                          style={{
-                            padding: '6px 10px',
-                            borderRadius: 6,
-                            border: '1px solid #ccc',
-                            background: '#fff',
-                            fontSize: 12,
-                            fontWeight: '600',
-                            color: '#333',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          <option value="">Tùy chỉnh...</option>
-                          <option value="rename">✍️ Đổi tên</option>
-                          <option value="changeRole">🔑 Đổi chức vụ</option>
-                          <option value="resetPass">🔒 Đặt lại Pass</option>
-                          {u.disabled ? (
-                            <option value="enable">✅ Kích hoạt</option>
-                          ) : (
-                            <option value="disable">🚫 Vô hiệu hóa</option>
-                          )}
-                          <option value="delete">❌ Xóa</option>
-                        </select>
+          {isMobile ? (
+            /* Mobile View: Render each user as a premium flat card to fit perfectly with the page */
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 15 }}>
+              {currentUsers.map(u => (
+                <div 
+                  key={u.uid} 
+                  style={{ 
+                    background: u.disabled ? '#fff0f0' : '#ffffff', 
+                    border: `1px solid ${u.disabled ? '#fecaca' : '#d0e2e0'}`, 
+                    borderRadius: 12, 
+                    padding: 16,
+                    boxShadow: '0 2px 8px rgba(70, 110, 115, 0.05)'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <span style={{ fontWeight: 700, color: colors.primary, fontSize: 16 }}>{u.name}</span>
+                    <span style={{ color: u.disabled ? 'red' : 'green', fontWeight: 600, fontSize: 13 }}>
+                      {u.disabled ? t('manager.status.disabled') : t('manager.status.active')}
+                    </span>
+                  </div>
+                  
+                  <div style={{ fontSize: 13, color: '#5a6f72', marginBottom: 6, wordBreak: 'break-all' }}>
+                    <strong>Email:</strong> {u.email}
+                  </div>
+                  
+                  <div style={{ fontSize: 13, color: '#2b3a3c', marginBottom: 12 }}>
+                    <strong>Chức vụ:</strong> <span style={{ background: colors.primaryLight, color: colors.primaryDark, padding: '2px 8px', borderRadius: 12, fontSize: 12, fontWeight: 600, marginLeft: 6 }}>{u.role}</span>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid #eee', paddingTop: 10 }}>
+                    <select
+                      onChange={(e) => {
+                        const act = e.target.value;
+                        if (!act) return;
+                        if (act === 'rename') {
+                          setRenameModal({ uid: u.uid, currentName: u.name });
+                          setNewName(u.name || '');
+                        } else if (act === 'resetPass') {
+                          setResetPassModal(u.uid);
+                        } else if (act === 'changeRole') {
+                          setRoleModal({ uid: u.uid, currentRoles: u.role });
+                          setSelectedRoles(u.role ? (Array.isArray(u.role) ? u.role : [u.role]) : []);
+                        } else if (act === 'enable') {
+                          handleAdminAction('enable', u.uid);
+                        } else if (act === 'disable') {
+                          handleAdminAction('disable', u.uid);
+                        } else if (act === 'delete') {
+                          handleAdminAction('delete', u.uid);
+                        }
+                        e.target.value = ''; // reset selection
+                      }}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: 8,
+                        border: '1px solid #ccc',
+                        background: '#fff',
+                        fontSize: 13,
+                        fontWeight: '600',
+                        color: '#333',
+                        cursor: 'pointer',
+                        width: '100%',
+                        maxWidth: 160
+                      }}
+                    >
+                      <option value="">Tùy chỉnh...</option>
+                      <option value="rename">✍️ Đổi tên</option>
+                      <option value="changeRole">🔑 Đổi chức vụ</option>
+                      <option value="resetPass">🔒 Đặt lại Pass</option>
+                      {u.disabled ? (
+                        <option value="enable">✅ Kích hoạt</option>
                       ) : (
-                        <>
-                          <button onClick={() => { setRenameModal({ uid: u.uid, currentName: u.name }); setNewName(u.name || ''); }} style={{ ...btnStyle, background: '#10b981' }}>Đổi tên</button>
-                          <button onClick={() => setResetPassModal(u.uid)} style={{ ...btnStyle, background: '#f59e0b' }}>{t('manager.action.resetPass')}</button>
-                          <button onClick={() => { setRoleModal({ uid: u.uid, currentRoles: u.role }); setSelectedRoles(u.role ? (Array.isArray(u.role) ? u.role : [u.role]) : []); }} style={{ ...btnStyle, background: '#3b82f6' }}>{t('manager.action.changeRole')}</button>
-                          
-                          {u.disabled ? (
-                            <button onClick={() => handleAdminAction('enable', u.uid)} style={{ ...btnStyle, background: '#10b981' }}>{t('manager.action.enable')}</button>
-                          ) : (
-                            <button onClick={() => handleAdminAction('disable', u.uid)} style={{ ...btnStyle, background: '#6b7280' }}>{t('manager.action.disable')}</button>
-                          )}
-                          
-                          <button onClick={() => handleAdminAction('delete', u.uid)} style={{ ...btnStyle, background: '#ef4444' }}>{t('manager.action.delete')}</button>
-                        </>
+                        <option value="disable">🚫 Vô hiệu hóa</option>
                       )}
-                    </td>
+                      <option value="delete">❌ Xóa</option>
+                    </select>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            /* Desktop View: Keep elegant structured table */
+            <div style={{ overflowX: 'auto', maxHeight: '60vh' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+                <thead>
+                  <tr>
+                    <th style={thStyle}>{t('manager.table.email')}</th>
+                    <th style={thStyle}>{t('manager.table.name')}</th>
+                    <th style={thStyle}>{t('manager.table.role')}</th>
+                    <th style={thStyle}>{t('manager.table.status')}</th>
+                    <th style={thStyle}>{t('manager.table.action')}</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {currentUsers.map(u => (
+                    <tr key={u.uid} style={{ background: u.disabled ? '#fff0f0' : 'inherit' }}>
+                      <td style={tdStyle}>{u.email}</td>
+                      <td style={tdStyle}>{u.name}</td>
+                      <td style={tdStyle}><strong>{u.role}</strong></td>
+                      <td style={tdStyle}>
+                        <span style={{ color: u.disabled ? 'red' : 'green', fontWeight: 600 }}>
+                          {u.disabled ? t('manager.status.disabled') : t('manager.status.active')}
+                        </span>
+                      </td>
+                      <td style={tdStyle}>
+                        <button onClick={() => { setRenameModal({ uid: u.uid, currentName: u.name }); setNewName(u.name || ''); }} style={{ ...btnStyle, background: '#10b981' }}>Đổi tên</button>
+                        <button onClick={() => setResetPassModal(u.uid)} style={{ ...btnStyle, background: '#f59e0b' }}>{t('manager.action.resetPass')}</button>
+                        <button onClick={() => { setRoleModal({ uid: u.uid, currentRoles: u.role }); setSelectedRoles(u.role ? (Array.isArray(u.role) ? u.role : [u.role]) : []); }} style={{ ...btnStyle, background: '#3b82f6' }}>{t('manager.action.changeRole')}</button>
+                        
+                        {u.disabled ? (
+                          <button onClick={() => handleAdminAction('enable', u.uid)} style={{ ...btnStyle, background: '#10b981' }}>{t('manager.action.enable')}</button>
+                        ) : (
+                          <button onClick={() => handleAdminAction('disable', u.uid)} style={{ ...btnStyle, background: '#6b7280' }}>{t('manager.action.disable')}</button>
+                        )}
+                        
+                        <button onClick={() => handleAdminAction('delete', u.uid)} style={{ ...btnStyle, background: '#ef4444' }}>{t('manager.action.delete')}</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
           {/* Pagination Controls */}
           {totalPages > 1 && (
@@ -383,29 +417,67 @@ export default function UserManager({ user, isMobile }) {
           {requests.length === 0 ? (
             <div style={{ padding: 20, textAlign: 'center', color: '#666' }}>Không có yêu cầu nào.</div>
           ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
-              <thead>
-                <tr>
-                  <th style={thStyle}>Tên (Email)</th>
-                  <th style={thStyle}>Quyền hiện tại</th>
-                  <th style={thStyle}>Quyền muốn đổi</th>
-                  <th style={thStyle}>Thao tác</th>
-                </tr>
-              </thead>
-              <tbody>
+            isMobile ? (
+              /* Mobile View: Render each role request as a flat card to fit perfectly with the page */
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {requests.map(req => (
-                  <tr key={req.id}>
-                    <td style={tdStyle}>{req.name} <br/><span style={{ color: '#666', fontSize: 12 }}>{req.email}</span></td>
-                    <td style={tdStyle}>{req.currentRole}</td>
-                    <td style={tdStyle}><strong style={{ color: colors.primary }}>{req.requestedRole}</strong></td>
-                    <td style={tdStyle}>
-                      <button onClick={() => handleAdminAction('approveRoleRequest', req.uid, { requestId: req.id, newRole: req.requestedRole })} style={{ ...btnStyle, background: '#10b981' }}>{t('manager.action.approve')}</button>
-                      <button onClick={() => handleAdminAction('rejectRoleRequest', req.uid, { requestId: req.id })} style={{ ...btnStyle, background: '#ef4444' }}>{t('manager.action.reject')}</button>
-                    </td>
-                  </tr>
+                  <div 
+                    key={req.id} 
+                    style={{ 
+                      background: '#ffffff', 
+                      border: `1px solid #d0e2e0`, 
+                      borderRadius: 12, 
+                      padding: 16,
+                      boxShadow: '0 2px 8px rgba(70, 110, 115, 0.05)'
+                    }}
+                  >
+                    <div style={{ fontWeight: 700, color: colors.primary, fontSize: 16, marginBottom: 8 }}>{req.name}</div>
+                    
+                    <div style={{ fontSize: 13, color: '#5a6f72', marginBottom: 6, wordBreak: 'break-all' }}>
+                      <strong>Email:</strong> {req.email}
+                    </div>
+                    
+                    <div style={{ fontSize: 13, color: '#2b3a3c', marginBottom: 6 }}>
+                      <strong>Quyền hiện tại:</strong> <span style={{ textDecoration: 'line-through', color: '#888', marginLeft: 6 }}>{req.currentRole}</span>
+                    </div>
+
+                    <div style={{ fontSize: 13, color: '#2b3a3c', marginBottom: 12 }}>
+                      <strong>Quyền muốn đổi:</strong> <span style={{ background: colors.primaryLight, color: colors.primaryDark, padding: '2px 8px', borderRadius: 12, fontSize: 12, fontWeight: 700, marginLeft: 6 }}>{req.requestedRole}</span>
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, borderTop: '1px solid #eee', paddingTop: 10 }}>
+                      <button onClick={() => handleAdminAction('rejectRoleRequest', req.uid, { requestId: req.id })} style={{ ...btnStyle, background: '#ef4444', padding: '6px 14px' }}>{t('manager.action.reject')}</button>
+                      <button onClick={() => handleAdminAction('approveRoleRequest', req.uid, { requestId: req.id, newRole: req.requestedRole })} style={{ ...btnStyle, background: '#10b981', padding: '6px 14px' }}>{t('manager.action.approve')}</button>
+                    </div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
+              </div>
+            ) : (
+              /* Desktop View: Keep elegant structured table */
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+                <thead>
+                  <tr>
+                    <th style={thStyle}>Tên (Email)</th>
+                    <th style={thStyle}>Quyền hiện tại</th>
+                    <th style={thStyle}>Quyền muốn đổi</th>
+                    <th style={thStyle}>Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {requests.map(req => (
+                    <tr key={req.id}>
+                      <td style={tdStyle}>{req.name} <br/><span style={{ color: '#666', fontSize: 12 }}>{req.email}</span></td>
+                      <td style={tdStyle}>{req.currentRole}</td>
+                      <td style={tdStyle}><strong style={{ color: colors.primary }}>{req.requestedRole}</strong></td>
+                      <td style={tdStyle}>
+                        <button onClick={() => handleAdminAction('approveRoleRequest', req.uid, { requestId: req.id, newRole: req.requestedRole })} style={{ ...btnStyle, background: '#10b981' }}>{t('manager.action.approve')}</button>
+                        <button onClick={() => handleAdminAction('rejectRoleRequest', req.uid, { requestId: req.id })} style={{ ...btnStyle, background: '#ef4444' }}>{t('manager.action.reject')}</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )
           )}
         </div>
       )}
