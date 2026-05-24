@@ -305,7 +305,7 @@ export default function App() {
         {/* Footer */}
         <div style={{
           textAlign: "center",
-          color: "#E88E2E",
+          color: colors.primary,
           fontSize: 14,
           fontWeight: 600,
           padding: "16px 0 22px 0",
