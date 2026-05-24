@@ -117,6 +117,25 @@ const safeTsToDate = (ts) => {
     return null;
 };
 
+const parseDateStr = (s) => {
+  if (!s) return null;
+  const parts = s.split('-');
+  if (parts.length === 3) {
+    const [y, m, d] = parts.map(Number);
+    return new Date(y, m - 1, d);
+  }
+  const dateObj = new Date(s);
+  return isNaN(dateObj.getTime()) ? null : dateObj;
+};
+
+const formatDateStr = (d) => {
+  if (!d) return "";
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+
 /* =========================
    ExportModal
    ========================= */
@@ -175,18 +194,61 @@ function ExportModal({ onClose, departments }) {
         }
       }
 
+      // Calculate Progress Status and Comment dynamically
+      let progressStatus = "Chưa thực hiện";
+      let ehsComment = "";
+
+      const hasImprovementInfo = r.responsiblePerson || r.dueDate || r.progressNotes || r.completionDate || r.afterUrl;
+
+      if (r.completionDate) {
+        progressStatus = "Đã hoàn thành";
+        const compDate = parseDateStr(r.completionDate);
+        const limitDate = r.dueDate ? parseDateStr(r.dueDate) : null;
+        if (compDate && limitDate && compDate > limitDate) {
+          ehsComment = `Hoàn thành trễ hạn (Hạn: ${r.dueDate.split('-').reverse().join('/')}, Hoàn thành: ${r.completionDate.split('-').reverse().join('/')})`;
+        } else {
+          ehsComment = "Hoàn thành đúng hạn";
+        }
+      } else if (hasImprovementInfo) {
+        if (r.dueDate) {
+          const limitDate = parseDateStr(r.dueDate);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          if (limitDate) {
+            limitDate.setHours(0, 0, 0, 0);
+            if (today > limitDate) {
+              progressStatus = "Quá hạn";
+              const diffTime = Math.abs(today - limitDate);
+              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+              ehsComment = `Quá hạn từ ngày ${r.dueDate.split('-').reverse().join('/')} (Quá hạn ${diffDays} ngày)`;
+            } else {
+              progressStatus = "Đang tiến hành";
+            }
+          } else {
+            progressStatus = "Đang tiến hành";
+          }
+        } else {
+          progressStatus = "Đang tiến hành";
+        }
+      }
+
+      if (r.dueDateHistory && r.dueDateHistory.length > 0) {
+        const historyText = r.dueDateHistory.join('\n');
+        ehsComment = ehsComment ? `${ehsComment}\n${historyText}` : historyText;
+      }
+
       ws.getCell(rowIndex, 1).value = i + 1; // No.
       ws.getCell(rowIndex, 2).value = findings; // Findings
       ws.getCell(rowIndex, 3).value = r.dateISO; // Audit date
       ws.getCell(rowIndex, 4).value = r.addedBy || ""; // Auditor
       ws.getCell(rowIndex, 5).value = r.department || ""; // Responsible Department
-      ws.getCell(rowIndex, 6).value = ""; // Information Recipient (blank)
+      ws.getCell(rowIndex, 6).value = r.responsiblePerson || ""; // Information Recipient (Người nhận thông tin)
       ws.getCell(rowIndex, 7).value = r.progressNotes || ""; // Corrective Action
       ws.getCell(rowIndex, 8).value = r.responsiblePerson || ""; // PIC
-      ws.getCell(rowIndex, 9).value = r.completionDate ? "Hoàn thành" : "Đang thực hiện"; // Progress Status
+      ws.getCell(rowIndex, 9).value = progressStatus; // Progress Status
       ws.getCell(rowIndex, 10).value = r.dueDate || ""; // Estimated Completion Date
       ws.getCell(rowIndex, 13).value = ""; // EHS Assessment (blank)
-      ws.getCell(rowIndex, 14).value = ""; // Comment (blank)
+      ws.getCell(rowIndex, 14).value = ehsComment; // Comment (blank)
 
       let imageAdded = false;
       const processImage = async (url, col) => {
@@ -380,28 +442,55 @@ function ExportModal({ onClose, departments }) {
         alert(`Không có dữ liệu trong khoảng thời gian / bộ phận đã chọn.`);
         setIsGenerating(false); return;
       }
+
+      // Fetch all scores from gemba_scores for backwards compatibility to merge updated improvement fields
+      const gembaScoresCollectionRef = collection(db, "gemba_scores");
+      const scoresSnapshot = await getDocs(gembaScoresCollectionRef);
+      const allScoresMap = new Map();
+      scoresSnapshot.forEach(docSnap => {
+        allScoresMap.set(docSnap.id, docSnap.data().scores || []);
+      });
+
       const rows = [];
       eventsSnapshot.forEach((docSnap) => {
         const ev = docSnap.data();
         const ts = safeTsToDate(ev.timestamp);
         const dateISO = ts ? ts.toISOString().slice(0, 10) : "";
+
+        // Merge latest data from gemba_scores array
+        const deptScores = allScoresMap.get(ev.department) || [];
+        const matchedScore = deptScores.find(s => {
+          if (s.code !== ev.error?.code) return false;
+          const sTime = s.timestamp ? safeTsToDate(s.timestamp) : null;
+          const evTime = ev.timestamp ? safeTsToDate(ev.timestamp) : null;
+          if (sTime && evTime) {
+            return Math.abs(sTime.getTime() - evTime.getTime()) < 600000;
+          }
+          return s.note === ev.error?.note;
+        });
+
+        const errorData = matchedScore ? { ...ev.error, ...matchedScore } : ev.error;
+
         rows.push({
-          dateISO, department: ev.department || "", ...ev.error,
-          basePoint: Number.isFinite(ev.error?.point) ? ev.error.point : 0,
-          heSo: ev.heSo, adjusted: Number(((ev.error.point + ev.heSo) / 2).toFixed(2)),
+          dateISO, department: ev.department || "", ...errorData,
+          basePoint: Number.isFinite(errorData?.point) ? errorData.point : 0,
+          heSo: ev.heSo, adjusted: Number(((errorData.point + ev.heSo) / 2).toFixed(2)),
           addedBy: ev.addedBy || "", 
-          beforeUrl: ev.error.imageUrl || "", 
-          imageUrls: ev.error.imageUrls || [],
-          afterUrl: ev.error.improvementImageUrl || "",
+          beforeUrl: errorData.imageUrl || "", 
+          imageUrls: errorData.imageUrls || [],
+          afterUrl: errorData.improvementImageUrl || "",
         });
       });
 
       if (mode === "cap") {
+        // Sắp xếp các hạng mục từ trên xuống dưới theo bộ phận
+        rows.sort((a, b) => {
+          const deptA = (a.department || "").toLowerCase();
+          const deptB = (b.department || "").toLowerCase();
+          return deptA.localeCompare(deptB, 'vi');
+        });
         await exportCAP(rows, label, selectedDept);
       } else {
-        // Lấy thông tin số người (hệ số) của từng bộ phận từ gemba_scores
-        const gembaScoresCollectionRef = collection(db, "gemba_scores");
-        const scoresSnapshot = await getDocs(gembaScoresCollectionRef);
         const allDeptData = new Map();
         scoresSnapshot.forEach(doc => { allDeptData.set(doc.id, doc.data()); });
         // Dùng trực tiếp rows từ gemba_events (không filter theo timestamp vì server/client timestamp khác nhau)
@@ -463,25 +552,6 @@ function ImprovementModal({ modalData, onClose, onSave }) {
   const [completionDate, setCompletionDate] = useState(modalData.error?.completionDate || "");
   const [improvementImageFile, setImprovementImageFile] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
-
-  const parseDateStr = (s) => {
-    if (!s) return null;
-    const parts = s.split('-');
-    if (parts.length === 3) {
-      const [y, m, d] = parts.map(Number);
-      return new Date(y, m - 1, d);
-    }
-    const dateObj = new Date(s);
-    return isNaN(dateObj.getTime()) ? null : dateObj;
-  };
-
-  const formatDateStr = (d) => {
-    if (!d) return "";
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
-  };
 
   const handleImageChange = async (e) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -862,8 +932,23 @@ function GembaCheckList({ user, isMobile, newErrorCounts, setGembaNotifCounts })
     const errorToUpdate = scoreList[indexInFilteredList];
     const originalIndex = allScores.findIndex(s => s.timestamp === errorToUpdate.timestamp);
     if (originalIndex === -1) return;
+
+    // Track due date changes history
+    const oldDueDate = errorToUpdate.dueDate || "";
+    let newDueDateHistory = errorToUpdate.dueDateHistory || [];
+    if (improvementData.dueDate && oldDueDate && improvementData.dueDate !== oldDueDate) {
+      const todayStr = new Date().toLocaleDateString("vi-VN");
+      const changeMsg = `Gia hạn lần ${newDueDateHistory.length + 1}: ${oldDueDate.split('-').reverse().join('/')} -> ${improvementData.dueDate.split('-').reverse().join('/')} vào ngày ${todayStr}`;
+      newDueDateHistory.push(changeMsg);
+    }
+
     const newAllScores = [...allScores];
-    newAllScores[originalIndex] = { ...allScores[originalIndex], ...improvementData };
+    newAllScores[originalIndex] = { 
+      ...allScores[originalIndex], 
+      ...improvementData,
+      dueDateHistory: newDueDateHistory
+    };
+
     const docRef = doc(db, "gemba_scores", dep.name);
     await setDoc(docRef, { scores: newAllScores }, { merge: true });
 
@@ -886,7 +971,8 @@ function GembaCheckList({ user, isMobile, newErrorCounts, setGembaNotifCounts })
           if (timeMatches) {
             const updatedError = {
               ...data.error,
-              ...improvementData
+              ...improvementData,
+              dueDateHistory: newDueDateHistory
             };
             await updateDoc(doc(db, "gemba_events", d.id), { error: updatedError });
           }

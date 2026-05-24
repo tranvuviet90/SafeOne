@@ -106,6 +106,25 @@ const safeTsToDate = (ts) => {
     return null;
 };
 
+const parseDateStr = (s) => {
+  if (!s) return null;
+  const parts = s.split('-');
+  if (parts.length === 3) {
+    const [y, m, d] = parts.map(Number);
+    return new Date(y, m - 1, d);
+  }
+  const dateObj = new Date(s);
+  return isNaN(dateObj.getTime()) ? null : dateObj;
+};
+
+const formatDateStr = (d) => {
+  if (!d) return "";
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+
 /* =========================
    ExportModal
    ========================= */
@@ -150,6 +169,13 @@ function ExportModal({ onClose, departments }) {
             beforeUrl: data.imageUrl,
             afterUrl: data.improvementImageUrl,
           }
+      });
+
+      // Sắp xếp các hạng mục từ trên xuống dưới theo bộ phận
+      rows.sort((a, b) => {
+        const deptA = (a.department || "").toLowerCase();
+        const deptB = (b.department || "").toLowerCase();
+        return deptA.localeCompare(deptB, 'vi');
       });
 
       const label = `${startDate.toISOString().slice(0, 10)}_to_${endDate.toISOString().slice(0, 10)}`;
@@ -202,18 +228,61 @@ function ExportModal({ onClose, departments }) {
         }
       }
 
+      // Calculate Progress Status and Comment dynamically
+      let progressStatus = "Chưa thực hiện";
+      let ehsComment = "";
+
+      const hasImprovementInfo = r.responsiblePerson || r.dueDate || r.progressNotes || r.completionDate || r.afterUrl;
+
+      if (r.completionDate) {
+        progressStatus = "Đã hoàn thành";
+        const compDate = parseDateStr(r.completionDate);
+        const limitDate = r.dueDate ? parseDateStr(r.dueDate) : null;
+        if (compDate && limitDate && compDate > limitDate) {
+          ehsComment = `Hoàn thành trễ hạn (Hạn: ${r.dueDate.split('-').reverse().join('/')}, Hoàn thành: ${r.completionDate.split('-').reverse().join('/')})`;
+        } else {
+          ehsComment = "Hoàn thành đúng hạn";
+        }
+      } else if (hasImprovementInfo) {
+        if (r.dueDate) {
+          const limitDate = parseDateStr(r.dueDate);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          if (limitDate) {
+            limitDate.setHours(0, 0, 0, 0);
+            if (today > limitDate) {
+              progressStatus = "Quá hạn";
+              const diffTime = Math.abs(today - limitDate);
+              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+              ehsComment = `Quá hạn từ ngày ${r.dueDate.split('-').reverse().join('/')} (Quá hạn ${diffDays} ngày)`;
+            } else {
+              progressStatus = "Đang tiến hành";
+            }
+          } else {
+            progressStatus = "Đang tiến hành";
+          }
+        } else {
+          progressStatus = "Đang tiến hành";
+        }
+      }
+
+      if (r.dueDateHistory && r.dueDateHistory.length > 0) {
+        const historyText = r.dueDateHistory.join('\n');
+        ehsComment = ehsComment ? `${ehsComment}\n${historyText}` : historyText;
+      }
+
       ws.getCell(rowIndex, 1).value = i + 1; // No.
       ws.getCell(rowIndex, 2).value = findings; // Findings
       ws.getCell(rowIndex, 3).value = r.dateISO; // Audit date
       ws.getCell(rowIndex, 4).value = r.addedBy || ""; // Auditor
       ws.getCell(rowIndex, 5).value = r.department || ""; // Responsible Department
-      ws.getCell(rowIndex, 6).value = ""; // Information Recipient (blank)
+      ws.getCell(rowIndex, 6).value = r.responsiblePerson || ""; // Information Recipient (Người nhận thông tin)
       ws.getCell(rowIndex, 7).value = r.progressNotes || ""; // Corrective Action
       ws.getCell(rowIndex, 8).value = r.responsiblePerson || ""; // PIC
-      ws.getCell(rowIndex, 9).value = r.completionDate ? "Hoàn thành" : "Đang thực hiện"; // Progress Status
+      ws.getCell(rowIndex, 9).value = progressStatus; // Progress Status
       ws.getCell(rowIndex, 10).value = r.dueDate || ""; // Estimated Completion Date
       ws.getCell(rowIndex, 13).value = ""; // EHS Assessment (blank)
-      ws.getCell(rowIndex, 14).value = ""; // Comment (blank)
+      ws.getCell(rowIndex, 14).value = ehsComment; // Comment (blank)
 
       let imageAdded = false;
       const processImage = async (url, col) => {
@@ -312,25 +381,6 @@ function ImprovementModal({ modalData, onClose, onSave }) {
   const [completionDate, setCompletionDate] = useState(modalData.log?.completionDate || "");
   const [improvementImageFile, setImprovementImageFile] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
-
-  const parseDateStr = (s) => {
-    if (!s) return null;
-    const parts = s.split('-');
-    if (parts.length === 3) {
-      const [y, m, d] = parts.map(Number);
-      return new Date(y, m - 1, d);
-    }
-    const dateObj = new Date(s);
-    return isNaN(dateObj.getTime()) ? null : dateObj;
-  };
-
-  const formatDateStr = (d) => {
-    if (!d) return "";
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
-  };
 
   const handleImageChange = async (e) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -634,7 +684,22 @@ function TuGemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
   
   const handleSaveImprovement = async (logId, improvementData) => {
     const logRef = doc(db, "tu_gemba_logs", logId);
-    await updateDoc(logRef, improvementData);
+    const logSnap = await getDoc(logRef);
+    let newDueDateHistory = [];
+    if (logSnap.exists()) {
+      const data = logSnap.data();
+      const oldDueDate = data.dueDate || "";
+      newDueDateHistory = data.dueDateHistory || [];
+      if (improvementData.dueDate && oldDueDate && improvementData.dueDate !== oldDueDate) {
+        const todayStr = new Date().toLocaleDateString("vi-VN");
+        const changeMsg = `Gia hạn lần ${newDueDateHistory.length + 1}: ${oldDueDate.split('-').reverse().join('/')} -> ${improvementData.dueDate.split('-').reverse().join('/')} vào ngày ${todayStr}`;
+        newDueDateHistory.push(changeMsg);
+      }
+    }
+    await updateDoc(logRef, {
+      ...improvementData,
+      dueDateHistory: newDueDateHistory
+    });
   };
   
   const handleSelectDepartment = (index) => {
