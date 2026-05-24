@@ -1,7 +1,7 @@
 // eslint.config.cjs — ESLint v9 Flat Config cho CommonJS Cloud Functions
-const js = require("@eslint/js"); [cite: 2]
+const js = require("@eslint/js");
 
-/** @type {import("eslint").Linter.FlatConfig[]} */ [cite: 3]
+/** @type {import("eslint").Linter.FlatConfig[]} */
 module.exports = [
   js.configs.recommended,
   {
