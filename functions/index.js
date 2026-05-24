@@ -274,6 +274,11 @@ exports.adminUserAction = onCall(
           await admin.auth().deleteUser(targetUid);
           await db.collection("users").doc(targetUid).delete();
           break;
+        case "changeName":
+          if (!data || !data.newName) throw new HttpsError("invalid-argument", "Thiếu tên mới.");
+          await db.collection("users").doc(targetUid).update({ name: data.newName });
+          await admin.auth().updateUser(targetUid, { displayName: data.newName });
+          break;
         case "approveRoleRequest":
           if (!data || !data.requestId || !data.newRole) throw new HttpsError("invalid-argument", "Thiếu thông tin yêu cầu.");
           await db.collection("users").doc(targetUid).update({ role: data.newRole });

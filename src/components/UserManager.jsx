@@ -4,6 +4,7 @@ import { db, functions } from '../firebase';
 import { collection, query, where, getDocs, orderBy, doc, getDoc, setDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { useToast } from './LightboxSwipeOnly';
+import { colors } from '../theme';
 
 const ALL_ROLES = [
   "admin", "ehs", "ehs committee", "manager", "Nhà Ăn",
@@ -35,6 +36,11 @@ export default function UserManager({ user, isMobile }) {
   const [selectedRoles, setSelectedRoles] = useState([]);
   const [createAccountModal, setCreateAccountModal] = useState(false);
   const [newAccountData, setNewAccountData] = useState({ name: '', email: '', password: '', role: 'Nhà Ăn', customRole: '' });
+  
+  // New States for Rename & Search
+  const [renameModal, setRenameModal] = useState(null); // { uid, currentName }
+  const [newName, setNewName] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Tab API Key Config
   const [aiProvider, setAiProvider] = useState('google');
@@ -161,9 +167,10 @@ export default function UserManager({ user, isMobile }) {
       pushToast('Thành công!', 'success');
       
       // Refresh data
-      if (['createUser', 'resetPassword', 'changeRole', 'disable', 'enable', 'delete'].includes(action)) {
+      if (['createUser', 'resetPassword', 'changeRole', 'changeName', 'disable', 'enable', 'delete'].includes(action)) {
         setResetPassModal(null);
         setRoleModal(null);
+        setRenameModal(null);
         fetchUsers();
       } else {
         fetchRequests();
@@ -174,37 +181,55 @@ export default function UserManager({ user, isMobile }) {
     }
   };
 
-  // Pagination logic
-  const totalPages = Math.ceil(users.length / pageSize);
-  const currentUsers = users.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  // Search & Pagination logic
+  const filteredUsers = users.filter(u => {
+    const term = searchTerm.toLowerCase().trim();
+    if (!term) return true;
+    return (
+      (u.name || '').toLowerCase().includes(term) ||
+      (u.email || '').toLowerCase().includes(term) ||
+      (u.role || '').toLowerCase().includes(term)
+    );
+  });
+
+  const totalPages = Math.ceil(filteredUsers.length / pageSize);
+  const currentUsers = filteredUsers.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const tdStyle = { padding: '10px 12px', borderBottom: '1px solid #eee' };
   const thStyle = { padding: '10px 12px', textAlign: 'left', borderBottom: '2px solid #ccc', background: '#f9f9f9', position: 'sticky', top: 0 };
   const btnStyle = { padding: '4px 8px', margin: '2px', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12, fontWeight: 600, color: 'white' };
 
   return (
-    <div style={{ padding: isMobile ? 10 : 20, maxWidth: 1000, margin: '0 auto', background: 'white', borderRadius: 12, boxShadow: '0 2px 10px rgba(0,0,0,0.05)', marginTop: 20 }}>
-      <h2 style={{ color: '#222', marginTop: 0, borderBottom: '2px solid #E88E2E', paddingBottom: 10 }}>{t('manager.title')}</h2>
+    <div style={{ 
+      padding: isMobile ? 0 : 20, 
+      maxWidth: 1000, 
+      margin: '0 auto', 
+      background: isMobile ? 'transparent' : 'white', 
+      borderRadius: isMobile ? 0 : 12, 
+      boxShadow: isMobile ? 'none' : '0 2px 10px rgba(0,0,0,0.05)', 
+      marginTop: isMobile ? 0 : 20 
+    }}>
+      <h2 style={{ color: colors.primary, marginTop: 0, borderBottom: `2px solid ${colors.primaryLight || '#E88E2E'}`, paddingBottom: 10 }}>{t('manager.title')}</h2>
       
       {/* Tabs Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 10 }}>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <button 
             onClick={() => setActiveTab('users')}
-            style={{ padding: '8px 16px', background: activeTab === 'users' ? '#E88E2E' : '#f0f0f0', color: activeTab === 'users' ? 'white' : '#333', border: 'none', borderRadius: 20, cursor: 'pointer', fontWeight: 600 }}
+            style={{ padding: '8px 16px', background: activeTab === 'users' ? colors.primary : '#f0f0f0', color: activeTab === 'users' ? 'white' : '#333', border: 'none', borderRadius: 20, cursor: 'pointer', fontWeight: 600 }}
           >
             {t('manager.tab.users')}
           </button>
           <button 
             onClick={() => setActiveTab('requests')}
-            style={{ padding: '8px 16px', background: activeTab === 'requests' ? '#E88E2E' : '#f0f0f0', color: activeTab === 'requests' ? 'white' : '#333', border: 'none', borderRadius: 20, cursor: 'pointer', fontWeight: 600 }}
+            style={{ padding: '8px 16px', background: activeTab === 'requests' ? colors.primary : '#f0f0f0', color: activeTab === 'requests' ? 'white' : '#333', border: 'none', borderRadius: 20, cursor: 'pointer', fontWeight: 600 }}
           >
             {t('manager.tab.requests')}
             {requests.length > 0 && <span style={{ background: 'red', color: 'white', borderRadius: 10, padding: '2px 6px', fontSize: 12, marginLeft: 6 }}>{requests.length}</span>}
           </button>
           <button 
             onClick={() => setActiveTab('apikey')}
-            style={{ padding: '8px 16px', background: activeTab === 'apikey' ? '#E88E2E' : '#f0f0f0', color: activeTab === 'apikey' ? 'white' : '#333', border: 'none', borderRadius: 20, cursor: 'pointer', fontWeight: 600 }}
+            style={{ padding: '8px 16px', background: activeTab === 'apikey' ? colors.primary : '#f0f0f0', color: activeTab === 'apikey' ? 'white' : '#333', border: 'none', borderRadius: 20, cursor: 'pointer', fontWeight: 600 }}
           >
             🔑 API Key
           </button>
@@ -224,16 +249,32 @@ export default function UserManager({ user, isMobile }) {
       {/* Tab: USERS */}
       {!loading && activeTab === 'users' && (
         <>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-            <div>
-              Hiển thị: 
-              <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setCurrentPage(1); }} style={{ marginLeft: 8, padding: 4 }}>
-                <option value={10}>10</option>
-                <option value={50}>50</option>
-                <option value={100}>100</option>
-              </select>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <div>
+                Hiển thị: 
+                <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setCurrentPage(1); }} style={{ marginLeft: 8, padding: '6px 10px', borderRadius: 6, border: '1px solid #ddd', background: 'white' }}>
+                  <option value={10}>10</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+              </div>
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                placeholder="🔍 Tìm kiếm tên, email, chức vụ..."
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: 20,
+                  border: '1px solid #ccc',
+                  fontSize: 14,
+                  minWidth: isMobile ? '100%' : 220,
+                  boxSizing: 'border-box'
+                }}
+              />
             </div>
-            <div style={{ fontSize: 14, color: '#666' }}>Tổng: {users.length} users</div>
+            <div style={{ fontSize: 14, color: '#666', fontWeight: 600 }}>Tổng: {filteredUsers.length} / {users.length} users</div>
           </div>
 
           <div style={{ overflowX: 'auto', maxHeight: '60vh' }}>
@@ -259,16 +300,65 @@ export default function UserManager({ user, isMobile }) {
                       </span>
                     </td>
                     <td style={tdStyle}>
-                      <button onClick={() => setResetPassModal(u.uid)} style={{ ...btnStyle, background: '#f59e0b' }}>{t('manager.action.resetPass')}</button>
-                      <button onClick={() => { setRoleModal({ uid: u.uid, currentRoles: u.role }); setSelectedRoles(u.role ? (Array.isArray(u.role) ? u.role : [u.role]) : []); }} style={{ ...btnStyle, background: '#3b82f6' }}>{t('manager.action.changeRole')}</button>
-                      
-                      {u.disabled ? (
-                        <button onClick={() => handleAdminAction('enable', u.uid)} style={{ ...btnStyle, background: '#10b981' }}>{t('manager.action.enable')}</button>
+                      {isMobile ? (
+                        <select
+                          onChange={(e) => {
+                            const act = e.target.value;
+                            if (!act) return;
+                            if (act === 'rename') {
+                              setRenameModal({ uid: u.uid, currentName: u.name });
+                              setNewName(u.name || '');
+                            } else if (act === 'resetPass') {
+                              setResetPassModal(u.uid);
+                            } else if (act === 'changeRole') {
+                              setRoleModal({ uid: u.uid, currentRoles: u.role });
+                              setSelectedRoles(u.role ? (Array.isArray(u.role) ? u.role : [u.role]) : []);
+                            } else if (act === 'enable') {
+                              handleAdminAction('enable', u.uid);
+                            } else if (act === 'disable') {
+                              handleAdminAction('disable', u.uid);
+                            } else if (act === 'delete') {
+                              handleAdminAction('delete', u.uid);
+                            }
+                            e.target.value = ''; // reset selection
+                          }}
+                          style={{
+                            padding: '6px 10px',
+                            borderRadius: 6,
+                            border: '1px solid #ccc',
+                            background: '#fff',
+                            fontSize: 12,
+                            fontWeight: '600',
+                            color: '#333',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <option value="">Tùy chỉnh...</option>
+                          <option value="rename">✍️ Đổi tên</option>
+                          <option value="changeRole">🔑 Đổi chức vụ</option>
+                          <option value="resetPass">🔒 Đặt lại Pass</option>
+                          {u.disabled ? (
+                            <option value="enable">✅ Kích hoạt</option>
+                          ) : (
+                            <option value="disable">🚫 Vô hiệu hóa</option>
+                          )}
+                          <option value="delete">❌ Xóa</option>
+                        </select>
                       ) : (
-                        <button onClick={() => handleAdminAction('disable', u.uid)} style={{ ...btnStyle, background: '#6b7280' }}>{t('manager.action.disable')}</button>
+                        <>
+                          <button onClick={() => { setRenameModal({ uid: u.uid, currentName: u.name }); setNewName(u.name || ''); }} style={{ ...btnStyle, background: '#10b981' }}>Đổi tên</button>
+                          <button onClick={() => setResetPassModal(u.uid)} style={{ ...btnStyle, background: '#f59e0b' }}>{t('manager.action.resetPass')}</button>
+                          <button onClick={() => { setRoleModal({ uid: u.uid, currentRoles: u.role }); setSelectedRoles(u.role ? (Array.isArray(u.role) ? u.role : [u.role]) : []); }} style={{ ...btnStyle, background: '#3b82f6' }}>{t('manager.action.changeRole')}</button>
+                          
+                          {u.disabled ? (
+                            <button onClick={() => handleAdminAction('enable', u.uid)} style={{ ...btnStyle, background: '#10b981' }}>{t('manager.action.enable')}</button>
+                          ) : (
+                            <button onClick={() => handleAdminAction('disable', u.uid)} style={{ ...btnStyle, background: '#6b7280' }}>{t('manager.action.disable')}</button>
+                          )}
+                          
+                          <button onClick={() => handleAdminAction('delete', u.uid)} style={{ ...btnStyle, background: '#ef4444' }}>{t('manager.action.delete')}</button>
+                        </>
                       )}
-                      
-                      <button onClick={() => handleAdminAction('delete', u.uid)} style={{ ...btnStyle, background: '#ef4444' }}>{t('manager.action.delete')}</button>
                     </td>
                   </tr>
                 ))}
@@ -307,7 +397,7 @@ export default function UserManager({ user, isMobile }) {
                   <tr key={req.id}>
                     <td style={tdStyle}>{req.name} <br/><span style={{ color: '#666', fontSize: 12 }}>{req.email}</span></td>
                     <td style={tdStyle}>{req.currentRole}</td>
-                    <td style={tdStyle}><strong style={{ color: '#E88E2E' }}>{req.requestedRole}</strong></td>
+                    <td style={tdStyle}><strong style={{ color: colors.primary }}>{req.requestedRole}</strong></td>
                     <td style={tdStyle}>
                       <button onClick={() => handleAdminAction('approveRoleRequest', req.uid, { requestId: req.id, newRole: req.requestedRole })} style={{ ...btnStyle, background: '#10b981' }}>{t('manager.action.approve')}</button>
                       <button onClick={() => handleAdminAction('rejectRoleRequest', req.uid, { requestId: req.id })} style={{ ...btnStyle, background: '#ef4444' }}>{t('manager.action.reject')}</button>
@@ -323,7 +413,7 @@ export default function UserManager({ user, isMobile }) {
       {/* Tab: API KEY */}
       {!loading && activeTab === 'apikey' && (
         <form onSubmit={handleSaveAIConfig} style={{ background: '#fafafa', border: '1px solid #e0e0e0', borderRadius: 12, padding: 24, marginTop: 10 }}>
-          <h3 style={{ marginTop: 0, color: '#E88E2E', borderBottom: '1px solid #eee', paddingBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <h3 style={{ marginTop: 0, color: colors.primary, borderBottom: '1px solid #eee', paddingBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
             🔑 Cấu hình Dịch vụ AI (Spellcheck)
           </h3>
           
@@ -426,7 +516,7 @@ export default function UserManager({ user, isMobile }) {
             <button 
               type="submit" 
               disabled={isSavingKey} 
-              style={{ padding: '10px 24px', borderRadius: 8, border: 'none', background: '#E88E2E', color: 'white', fontWeight: 'bold', cursor: 'pointer', opacity: isSavingKey ? 0.6 : 1 }}
+              style={{ padding: '10px 24px', borderRadius: 8, border: 'none', background: colors.primary, color: 'white', fontWeight: 'bold', cursor: 'pointer', opacity: isSavingKey ? 0.6 : 1 }}
             >
               {isSavingKey ? 'Đang lưu...' : 'Lưu cấu hình'}
             </button>
@@ -478,9 +568,34 @@ export default function UserManager({ user, isMobile }) {
                   setNewAccountData({ name: '', email: '', password: '', role: 'Nhà Ăn', customRole: '' });
                 }} 
                 disabled={!newAccountData.email || newAccountData.password.length < 6 || (newAccountData.role === 'Khác (Tạo mới)' && !newAccountData.customRole)} 
-                style={{ padding: '8px 16px', border: 'none', borderRadius: 6, background: '#E88E2E', color: 'white', fontWeight: 'bold', cursor: 'pointer' }}
+                style={{ padding: '8px 16px', border: 'none', borderRadius: 6, background: colors.primary, color: 'white', fontWeight: 'bold', cursor: 'pointer' }}
               >
                 Tạo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {renameModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+          <div style={{ background: 'white', padding: 24, borderRadius: 12, width: '90%', maxWidth: 400 }}>
+            <h3 style={{ marginTop: 0 }}>Đổi tên người dùng</h3>
+            <p style={{ fontSize: 14, color: '#666', marginBottom: 12 }}>Nhập tên mới cho tài khoản email <strong>{users.find(u => u.uid === renameModal.uid)?.email}</strong>:</p>
+            <input 
+              type="text" 
+              value={newName} 
+              onChange={e => setNewName(e.target.value)} 
+              style={{ width: '100%', padding: 10, borderRadius: 6, border: '1px solid #ccc', marginBottom: 20, boxSizing: 'border-box' }} 
+              placeholder="Tên mới..."
+            />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <button onClick={() => setRenameModal(null)} style={{ padding: '8px 16px', border: 'none', borderRadius: 6, background: '#e0e0e0', cursor: 'pointer' }}>Hủy</button>
+              <button 
+                onClick={() => handleAdminAction('changeName', renameModal.uid, { newName })} 
+                disabled={!newName.trim() || newName === renameModal.currentName} 
+                style={{ padding: '8px 16px', border: 'none', borderRadius: 6, background: colors.primary, color: 'white', fontWeight: 'bold', cursor: 'pointer', opacity: (!newName.trim() || newName === renameModal.currentName) ? 0.5 : 1 }}
+              >
+                Lưu
               </button>
             </div>
           </div>
@@ -494,7 +609,7 @@ export default function UserManager({ user, isMobile }) {
             <input type="text" value={newPassword} onChange={e => setNewPassword(e.target.value)} style={{ width: '100%', padding: 10, borderRadius: 6, border: '1px solid #ccc', marginBottom: 20, boxSizing: 'border-box' }} />
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
               <button onClick={() => setResetPassModal(null)} style={{ padding: '8px 16px', border: 'none', borderRadius: 6, cursor: 'pointer' }}>Hủy</button>
-              <button onClick={() => handleAdminAction('resetPassword', resetPassModal, { newPassword })} disabled={newPassword.length < 6} style={{ padding: '8px 16px', border: 'none', borderRadius: 6, background: '#E88E2E', color: 'white', fontWeight: 'bold', cursor: 'pointer' }}>Lưu</button>
+              <button onClick={() => handleAdminAction('resetPassword', resetPassModal, { newPassword })} disabled={newPassword.length < 6} style={{ padding: '8px 16px', border: 'none', borderRadius: 6, background: colors.primary, color: 'white', fontWeight: 'bold', cursor: 'pointer' }}>Lưu</button>
             </div>
           </div>
         </div>
@@ -515,14 +630,14 @@ export default function UserManager({ user, isMobile }) {
                       if (e.target.checked) setSelectedRoles(prev => [...prev, r]);
                       else setSelectedRoles(prev => prev.filter(x => x !== r));
                     }}
-                    style={{ width: 16, height: 16, accentColor: '#E88E2E', cursor: 'pointer' }}
+                    style={{ width: 16, height: 16, accentColor: colors.primary, cursor: 'pointer' }}
                   />
-                  <span style={{ fontSize: 14, color: selectedRoles.includes(r) ? '#E88E2E' : '#333', fontWeight: selectedRoles.includes(r) ? 700 : 400 }}>{r}</span>
+                  <span style={{ fontSize: 14, color: selectedRoles.includes(r) ? colors.primary : '#333', fontWeight: selectedRoles.includes(r) ? 700 : 400 }}>{r}</span>
                 </label>
               ))}
             </div>
             {selectedRoles.length > 0 && (
-              <p style={{ fontSize: 13, color: '#E88E2E', fontWeight: 600, marginTop: 10, marginBottom: 0 }}>
+              <p style={{ fontSize: 13, color: colors.primary, fontWeight: 600, marginTop: 10, marginBottom: 0 }}>
                 Đã chọn ({selectedRoles.length}): {selectedRoles.join(', ')}
               </p>
             )}
@@ -531,7 +646,7 @@ export default function UserManager({ user, isMobile }) {
               <button
                 onClick={() => handleAdminAction('changeRole', roleModal.uid, { newRole: selectedRoles.length === 1 ? selectedRoles[0] : selectedRoles.join(', ') })}
                 disabled={selectedRoles.length === 0}
-                style={{ padding: '8px 16px', border: 'none', borderRadius: 6, background: '#E88E2E', color: 'white', fontWeight: 'bold', cursor: 'pointer', opacity: selectedRoles.length === 0 ? 0.5 : 1 }}
+                style={{ padding: '8px 16px', border: 'none', borderRadius: 6, background: colors.primary, color: 'white', fontWeight: 'bold', cursor: 'pointer', opacity: selectedRoles.length === 0 ? 0.5 : 1 }}
               >
                 Lưu
               </button>

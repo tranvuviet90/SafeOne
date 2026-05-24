@@ -264,7 +264,7 @@ export const DICTS = {
     "settings.requestRole.pending": "Yêu cầu của bạn đang chờ Admin duyệt.",
 
     // UserManager
-    "manager.title": "Quản lý Người Dùng",
+    "manager.title": "Admin",
     "manager.tab.users": "Danh sách User",
     "manager.tab.requests": "Yêu cầu chức vụ",
     "manager.table.email": "Email",
@@ -549,7 +549,7 @@ export const DICTS = {
     "settings.requestRole.pending": "Your request is pending Admin approval.",
 
     // UserManager
-    "manager.title": "User Management",
+    "manager.title": "Admin",
     "manager.tab.users": "User List",
     "manager.tab.requests": "Role Requests",
     "manager.table.email": "Email",

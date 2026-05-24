@@ -513,7 +513,7 @@ function DeptDetailModal({ department, reportData, onClose }) {
 }
 
 /* --- AdminView: Giao diện Admin --- */
-function AdminView({ user, reportData, selectedDateKey, onDeptClick, onOpenExport }) {
+function AdminView({ user, reportData, selectedDateKey, onDeptClick, onOpenExport, isMobile }) {
   const { pushToast } = useToast();
   const [adjustedTotals, setAdjustedTotals] = useState({});
 
@@ -813,7 +813,7 @@ function AdminView({ user, reportData, selectedDateKey, onDeptClick, onOpenExpor
             </h3>
 
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 400 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: isMobile ? '100%' : 400 }}>
               <thead style={{ background: colors.primaryLight || '#eef5ff' }}>
                 <tr>
                   <th style={{ padding: 8, border: '1px solid #eee' }}>Loại cơm</th>
@@ -878,7 +878,7 @@ function AdminView({ user, reportData, selectedDateKey, onDeptClick, onOpenExpor
 }
 
 /* --- CanteenView: Giao diện Nhà Ăn --- */
-function CanteenView({ user, reportData, selectedDateKey }) {
+function CanteenView({ user, reportData, selectedDateKey, isMobile }) {
   const { pushToast } = useToast();
 
   // Tên hiển thị của tài khoản Nhà ăn (ưu tiên tên đầy đủ nếu có)
@@ -1081,7 +1081,7 @@ function CanteenView({ user, reportData, selectedDateKey }) {
               </h3>
 
               <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 400 }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: isMobile ? '100%' : 400 }}>
                 <thead style={{ background: colors.primaryLight || '#eef5ff' }}>
                   <tr>
                     <th style={{ padding: 8, border: '1px solid #eee' }}>Loại cơm/suất ăn</th>
@@ -1382,7 +1382,7 @@ function ExportBaoComModal({ onClose }) {
 }
 
 /* --- BaoCom: Component chính --- */
-export default function BaoCom({ user }) {
+export default function BaoCom({ user, isMobile }) {
   const { t } = useI18n();
   const { pushToast } = useToast();
 
@@ -1476,12 +1476,14 @@ export default function BaoCom({ user }) {
       selectedDateKey={selectedDateKey}
       onDeptClick={setOpenDept}
       onOpenExport={() => setShowExport(true)}
+      isMobile={isMobile}
     />;
   } else if (isCanteen) {
     content = <CanteenView
       user={user}
       reportData={reportData}
       selectedDateKey={selectedDateKey}
+      isMobile={isMobile}
     />;
   } else if (effectiveDeptRoles.length > 0) {
     // User có 1 hoặc nhiều bộ phận
