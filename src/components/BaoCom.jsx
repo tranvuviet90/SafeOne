@@ -7,7 +7,7 @@ import {
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { colors } from '../theme';
-import { useToast } from './LightboxSwipeOnly';
+import { useToast, useConfirm } from './LightboxSwipeOnly';
 import { useI18n } from '../i18n/I18nProvider';
 
 /* =========================
@@ -515,6 +515,7 @@ function DeptDetailModal({ department, reportData, onClose }) {
 /* --- AdminView: Giao diện Admin --- */
 function AdminView({ user, reportData, selectedDateKey, onDeptClick, onOpenExport, isMobile }) {
   const { pushToast } = useToast();
+  const { askConfirm } = useConfirm();
   const [adjustedTotals, setAdjustedTotals] = useState({});
 
   // Tính tổng hợp suất ăn từ dữ liệu các bộ phận (trừ phần tăng ca đang chờ duyệt)
@@ -573,7 +574,7 @@ function AdminView({ user, reportData, selectedDateKey, onDeptClick, onOpenExpor
   }, [reportData]);
 
   const confirmRecall = async (recall) => {
-    if (!window.confirm(`Xác nhận đã thu hồi ${recall.surplusMi} mì và ${recall.surplusSua} sữa từ bộ phận ${recall.dept} (${SHIFT_NAMES[recall.shift]})?`)) {
+    if (!(await askConfirm(`Xác nhận đã thu hồi ${recall.surplusMi} mì và ${recall.surplusSua} sữa từ bộ phận ${recall.dept} (${SHIFT_NAMES[recall.shift]})?`, "Xác nhận thu hồi tăng ca"))) {
       return;
     }
     const docRef = doc(db, 'meal_reports', selectedDateKey);
@@ -629,7 +630,7 @@ function AdminView({ user, reportData, selectedDateKey, onDeptClick, onOpenExpor
   }, []);
 
   const confirmShift = async (shift) => {
-    if (!window.confirm(`Xác nhận & gửi ${SHIFT_NAMES[shift]} cho Nhà Ăn?`)) return;
+    if (!(await askConfirm(`Xác nhận & gửi ${SHIFT_NAMES[shift]} cho Nhà Ăn?`, "Xác nhận gửi số liệu"))) return;
     const docRef = doc(db, 'meal_reports', selectedDateKey);
     const batch = writeBatch(db);
 
@@ -880,6 +881,7 @@ function AdminView({ user, reportData, selectedDateKey, onDeptClick, onOpenExpor
 /* --- CanteenView: Giao diện Nhà Ăn --- */
 function CanteenView({ user, reportData, selectedDateKey, isMobile }) {
   const { pushToast } = useToast();
+  const { askConfirm } = useConfirm();
 
   // Tên hiển thị của tài khoản Nhà ăn (ưu tiên tên đầy đủ nếu có)
   const canteenName = useMemo(() => user?.name || user?.displayName || 'Nhà Ăn', [user]);
@@ -954,7 +956,7 @@ function CanteenView({ user, reportData, selectedDateKey, isMobile }) {
 
   const confirmShift = async (shift, isReconfirm = false) => {
     const actionText = isReconfirm ? 'xác nhận thay đổi' : 'nhận số liệu';
-    if (!window.confirm(`Xác nhận đã ${actionText} cho ${SHIFT_NAMES[shift]}?`)) return;
+    if (!(await askConfirm(`Xác nhận đã ${actionText} cho ${SHIFT_NAMES[shift]}?`, "Xác nhận nhận số liệu"))) return;
     const docRef = doc(db, 'meal_reports', selectedDateKey);
     // Lấy số liệu summary mới nhất mà Admin vừa gửi
     const currentSummary = reportData[shift]?.summary || {};
@@ -987,7 +989,7 @@ function CanteenView({ user, reportData, selectedDateKey, isMobile }) {
       pushToast('Không có gì để phát bù.', 'info');
       return;
     }
-    if (!window.confirm(`Xác nhận ${actionText} ${miToFulfill} mì và ${suaToFulfill} sữa cho ${dept} (${SHIFT_NAMES[shift]})?`)) {
+    if (!(await askConfirm(`Xác nhận ${actionText} ${miToFulfill} mì và ${suaToFulfill} sữa cho ${dept} (${SHIFT_NAMES[shift]})?`, "Xác nhận phát tăng ca"))) {
       return;
     }
     const docRef = doc(db, 'meal_reports', selectedDateKey);

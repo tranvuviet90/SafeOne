@@ -112,6 +112,177 @@ export function ToastProvider({ children }) {
   );
 }
 
+const ConfirmCtx = createContext({ askConfirm: () => Promise.resolve(false) });
+
+export function useConfirm() {
+  return useContext(ConfirmCtx);
+}
+
+export function ConfirmProvider({ children }) {
+  const [confirmState, setConfirmState] = useState({
+    open: false,
+    message: "",
+    title: "Xác nhận",
+    resolve: null,
+  });
+
+  const askConfirm = (message, title = "Xác nhận hành động") => {
+    return new Promise((resolve) => {
+      setConfirmState({
+        open: true,
+        message,
+        title,
+        resolve,
+      });
+    });
+  };
+
+  const handleCancel = () => {
+    confirmState.resolve?.(false);
+    setConfirmState((prev) => ({ ...prev, open: false }));
+  };
+
+  const handleConfirm = () => {
+    confirmState.resolve?.(true);
+    setConfirmState((prev) => ({ ...prev, open: false }));
+  };
+
+  return (
+    <ConfirmCtx.Provider value={{ askConfirm }}>
+      {children}
+      {confirmState.open && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0, 0, 0, 0.65)",
+            backdropFilter: "blur(8px)",
+            WebkitBackdropFilter: "blur(8px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 12000,
+            padding: "16px",
+            animation: "confirmFadeIn 0.2s ease-out",
+          }}
+          onClick={handleCancel}
+        >
+          <style>{`
+            @keyframes confirmFadeIn {
+              from { opacity: 0; }
+              to { opacity: 1; }
+            }
+            @keyframes confirmScaleUp {
+              from { transform: scale(0.95); opacity: 0; }
+              to { transform: scale(1); opacity: 1; }
+            }
+            .confirm-btn {
+              padding: 10px 22px;
+              border-radius: 12px;
+              font-weight: 700;
+              font-size: 15px;
+              cursor: pointer;
+              transition: all 0.2s ease;
+              border: none;
+              line-height: 1.4;
+            }
+            .confirm-btn-cancel {
+              background: #f1f5f9;
+              color: #475569;
+              border: 1px solid #cbd5e1;
+            }
+            .confirm-btn-cancel:hover {
+              background: #e2e8f0;
+              transform: translateY(-1px);
+            }
+            .confirm-btn-confirm {
+              background: #466E73;
+              color: white;
+            }
+            .confirm-btn-confirm:hover {
+              background: #395c60;
+              box-shadow: 0 4px 12px rgba(70, 110, 115, 0.3);
+              transform: translateY(-1px);
+            }
+            .confirm-btn:active {
+              transform: translateY(1px);
+            }
+          `}</style>
+          <div
+            style={{
+              background: "#ffffff",
+              borderRadius: 20,
+              padding: "24px 28px",
+              width: "100%",
+              maxWidth: 440,
+              boxShadow: "0 15px 35px rgba(0, 0, 0, 0.3)",
+              display: "flex",
+              flexDirection: "column",
+              gap: 16,
+              animation: "confirmScaleUp 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                borderBottom: "1px solid #f1f5f9",
+                paddingBottom: 12,
+              }}
+            >
+              <span style={{ fontSize: 24 }}>⚠️</span>
+              <h3
+                style={{
+                  margin: 0,
+                  fontSize: 18,
+                  fontWeight: 800,
+                  color: "#1e293b",
+                }}
+              >
+                {confirmState.title}
+              </h3>
+            </div>
+            <div
+              style={{
+                fontSize: 15,
+                lineHeight: 1.6,
+                color: "#475569",
+                whiteSpace: "pre-wrap",
+                wordBreak: "break-word",
+              }}
+            >
+              {confirmState.message}
+            </div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: 12,
+                marginTop: 8,
+              }}
+            >
+              <button
+                className="confirm-btn confirm-btn-cancel"
+                onClick={handleCancel}
+              >
+                Hủy (No)
+              </button>
+              <button
+                className="confirm-btn confirm-btn-confirm"
+                onClick={handleConfirm}
+              >
+                Xác nhận (Yes)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </ConfirmCtx.Provider>
+  );
+}
+
 /**
  * LightboxSwipeOnly (Premium 3-Panel Viewport Slider)
  * - Màn hình lớn & nhỏ: kéo trượt ngang để xem ảnh kế tiếp/trước đó theo thời gian thực (real-time peeking).

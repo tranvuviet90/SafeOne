@@ -22,7 +22,7 @@ import "./App.css";
 import MagicMenu from "./components/MagicMenu";
 import Chatbot from "./components/Chatbot";
 import { colors } from "./theme";
-import { ToastProvider, useToast } from "./components/LightboxSwipeOnly";
+import { ToastProvider, ConfirmProvider, useToast } from "./components/LightboxSwipeOnly";
 
 import { useI18n } from "./i18n/I18nProvider";
 
@@ -215,7 +215,8 @@ export default function App() {
 
   return (
     <ToastProvider>
-      <ToastBridge />
+      <ConfirmProvider>
+        <ToastBridge />
       <div style={{
         minHeight: "100vh",
         background: colors.backgroundLight,
@@ -316,6 +317,7 @@ export default function App() {
 
         <Chatbot />
       </div>
+      </ConfirmProvider>
     </ToastProvider>
   );
 }

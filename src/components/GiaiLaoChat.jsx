@@ -4,7 +4,7 @@ import { collection, addDoc, onSnapshot, serverTimestamp, query, orderBy, doc, d
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import imageCompression from 'browser-image-compression';
 import { colors } from "../theme";
-import LightboxSwipeOnly from "./LightboxSwipeOnly";
+import LightboxSwipeOnly, { useConfirm } from "./LightboxSwipeOnly";
 import { useI18n } from "../i18n/I18nProvider";
 
 const orange = colors.primary;
@@ -39,6 +39,7 @@ function UndoIcon({ size = 20 }) {
 
 function GiaiLaoChat({ user }) {
   const { t } = useI18n();
+  const { askConfirm } = useConfirm();
   const [chat, setChat] = useState([]);
   const [text, setText] = useState('');
   const [files, setFiles] = useState([]);
@@ -131,7 +132,7 @@ function GiaiLaoChat({ user }) {
 
   // Soft/Permanent delete (giữ nguyên)
   const handleSoftDelete = async (postId) => {
-    if (window.confirm(t("common.confirmDelete"))) {
+    if (await askConfirm(t("common.confirmDelete"), "Xác nhận yêu cầu xóa")) {
       const docRef = doc(db, "gialaokv", postId);
       await updateDoc(docRef, { pendingDeletion: true });
     }
@@ -141,7 +142,7 @@ function GiaiLaoChat({ user }) {
     await updateDoc(docRef, { pendingDeletion: false });
   };
   const handlePermanentDelete = async (message) => {
-    if (!window.confirm(t("common.confirmPermanentDelete"))) return;
+    if (!(await askConfirm(t("common.confirmPermanentDelete"), "Xác nhận xóa vĩnh viễn"))) return;
     try {
       if (message.images?.length) {
         for (const url of message.images) {

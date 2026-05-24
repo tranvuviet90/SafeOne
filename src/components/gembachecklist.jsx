@@ -14,7 +14,7 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { colors } from "../theme";
 import { useI18n } from "../i18n/I18nProvider";
-import LightboxSwipeOnly from "./LightboxSwipeOnly";
+import LightboxSwipeOnly, { useConfirm } from "./LightboxSwipeOnly";
 import { callAIService } from "../utils/aiAdapter";
 
 /* ====================== BIỂU TƯỢNG (ICON) ====================== */
@@ -653,6 +653,7 @@ function ImprovementModal({ modalData, onClose, onSave }) {
    ========================= */
 function GembaCheckList({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
   const { t } = useI18n();
+  const { askConfirm } = useConfirm();
   const [depIndex, setDepIndex] = useState(0);
   const [selectedGroup, setSelectedGroup] = useState("");
   const [selectedError, setSelectedError] = useState("");
@@ -891,7 +892,7 @@ function GembaCheckList({ user, isMobile, newErrorCounts, setGembaNotifCounts })
 
   async function handleDelete(idx) {
     const errorToDelete = scoreList[idx];
-    if (window.confirm(`Bạn có chắc muốn XÓA VĨNH VIỄN lỗi "${errorToDelete.desc}" không?`)) {
+    if (await askConfirm(`Bạn có chắc muốn XÓA VĨNH VIỄN lỗi "${errorToDelete.desc}" không?`, "Xác nhận xóa lỗi")) {
         // 1. Cập nhật gemba_scores
         const newAllScores = allScores.filter(score => score.timestamp !== errorToDelete.timestamp);
         const docRef = doc(db, "gemba_scores", dep.name);

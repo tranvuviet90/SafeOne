@@ -7,7 +7,7 @@ import {
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import imageCompression from 'browser-image-compression';
 import { colors } from "../theme";
-import LightboxSwipeOnly from "./LightboxSwipeOnly";
+import LightboxSwipeOnly, { useConfirm } from "./LightboxSwipeOnly";
 import { useI18n } from "../i18n/I18nProvider";
 
 const orange = colors.primary;
@@ -42,6 +42,7 @@ function UndoIcon({ size = 20 }) {
 
 function HutThuocToilet({ user }) {
   const { t } = useI18n();
+  const { askConfirm } = useConfirm();
   const [selected, setSelected] = useState([]);
   const [note, setNote] = useState('');
   const [files, setFiles] = useState([]);
@@ -140,7 +141,7 @@ function HutThuocToilet({ user }) {
 
   // Soft/Permanent delete (giữ nguyên)
   const handleSoftDelete = async (entryId) => {
-    if (window.confirm(t("common.confirmDelete"))) {
+    if (await askConfirm(t("common.confirmDelete"), "Xác nhận yêu cầu xóa")) {
       const docRef = doc(db, "hutthuoc_history", entryId);
       await updateDoc(docRef, { pendingDeletion: true });
     }
@@ -150,7 +151,7 @@ function HutThuocToilet({ user }) {
     await updateDoc(docRef, { pendingDeletion: false });
   };
   const handlePermanentDelete = async (entryToDelete) => {
-    if (!window.confirm(t("common.confirmPermanentDelete"))) return;
+    if (!(await askConfirm(t("common.confirmPermanentDelete"), "Xác nhận xóa vĩnh viễn"))) return;
     try {
       if (entryToDelete.images?.length) {
         for (const url of entryToDelete.images) {

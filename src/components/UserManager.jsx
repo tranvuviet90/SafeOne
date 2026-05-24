@@ -3,7 +3,7 @@ import { useI18n } from '../i18n/I18nProvider';
 import { db, functions } from '../firebase';
 import { collection, query, where, getDocs, orderBy, doc, getDoc, setDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { useToast } from './LightboxSwipeOnly';
+import { useToast, useConfirm } from './LightboxSwipeOnly';
 import { colors } from '../theme';
 
 const ALL_ROLES = [
@@ -17,6 +17,7 @@ const ALL_ROLES = [
 export default function UserManager({ user, isMobile }) {
   const { t } = useI18n();
   const { pushToast } = useToast();
+  const { askConfirm } = useConfirm();
   
   const [activeTab, setActiveTab] = useState('users'); // 'users' or 'requests'
   const [loading, setLoading] = useState(false);
@@ -158,7 +159,7 @@ export default function UserManager({ user, isMobile }) {
   }, [activeTab]);
 
   const handleAdminAction = async (action, targetUid, data = {}) => {
-    if (action === 'delete' && !window.confirm(t('manager.confirm.delete'))) return;
+    if (action === 'delete' && !(await askConfirm(t('manager.confirm.delete'), "Xác nhận xóa người dùng"))) return;
     
     const toastId = pushToast('Đang xử lý...', 'info');
     try {
@@ -574,7 +575,7 @@ export default function UserManager({ user, isMobile }) {
               <button
                 type="button"
                 onClick={async () => {
-                  if (window.confirm("Bạn có chắc chắn muốn XÓA API Key đã lưu?")) {
+                  if (await askConfirm("Bạn có chắc chắn muốn XÓA API Key đã lưu?", "Xác nhận xóa API Key")) {
                     setApiKey('');
                     setHasSavedKey(false);
                     setSaveStatus('Chưa lưu thay đổi.');

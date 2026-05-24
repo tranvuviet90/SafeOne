@@ -11,7 +11,7 @@ import imageCompression from "browser-image-compression";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { colors } from "../theme";
-import LightboxSwipeOnly from "./LightboxSwipeOnly";
+import LightboxSwipeOnly, { useConfirm } from "./LightboxSwipeOnly";
 import { useI18n } from "../i18n/I18nProvider";
 import { callAIService } from "../utils/aiAdapter";
 
@@ -475,6 +475,7 @@ function ImprovementModal({ modalData, onClose, onSave }) {
    ========================= */
 function TuGemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
   const { t } = useI18n();
+  const { askConfirm } = useConfirm();
   const [depIndex, setDepIndex] = useState(0);
   const [selectedGroup, setSelectedGroup] = useState("");
   const [selectedError, setSelectedError] = useState("");
@@ -665,7 +666,7 @@ function TuGemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
   async function handleDelete(logId) {
     const logToDelete = logs.find(log => log.id === logId);
     if (!logToDelete) return;
-    if (window.confirm(`Bạn có chắc muốn XÓA VĨNH VIỄN lỗi "${logToDelete.description}" không?`)) {
+    if (await askConfirm(`Bạn có chắc muốn XÓA VĨNH VIỄN lỗi "${logToDelete.description}" không?`, "Xác nhận xóa lỗi")) {
         try {
             const images = logToDelete.imageUrls || (logToDelete.imageUrl ? [logToDelete.imageUrl] : []);
             for (const url of images) {

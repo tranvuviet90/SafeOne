@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { db } from "../firebase";
 import { doc, setDoc, onSnapshot, collection, query, where, getDocs, addDoc, serverTimestamp } from "firebase/firestore";
 import { useI18n } from "../i18n/I18nProvider";
+import { useConfirm } from "./LightboxSwipeOnly";
 
 const boDams = [
   "Bộ đàm 1", "Bộ đàm 2", "Bộ đàm 3", "Bộ đàm 4", "Bộ đàm 5",
@@ -16,6 +17,7 @@ const red = "#d9534f";
 
 function BoDam({ user, isMobile }) {
   const { t } = useI18n();
+  const { askConfirm } = useConfirm();
   const [status, setStatus] = useState(() => boDams.map(() => ({ checked: false, name: "", unavailable: false })));
   const userRole = (user && user.role) ? user.role.toLowerCase() : '';
 
@@ -60,7 +62,7 @@ function BoDam({ user, isMobile }) {
   }
 
   async function handleCancelAssign(idx) {
-    if (!window.confirm("Bạn có chắc muốn hủy chỉ định này không?")) return;
+    if (!(await askConfirm("Bạn có chắc muốn hủy chỉ định này không?", "Hủy chỉ định bộ đàm"))) return;
     let newStatus = [...status];
     const cur = newStatus[idx];
     newStatus[idx] = { ...cur, assignedTo: null };
