@@ -194,8 +194,12 @@ export default function NotificationBell({ user, setActiveTab }) {
     let notifsMap = new Map();
 
     function processNewNotifs(snap, isInitial) {
-      snap.docs.forEach(d => {
-        notifsMap.set(d.id, { id: d.id, ...d.data() });
+      snap.docChanges().forEach(change => {
+        if (change.type === "removed") {
+          notifsMap.delete(change.doc.id);
+        } else {
+          notifsMap.set(change.doc.id, { id: change.doc.id, ...change.doc.data() });
+        }
       });
 
       const sorted = Array.from(notifsMap.values()).sort((a, b) => {
