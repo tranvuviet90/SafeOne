@@ -146,11 +146,11 @@ function ExportModal({ onClose, departments }) {
     const ws = wb.getWorksheet("Sheet1") || wb.worksheets[0];
     if (!ws) throw new Error("Template CAP.xlsx thiếu Sheet1.");
     
-    // Explicitly enforce columns widths for 14 columns
-    const widths = [6, 30, 15, 18, 22, 20, 35, 15, 18, 20, 31.29, 31.29, 22, 20];
-    widths.forEach((w, idx) => {
-      ws.getColumn(idx + 1).width = w;
-    });
+    // Explicitly enforce columns widths up to Column 20
+    const baseWidths = [6, 30, 15, 18, 22, 20, 35, 15, 18, 20, 31.29, 31.29, 22, 20];
+    for (let idx = 0; idx < 20; idx++) {
+      ws.getColumn(idx + 1).width = idx < baseWidths.length ? baseWidths[idx] : 31.29;
+    }
 
     let rowIndex = 7;
     for (let i = 0; i < rows.length; i++) {
@@ -164,7 +164,7 @@ function ExportModal({ onClose, departments }) {
         bottom: { style: 'thin', color: { auto: true } }
       };
 
-      for (let c = 1; c <= 14; c++) {
+      for (let c = 1; c <= 20; c++) {
         const cell = ws.getCell(rowIndex, c);
         cell.border = borderThin;
         cell.font = { name: 'Times New Roman', size: 11 };
@@ -211,10 +211,16 @@ function ExportModal({ onClose, departments }) {
         }
       };
 
-      // Process "Before" picture in Column 11 (K)
-      const beforeUrl = r.beforeUrl || (r.imageUrls && r.imageUrls[0]) || "";
-      if (beforeUrl) {
-        await processImage(beforeUrl, 11);
+      // Process "Before" pictures: first goes to Col 11 (K), subsequent to 15 (O), 16 (P)...
+      const beforeImages = r.imageUrls && r.imageUrls.length > 0 ? r.imageUrls : (r.beforeUrl ? [r.beforeUrl] : []);
+      for (let j = 0; j < beforeImages.length; j++) {
+        const url = beforeImages[j];
+        if (j === 0) {
+          await processImage(url, 11); // Column 11 (K)
+        } else {
+          const col = 15 + (j - 1); // Column 15 (O), 16 (P), etc.
+          await processImage(url, col);
+        }
       }
       
       // Process "After" picture in Column 12 (L)
@@ -457,6 +463,26 @@ function ImprovementModal({ modalData, onClose, onSave }) {
   const [completionDate, setCompletionDate] = useState(modalData.error?.completionDate || "");
   const [improvementImageFile, setImprovementImageFile] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  const parseDateStr = (s) => {
+    if (!s) return null;
+    const parts = s.split('-');
+    if (parts.length === 3) {
+      const [y, m, d] = parts.map(Number);
+      return new Date(y, m - 1, d);
+    }
+    const dateObj = new Date(s);
+    return isNaN(dateObj.getTime()) ? null : dateObj;
+  };
+
+  const formatDateStr = (d) => {
+    if (!d) return "";
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
   const handleImageChange = async (e) => {
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
@@ -503,13 +529,44 @@ function ImprovementModal({ modalData, onClose, onSave }) {
         <p><b>Lỗi:</b> {modalData.error.desc}</p>
         <div style={{ display: 'grid', gap: 12 }}>
           <div> <label style={labelStyle}>Người phụ trách</label> <input type="text" value={responsiblePerson} onChange={e => setResponsiblePerson(e.target.value)} style={inputStyle} /> </div>
-          <div> <label style={labelStyle}>Ngày dự kiến hoàn thành</label> <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} style={inputStyle} /> </div>
+          <div>
+            <label style={labelStyle}>Ngày dự kiến hoàn thành</label>
+            <DatePicker
+              selected={dueDate ? parseDateStr(dueDate) : null}
+              onChange={(date) => setDueDate(formatDateStr(date))}
+              dateFormat="dd/MM/yyyy"
+              placeholderText="dd/mm/yyyy"
+              className="date-picker-input"
+              customInput={<input style={inputStyle} />}
+            />
+          </div>
           <div> <label style={labelStyle}>Ghi chú tiến độ</label> <textarea value={progressNotes} onChange={e => setProgressNotes(e.target.value)} style={{...inputStyle, minHeight: 70}} /> </div>
-          <div> <label style={labelStyle}>Ngày hoàn thành</label> <input type="date" value={completionDate} onChange={e => setCompletionDate(e.target.value)} style={inputStyle} /> </div>
+          <div>
+            <label style={labelStyle}>Ngày hoàn thành</label>
+            <DatePicker
+              selected={completionDate ? parseDateStr(completionDate) : null}
+              onChange={(date) => setCompletionDate(formatDateStr(date))}
+              dateFormat="dd/MM/yyyy"
+              placeholderText="dd/mm/yyyy"
+              className="date-picker-input"
+              customInput={<input style={inputStyle} />}
+            />
+          </div>
           <div>
             <label style={labelStyle}>Ảnh cải thiện</label>
             <input type="file" accept="image/*" onChange={handleImageChange} style={{...inputStyle, padding: 5}} />
-            {modalData.error.improvementImageUrl && !improvementImageFile && <a href={modalData.error.improvementImageUrl} target="_blank" rel="noopener noreferrer" style={{fontSize: 12}}>Xem ảnh đã tải lên</a>}
+            {modalData.error.improvementImageUrl && !improvementImageFile && (
+              <div style={{ marginTop: 8 }}>
+                <span style={{ fontSize: 12, color: colors.textSecondary, display: 'block', marginBottom: 4 }}>Ảnh cải thiện đã lưu:</span>
+                <a href={modalData.error.improvementImageUrl} target="_blank" rel="noopener noreferrer">
+                  <img
+                    src={modalData.error.improvementImageUrl}
+                    alt="Ảnh cải thiện"
+                    style={{ maxWidth: '100%', maxHeight: 150, borderRadius: 6, border: `1px solid ${colors.border}`, display: 'block', objectFit: 'contain' }}
+                  />
+                </a>
+              </div>
+            )}
           </div>
         </div>
         <div style={{ display: "flex", gap: 12, marginTop: 20, justifyContent: "flex-end" }}>
@@ -809,6 +866,35 @@ function GembaCheckList({ user, isMobile, newErrorCounts, setGembaNotifCounts })
     newAllScores[originalIndex] = { ...allScores[originalIndex], ...improvementData };
     const docRef = doc(db, "gemba_scores", dep.name);
     await setDoc(docRef, { scores: newAllScores }, { merge: true });
+
+    // Synchronization with gemba_events collection
+    try {
+      const qEvents = query(
+        collection(db, "gemba_events"),
+        where("department", "==", dep.name)
+      );
+      const eventsSnap = await getDocs(qEvents);
+      for (const d of eventsSnap.docs) {
+        const data = d.data();
+        if (data.error && data.error.code === errorToUpdate.code) {
+          const evTime = data.timestamp ? safeTsToDate(data.timestamp) : null;
+          const errTime = errorToUpdate.timestamp ? safeTsToDate(errorToUpdate.timestamp) : null;
+          
+          // Match by error code and check if timestamp is very close (within 10 minutes)
+          const timeMatches = (!evTime || !errTime) || (Math.abs(evTime.getTime() - errTime.getTime()) < 600000);
+          
+          if (timeMatches) {
+            const updatedError = {
+              ...data.error,
+              ...improvementData
+            };
+            await updateDoc(doc(db, "gemba_events", d.id), { error: updatedError });
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Lỗi đồng bộ sang gemba_events:", err);
+    }
   };
   
   const numberInputStyle = { width: 60, fontSize: 16, padding: "2px 5px", border: `1px solid ${colors.primaryLight}`, borderRadius: 4, MozAppearance: "textfield" };
