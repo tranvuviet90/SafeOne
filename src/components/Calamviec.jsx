@@ -15,8 +15,8 @@ import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { useI18n } from "../i18n/I18nProvider";
 
 /* ====== UI constants ====== */
-const orange = "#E88E2E";
-const orangeLight = "#FFD8A8";
+const orange = "#466E73";
+const orangeLight = "#A9D9D4";
 const dark = "#222";
 const redInvalid = "#f8d7da";
 const statusGreenBg = "#d4edda";
@@ -438,7 +438,7 @@ function CaLamViec({ user, isMobile }) {
                                       {...provided2.dragHandleProps}
                                       style={{
                                         padding: "6px 8px", borderRadius: 4, cursor: "grab", fontSize: 12, fontWeight: 500,
-                                        background: "#fff0e1", ...provided2.draggableProps.style,
+                                        background: "#EBF5F4", ...provided2.draggableProps.style,
                                       }}
                                     >
                                       {item.name}
@@ -512,7 +512,7 @@ function CaLamViec({ user, isMobile }) {
                                 {...provided2.dragHandleProps}
                                 style={{
                                   padding: "8px 10px", margin: "2px", borderRadius: 4, cursor: "grab", textAlign: "center",
-                                  fontSize: 13, fontWeight: 500, background: "#fff0e1",
+                                  fontSize: 13, fontWeight: 500, background: "#EBF5F4",
                                   ...provided2.draggableProps.style,
                                   transform: snapshot2.isDragging ? `${provided2.draggableProps.style.transform} scale(1.05)` : provided2.draggableProps.style.transform,
                                   boxShadow: snapshot2.isDragging ? "0 4px 12px rgba(0,0,0,0.2)" : "0 1px 2px rgba(0,0,0,0.1)",

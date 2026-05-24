@@ -13,7 +13,7 @@ import BaoCom from "./components/BaoCom";
 import UserSettings from "./components/UserSettings";
 import UserManager from "./components/UserManager";
 import NotificationBell from "./components/NotificationBell";
-import logo from "./assets/logo.png";
+import logo from "./assets/logo.svg";
 import { auth, db } from "./firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { doc, getDoc, collection, query, where, Timestamp, getCountFromServer, setDoc } from "firebase/firestore";
@@ -231,7 +231,7 @@ export default function App() {
           top: 0,
           background: colors.primary,
           width: "100vw",
-          boxShadow: "0 2px 12px #E88E2E55",
+          boxShadow: `0 2px 12px ${colors.primary}55`,
           zIndex: 10,
           padding: isMobile ? "10px 16px" : "10px 24px",
           boxSizing: "border-box"
@@ -281,7 +281,7 @@ export default function App() {
           background: colors.surface,
           borderRadius: isMobile ? 0 : 22,
           minHeight: 460,
-          boxShadow: "0 6px 32px #E88E2E22, 0 1.5px 10px #0001",
+          boxShadow: `0 6px 32px ${colors.primary}22, 0 1.5px 10px #0001`,
           padding: isMobile ? "24px 16px" : "38px 32px",
           display: "flex",
           color: colors.textPrimary,

@@ -703,7 +703,7 @@ function TuGemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
                     const images = log.imageUrls || (log.imageUrl ? [log.imageUrl] : []);
                     const isImproved = log.completionDate && log.improvementImageUrl;
                     return (
-                      <div key={log.id} style={{ border: '1.2px solid ' + colors.primaryLight, borderRadius: 12, padding: 12, background: colors.surface, boxShadow: '0 1.5px 10px #E88E2E11' }}>
+                      <div key={log.id} style={{ border: '1.2px solid ' + colors.primaryLight, borderRadius: 12, padding: 12, background: colors.surface, boxShadow: `0 1.5px 10px ${colors.primary}11` }}>
                         <div style={{ display:'flex', justifyContent:'space-between', gap:8, flexWrap:'wrap' }}>
                           <div style={{ fontSize: 12, color: colors.textSecondary }}>{safeTsToDate(log.timestamp)?.toLocaleString('vi-VN')}</div>
                           <div style={{ fontWeight: 700, color: colors.primary }}>{log.group}</div>
@@ -742,7 +742,7 @@ function TuGemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
                   )}
                 </div>
               ) : (
-    <table style={{ marginTop: 10, width: "100%", borderCollapse: "separate", borderSpacing: 0, boxShadow: "0 1.5px 10px #E88E2E11", border: `1.2px solid ${colors.primaryLight}`, background: colors.surface, borderRadius: 12, overflow: "hidden" }}>
+    <table style={{ marginTop: 10, width: "100%", borderCollapse: "separate", borderSpacing: 0, boxShadow: `0 1.5px 10px ${colors.primary}11`, border: `1.2px solid ${colors.primaryLight}`, background: colors.surface, borderRadius: 12, overflow: "hidden" }}>
                   <thead>
                     <tr style={{ background: colors.primaryLight }}>
                         <th style={{ padding: "10px 14px", color: colors.textPrimary }}>{t("gemba.table.time")}</th>
@@ -796,11 +796,11 @@ function TuGemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
                   </select>
               </div>
               ) : (
-              <div style={{ padding: 18, background: colors.primaryLight, borderRadius: 14, boxShadow: "0 1.5px 10px #e88e2e11" }}>
+              <div style={{ padding: 18, background: colors.primaryLight, borderRadius: 14, boxShadow: `0 1.5px 10px ${colors.primary}11` }}>
                   <div style={{ fontWeight: 700, color: colors.primary, marginBottom: 14, fontSize: 17 }}>Bộ phận</div>
                   <div>
                   {departments.map((d, i) => (
-                      <button key={d.name} style={{ display: "block", width: "100%", marginBottom: 10, padding: "10px 15px", borderRadius: 8, border: "none", fontWeight: 600, fontSize: 15, background: depIndex === i ? colors.primary : "#fff3e0", color: depIndex === i ? colors.white : colors.primary, boxShadow: depIndex === i ? "0 1.5px 7px #e88e2e33" : "none", cursor: "pointer", transition: "all .13s", position: 'relative' }} onClick={() => handleSelectDepartment(i)}>
+                      <button key={d.name} style={{ display: "block", width: "100%", marginBottom: 10, padding: "10px 15px", borderRadius: 8, border: "none", fontWeight: 600, fontSize: 15, background: depIndex === i ? colors.primary : colors.backgroundLight, color: depIndex === i ? colors.white : colors.primary, boxShadow: depIndex === i ? `0 1.5px 7px ${colors.primary}33` : "none", cursor: "pointer", transition: "all .13s", position: 'relative' }} onClick={() => handleSelectDepartment(i)}>
                         {d.name}
                         {newLogCounts && newLogCounts[d.name] > 0 && (
                           <span style={{ position: 'absolute', top: 5, right: 8, background: 'red', color: 'white', borderRadius: '50%', width: 20, height: 20, fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>

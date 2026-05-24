@@ -9,8 +9,8 @@ const boDams = [
   "Bộ đàm 11", "Bộ đàm 12", "Bộ đàm 13", "Bộ đàm 14", "Bộ đàm 15"
 ];
 
-const orange = "#E88E2E";
-const orangeLight = "#FFD8A8";
+const orange = "#466E73";
+const orangeLight = "#A9D9D4";
 const dark = "#222";
 const red = "#d9534f";
 
@@ -96,7 +96,7 @@ function BoDam({ user, isMobile }) {
       {isMobile ? (
         <div>
           {boDams.map((item, idx) => (
-            <div key={idx} style={{ background: idx % 2 ? "#fff6ea" : "#fff", opacity: status[idx]?.unavailable ? 0.5 : 1, padding: '15px', border: `1.2px solid ${orangeLight}`, borderRadius: 12, marginBottom: 10, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+            <div key={idx} style={{ background: idx % 2 ? "#F4FAF9" : "#fff", opacity: status[idx]?.unavailable ? 0.5 : 1, padding: '15px', border: `1.2px solid ${orangeLight}`, borderRadius: 12, marginBottom: 10, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
               <div style={{ fontWeight: 600, color: dark, fontSize: 18, marginBottom: 12 }}>{item}</div>
               <div style={{ marginBottom: 12 }}>
                 <label style={{ display: 'flex', alignItems: 'center', cursor: (status[idx]?.unavailable || status[idx]?.assignedTo) ? 'not-allowed' : 'pointer' }}>
@@ -157,7 +157,7 @@ function BoDam({ user, isMobile }) {
           </thead>
           <tbody>
             {boDams.map((item, idx) => (
-              <tr key={idx} style={{ background: idx % 2 ? "#fff6ea" : "#fff", opacity: status[idx]?.unavailable ? 0.5 : 1 }}>
+              <tr key={idx} style={{ background: idx % 2 ? "#F4FAF9" : "#fff", opacity: status[idx]?.unavailable ? 0.5 : 1 }}>
                 <td style={{ padding: "15px 22px", fontWeight: 600, color: dark }}>{item}</td>
                 <td style={{ padding: "15px 22px" }}>
                   <input type="checkbox" checked={status[idx]?.checked || false} disabled={status[idx]?.unavailable || status[idx]?.assignedTo} style={{ width: 22, height: 22, accentColor: orange, marginRight: 14, cursor: (status[idx]?.unavailable || status[idx]?.assignedTo) ? 'not-allowed' : 'pointer', verticalAlign: 'middle' }} onChange={() => handleCheck(idx)} />

@@ -40,7 +40,7 @@ function Login({ setUser }) {
   };
 
   return (
-    <div style={{ display:'flex', justifyContent:'center', alignItems:'center', minHeight:'100vh', width:'100vw', background:'linear-gradient(135deg, #FFE0CB 0%, #E88E2E 100%)', padding:'20px', boxSizing:'border-box' }}>
+    <div style={{ display:'flex', justifyContent:'center', alignItems:'center', minHeight:'100vh', width:'100vw', background:'linear-gradient(135deg, #A9D9D4 0%, #466E73 100%)', padding:'20px', boxSizing:'border-box' }}>
       <form onSubmit={handleLogin} style={{ background:'white', padding:'40px 50px', borderRadius:'16px', boxShadow:'0 10px 30px rgba(0,0,0,0.1)', width:'100%', maxWidth:'400px', textAlign:'center', boxSizing:'border-box' }}>
         <h2 style={{ color:'#222', marginBottom:'10px', fontWeight:'700', fontSize:'28px' }}>{t('login.title')}</h2>
         <p style={{ color:'#555', marginBottom:'30px', fontSize:'16px' }}>{t('login.subtitle')}</p>
@@ -55,15 +55,15 @@ function Login({ setUser }) {
         </div>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'30px', fontSize:'14px' }}>
           <label style={{ display:'flex', alignItems:'center', color:'#555', cursor:'pointer' }}>
-            <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)} style={{ marginRight:'8px', accentColor:'#E88E2E' }} />
+            <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)} style={{ marginRight:'8px', accentColor:'#466E73' }} />
             {t('login.remember')}
           </label>
-          <a href="#" style={{ color:'#E88E2E', textDecoration:'none', fontWeight:'600' }}
+          <a href="#" style={{ color:'#466E73', textDecoration:'none', fontWeight:'600' }}
             onClick={e => { e.preventDefault(); alert(t('login.forgot.dev')); }}>
             {t('login.forgot')}
           </a>
         </div>
-        <button type="submit" disabled={loading} style={{ width:'100%', padding:'15px', borderRadius:'8px', border:'none', background:'#E88E2E', color:'white', fontSize:'18px', fontWeight:'700', cursor:'pointer', boxShadow:'0 4px 15px rgba(232,142,46,0.4)', opacity: loading ? 0.7 : 1 }}>
+        <button type="submit" disabled={loading} style={{ width:'100%', padding:'15px', borderRadius:'8px', border:'none', background:'#466E73', color:'white', fontSize:'18px', fontWeight:'700', cursor:'pointer', boxShadow:'0 4px 15px rgba(70,110,115,0.4)', opacity: loading ? 0.7 : 1 }}>
           {loading ? t('login.logging') : t('login.button')}
         </button>
       </form>
