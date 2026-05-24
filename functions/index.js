@@ -12,12 +12,12 @@ const GOOGLE_API_KEY = process.env.GOOGLE_APIKEY;
 const genAI = new GoogleGenerativeAI(GOOGLE_API_KEY);
 
 // ===================================================================
-// ### KHU VỰC "ĐÀO TẠO" CHATBOT - DỰA TRÊN TÀI LIỆU EHS + HƯỚNG DẪN WEBSITE ACP360 ###
+// ### KHU VỰC "ĐÀO TẠO" CHATBOT - DỰA TRÊN TÀI LIỆU EHS + HƯỚNG DẪN WEBSITE SafeOne ###
 // ===================================================================
 const systemInstruction = `
 Bạn là "Trợ lý ảo EHS" của công ty Aldila Composite Products (ACP). Vai trò của bạn:
 1) Trả lời các câu hỏi về An toàn, Sức khỏe và Môi trường (EHS) dựa trên "HƯỚNG DẪN MÔI TRƯỜNG – SỨC KHỎE – AN TOÀN".
-2) Hướng dẫn người dùng sử dụng trang web ACP360 (các tab Gemba, Tự Gemba, Giám sát hút thuốc, Storage/MSDS, Báo cơm, Lightbox/Toast).
+2) Hướng dẫn người dùng sử dụng trang web SafeOne (các tab Gemba, Tự Gemba, Giám sát hút thuốc, Storage/MSDS, Báo cơm, Lightbox/Toast).
 3) Luôn trả lời chuyên nghiệp, thân thiện, từng bước, và chỉ dựa trên thông tin đào tạo dưới đây. Nếu câu hỏi nằm ngoài phạm vi, hãy nói rõ “Tôi không có thông tin…” và hướng dẫn liên hệ EHS.
 
 ========================
@@ -63,7 +63,7 @@ PHẦN A – KIẾN THỨC EHS NỀN
 - [cite_start]**5S:** Sàng lọc, Sắp xếp, Sạch sẽ, Săn sóc, Sẵn sàng[cite: 1519].
 
 ===============================
-PHẦN B – HƯỚNG DẪN SỬ DỤNG WEBSITE ACP360
+PHẦN B – HƯỚNG DẪN SỬ DỤNG WEBSITE SafeOne
 ===============================
 **Vai trò & đăng nhập**
 - Vai trò chính: EHS, Nhà Ăn, Bộ phận, Ban giám sát (có thể khác nhau tùy quyền).
@@ -147,7 +147,7 @@ exports.askAI = onRequest(
     try {
       // Chấp nhận cả GET 'ping'
       if (req.method === "GET") {
-        return res.status(200).json({ ok: true, message: "ACP360 EHS Assistant ready" });
+        return res.status(200).json({ ok: true, message: "SafeOne EHS Assistant ready" });
       }
 
       const userPrompt = (req.body && req.body.prompt) ? String(req.body.prompt) : "";

@@ -317,7 +317,7 @@ export default function App() {
           padding: "16px 0 22px 0",
           width: "100%"
         }}>
-          ACP360 © {new Date().getFullYear()} | Created by Viet Tran
+          SafeOne © {new Date().getFullYear()} | Created by Viet Tran
         </div>
 
         <Chatbot />
