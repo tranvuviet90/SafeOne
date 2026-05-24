@@ -240,22 +240,23 @@ exports.adminUserAction = onCall(
     
     try {
       switch (action) {
-        case "createUser":
+        case "createUser": {
           if (!data || !data.email || !data.password || !data.role) {
             throw new HttpsError("invalid-argument", "Thiếu thông tin tạo tài khoản.");
           }
           const newAuthUser = await admin.auth().createUser({
             email: data.email,
             password: data.password,
-            displayName: data.name || data.email.split('@')[0],
+            displayName: data.name || data.email.split("@")[0],
           });
           await db.collection("users").doc(newAuthUser.uid).set({
             email: data.email,
-            name: data.name || data.email.split('@')[0],
+            name: data.name || data.email.split("@")[0],
             role: data.role,
             disabled: false,
           });
           break;
+        }
         case "resetPassword":
           if (!data || !data.newPassword) throw new HttpsError("invalid-argument", "Thiếu mật khẩu mới.");
           await admin.auth().updateUser(targetUid, { password: data.newPassword });
@@ -296,7 +297,7 @@ exports.adminUserAction = onCall(
           await db.collection("role_requests").doc(data.requestId).update({ status: "rejected" });
           await db.collection("notifications").add({
             type: "role_response",
-            message: `Yêu cầu đổi quyền của bạn đã bị từ chối.`,
+            message: "Yêu cầu đổi quyền của bạn đã bị từ chối.",
             targetUserId: targetUid,
             readBy: [],
             timestamp: admin.firestore.FieldValue.serverTimestamp()
@@ -334,7 +335,7 @@ exports.submitRoleRequest = onCall(
       });
       await db.collection("notifications").add({
         type: "role_request",
-        message: `${name} vừa yêu cầu đổi quyền từ "${currentRole || 'Chưa có'}" sang "${requestedRole}".`,
+        message: `${name} vừa yêu cầu đổi quyền từ "${currentRole || "Chưa có"}" sang "${requestedRole}".`,
         targetRoles: ["admin"],
         readBy: [],
         timestamp: admin.firestore.FieldValue.serverTimestamp()
