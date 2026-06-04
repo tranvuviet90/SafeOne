@@ -1,187 +1,128 @@
-# SafeOne 🛡️
+# SafeOne 🛡️ — Bộ Giải Pháp Quản Lý Vận Hành Số Hóa Nhà Xưởng (Phiên bản Cục bộ / Offline)
 
-**SafeOne** là hệ thống quản lý vận hành số hóa nhà xưởng toàn diện, tập trung vào công tác Giám sát An toàn, Sức khỏe, Môi trường (EHS), đánh giá Gemba, và quản lý quy trình hành chính (Báo cơm, Lịch làm việc) theo thời gian thực. Dự án được tối ưu hóa giao diện trực quan cao cấp, hiệu ứng mượt mà và tích hợp Trợ lý ảo AI EHS thông minh.
+**SafeOne** (tiền thân là dự án ACP360) là hệ thống quản lý vận hành số hóa nhà xưởng toàn diện. Dự án tập trung vào công tác Giám sát An toàn, Sức khỏe, Môi trường (EHS), đánh giá Gemba, liên lạc nội bộ và quản lý quy trình hành chính (Báo cơm, Ca làm việc) theo thời gian thực. 
+
+Phiên bản này (`SafeOne`) được tối ưu hóa đặc biệt để **chạy cục bộ (Offline/Local)** sử dụng cơ sở dữ liệu **MySQL (XAMPP)** và máy chủ **Node.js Backend**, giúp nhà xưởng vận hành độc lập không phụ thuộc vào kết nối Internet ra bên ngoài.
 
 ---
 
 ## 🇻🇳 TIẾNG VIỆT - HƯỚNG DẪN DỰ ÁN
 
-### 🌟 Tính năng chính
-1. **Gemba Checklist & Tự Gemba**: Ghi nhận và chấm điểm lỗi trực quan, chụp ảnh báo cáo vi phạm/cải tiến an toàn, xuất báo cáo CAP (Corrective Action Plan) theo khoảng ngày linh hoạt.
+### 🌟 Tính năng chính & Cập nhật mới nhất
+
+1. **Gemba Checklist & Tự Gemba**: Ghi nhận, chấm điểm lỗi trực quan, chụp ảnh báo cáo vi phạm an toàn, xuất báo cáo CAP (Corrective Action Plan) ra Excel.
 2. **Bộ đàm & Chat Giải lao (Bodam & GiaiLaoChat)**: Kênh truyền thông tin liên lạc và trao đổi nội bộ thời gian thực cho nhân viên và ban giám sát.
-3. **Báo cơm (BaoCom)**: Luồng kiểm duyệt 2 chiều chặt chẽ giữa **Bộ phận (gửi)** ➡️ **EHS (duyệt & chuyển tiếp)** ➡️ **Nhà ăn (xác nhận chốt suất)**.
-4. **Giám sát chuyên biệt**: Theo dõi vi phạm hút thuốc ngoài khu vực quy định (`HutThuocToilet`) và quản lý vệ sinh khu vực rác thải sản xuất (`GiamSatNhaRac`).
-5. **Trợ lý ảo EHS AI Chatbot**: Sử dụng mô hình **Gemini 2.5 Flash** tiên tiến, được huấn luyện bằng tài liệu kiến thức EHS chuẩn chỉnh của nhà máy và hướng dẫn sử dụng website.
-
-### 🛠️ Công nghệ cốt lõi
-* **Frontend**: React 19 (Vite), CSS Custom Theme (Harmonious Palette), React Icons, `@hello-pangea/dnd` (Kéo thả), `exceljs` & `xlsx` (Xuất báo cáo Excel chuyên nghiệp).
-* **Backend & Cơ sở dữ liệu**: Firebase v11 (Authentication, Firestore Database, Cloud Storage để lưu trữ hình ảnh).
-* **AI Backend**: Firebase Cloud Functions (Node.js) kết nối trực tiếp với Gemini API thông qua `@google/generative-ai`.
-
-### 🚀 Hướng dẫn khởi chạy cục bộ & Triển khai đám mây (Local & Cloud Deployment)
-
-#### 1. Hướng dẫn khởi chạy dự án trên máy Local khác
-
-Nếu bạn muốn sao chép toàn bộ dự án này sang một máy tính local mới để tiếp tục chạy và chỉnh sửa:
-
-* **Bước 1: Chuẩn bị môi trường**
-  * Tải và cài đặt **Node.js** phiên bản LTS mới nhất từ trang chủ: [https://nodejs.org](https://nodejs.org). Công cụ quản lý gói `npm` sẽ tự động được cài đặt đi kèm.
-* **Bước 2: Giải nén mã nguồn**
-  * Sao chép tệp nén `acp360_local.zip` sang máy tính mới và giải nén ra một thư mục làm việc bất kỳ (ví dụ: `D:\SafeOne`).
-* **Bước 3: Cài đặt các gói phụ thuộc (Dependencies)**
-  * Mở terminal (PowerShell / Command Prompt) tại thư mục vừa giải nén và chạy lệnh sau để tự động tải toàn bộ thư viện:
-    ```bash
-    npm install
-    ```
-* **Bước 4: Khởi chạy Development Server**
-  * Chạy lệnh sau để kích hoạt server local thời gian thực:
-    ```bash
-    npm run dev
-    ```
-  * Mở trình duyệt và truy cập theo đường dẫn hiển thị trên terminal: `http://localhost:5173`.
+3. **Báo cơm (BaoCom) & Suất ăn (Cập nhật logic mới)**: 
+   * Luồng kiểm duyệt chặt chẽ giữa **Bộ phận** ➡️ **EHS** ➡️ **Nhà ăn**.
+   * **Logic Mì & Sữa Tăng Ca nâng cao:** Số lượng Mì và Sữa tăng ca chỉ chính thức được cộng vào báo cáo Excel xuất ra sau khi Nhà ăn đã phát thực tế và đại diện Bộ phận đã nhấn nút **"Xác nhận đã nhận đủ"**.
+4. **Giám sát chuyên biệt**: Theo dõi vi phạm hút thuốc (`HutThuocToilet`) và quản lý vệ sinh khu vực rác thải sản xuất (`GiamSatNhaRac`).
+5. **Thông báo Real-time dạng Facebook (Cập nhật mới nhất)**: 
+   * Tích hợp bong bóng Toast thông báo thời gian thực tự động ẩn (Facebook-style) hiển thị ở góc dưới bên phải màn hình.
+   * Đồng bộ hóa luồng thông báo tập trung qua `NotificationBell` để tránh lặp và nâng cao trải nghiệm người dùng.
+6. **Bộ lọc lịch sử chuyên biệt cho Nhà Ăn (Canteen - Cập nhật mới nhất)**: 
+   * Nhà ăn chỉ theo dõi các hoạt động liên quan đến EHS/Admin hoặc hoạt động phát/nhận tăng ca của các bộ phận thường.
+   * Các lịch sử sửa đổi cơm thường (Cơm mặn, Cơm chay, Sữa GS...) của bộ phận thường sẽ tự động ẩn đi, đồng thời ẩn hoàn toàn thông tin liên quan đến `Sữa (cơm) (GS)` để tránh nhiễu thông tin.
 
 ---
 
-#### 2. Hướng dẫn đẩy bản cập nhật lên trang web (Firebase Hosting & Cloud Functions)
+### 🛠️ Kiến trúc hệ thống cục bộ (Local Architecture)
 
-Hệ thống được thiết kế để triển khai trực tuyến vô cùng đơn giản lên nền t sản **Firebase Cloud Platform**:
-
-* **Bước 1: Cài đặt Firebase CLI (Nếu chưa có)**
-  * Chạy lệnh sau ở dòng lệnh máy tính để cài đặt bộ công cụ Firebase toàn cầu:
-    ```bash
-    npm install -g firebase-tools
-    ```
-* **Bước 2: Đăng nhập & Chọn Project**
-  * Đăng nhập tài khoản Firebase của bạn:
-    ```bash
-    firebase login
-    ```
-  * Chọn đúng dự án của bạn bằng cách liên kết hoặc kiểm tra tên dự án trong tệp `.firebaserc`.
-* **Bước 3: Biên dịch sản phẩm tối ưu (Build)**
-  * Tạo bản build production tối ưu hóa dung lượng:
-    ```bash
-    npm run build
-    ```
-* **Bước 4: Cấu hình biến môi trường & API Key cho Chatbot AI**
-  * Tạo tệp cấu hình `.env` ở thư mục gốc nếu bạn dùng Cloud Functions để chạy fallback chatbot:
-    ```env
-    VITE_ASKAI_URL=https://<region>-<project-id>.cloudfunctions.net/askAI
-    ```
-  * Cấu hình khóa bí mật (Secret API Key) cho Cloud Functions gọi đến Gemini API:
-    ```bash
-    firebase functions:secrets:set GOOGLE_APIKEY="API_KEY_GEMINI_CUA_BAN"
-    ```
-* **Bước 5: Triển khai trực tuyến (Deploy)**
-  * Triển khai tất cả lên cloud chỉ với một câu lệnh:
-    ```bash
-    firebase deploy
-    ```
-  * Hoặc nếu bạn chỉ muốn deploy phần Hosting:
-    ```bash
-    firebase deploy --only hosting
-    ```
-  * Sau khi hoàn tất, hệ thống sẽ cấp cho bạn một đường dẫn trực tuyến (ví dụ: `https://acp360.web.app`).
+* **Frontend**: React 19, Vite, CSS Custom Theme. 
+  * Dự án sử dụng bộ thư viện giả lập **`src/firebase-mock.js`** để chuyển hướng toàn bộ các lệnh gọi Firebase SDK gốc thành các yêu cầu HTTP API gửi đến Node.js Server cục bộ.
+* **Backend (Node.js)**: Express Server chạy tại cổng `5000` (`http://localhost:5000`), chịu trách nhiệm xác thực JWT và xử lý nghiệp vụ API.
+* **Cơ sở dữ liệu (MySQL)**: Chạy trên cổng `3306` (`127.0.0.1:3306`) thông qua **XAMPP**, lưu trữ tất cả thông tin tài khoản, báo cơm, gemba, lịch sử hoạt động.
 
 ---
 
-#### 3. Cấu hình Luật bảo mật trên Firebase (Security Rules)
+### 🚀 Hướng dẫn khởi chạy cục bộ (Setup Local)
 
-Để đảm bảo hệ thống có thể kết nối và ghi nhận dữ liệu chính xác trên máy chủ đám mây mới hoặc tên miền khác, bạn cần sao chép các cấu hình luật bảo mật dưới đây và dán vào tab **Rules** trên bảng điều khiển Firebase:
+#### Bước 1: Thiết lập Cơ sở dữ liệu MySQL (XAMPP)
+1. Tải và cài đặt **XAMPP** từ trang chủ.
+2. Khởi động bảng điều khiển **XAMPP Control Panel** và nhấn nút **Start** ở dịch vụ **MySQL** (và Apache nếu cần).
+3. Truy cập vào trang quản trị cơ sở dữ liệu `http://localhost/phpmyadmin`.
+4. Tạo một cơ sở dữ liệu mới tên là `safeone`.
+5. Import file cấu trúc dữ liệu từ tệp mã nguồn: [backend/schema.sql](file:///C:/Users/tranv/SafeOne/backend/schema.sql) để tạo đầy đủ các bảng dữ liệu cần thiết.
 
-##### 🔒 Luật bảo mật Cơ sở dữ liệu (Firestore Security Rules)
-Truy cập **Firebase Console ➔ Firestore Database ➔ tab Rules** và cấu hình như sau để cho phép tất cả các tài khoản đã xác thực có quyền đọc và ghi dữ liệu:
-```javascript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    // Yêu cầu người dùng phải đăng nhập thông qua Firebase Auth để đọc/ghi dữ liệu
-    match /{document=**} {
-      allow read, write: if request.auth != null;
-    }
-  }
-}
-```
+#### Bước 2: Cài đặt và cấu hình Node.js Backend
+1. Mở cửa sổ Terminal/PowerShell tại thư mục Backend: `C:\Users\tranv\SafeOne\backend`
+2. Cài đặt các thư viện bổ trợ:
+   ```bash
+   npm install
+   ```
+3. Tạo/Kiểm tra tệp tin cấu hình môi trường `.env` tại thư mục `backend/` với nội dung:
+   ```env
+   PORT=5000
+   DB_HOST=127.0.0.1
+   DB_PORT=3306
+   DB_USER=root
+   DB_PASSWORD=
+   DB_NAME=safeone
+   JWT_SECRET=safeone_super_secret_key_2026
+   ```
+4. Khởi chạy máy chủ Backend:
+   * Chạy môi trường phát triển (tự động restart khi sửa file): `npm run dev`
+   * Chạy môi trường sản phẩm: `npm start`
+   * *Đảm bảo hiển thị thông báo kết nối MySQL thành công tại terminal.*
 
-##### 📂 Luật bảo mật Lưu trữ Hình ảnh (Firebase Storage Security Rules)
-Truy cập **Firebase Console ➔ Storage ➔ tab Rules** và cấu hình như sau để cho phép lưu trữ và hiển thị ảnh cải tiến Gemba:
-```javascript
-rules_version = '2';
-service firebase.storage {
-  match /b/{bucket}/o {
-    match /{allPaths=**} {
-      allow read, write: if request.auth != null;
-    }
-  }
-}
-```
+#### Bước 3: Cài đặt và chạy Frontend
+1. Mở một cửa sổ Terminal/PowerShell mới tại thư mục gốc: `C:\Users\tranv\SafeOne`
+2. Cài đặt các thư viện frontend:
+   ```bash
+   npm install
+   ```
+3. Khởi chạy máy chủ phát triển thời gian thực:
+   ```bash
+   npm run dev
+   ```
+4. Mở trình duyệt và truy cập: `http://localhost:5173`. Bạn đã có thể đăng ký tài khoản, đăng nhập và sử dụng toàn bộ tính năng offline.
 
-##### 🌐 Trỏ tên miền riêng tùy chỉnh (Custom Domain)
-Nếu bạn muốn đổi từ tên miền mặc định của Firebase (`.web.app` / `.firebaseapp.com`) sang tên miền riêng của doanh nghiệp:
-1. Truy cập **Firebase Console ➔ Hosting ➔ bấm nút "Add custom domain"**.
-2. Nhập tên miền của bạn (ví dụ: `safeone.mycompany.com`).
-3. Firebase sẽ cấp cho bạn bản ghi **TXT** để xác minh quyền sở hữu và bản ghi **A** (IP Address).
-4. Bạn chỉ cần truy cập vào trang quản lý DNS tên miền của mình, thêm các bản ghi tương ứng và đợi khoảng 10 - 30 phút để Cloudflare/Firebase tự động kích hoạt chứng chỉ SSL (HTTPS) miễn phí.
+---
+
+### 🌐 Hướng dẫn triển khai lên máy chủ thuê (Ví dụ: Viettel Cloud)
+
+Nếu bạn đưa dự án này lên máy chủ VPS Viettel:
+1. **Nếu chạy chung database & backend trên VPS:** Giữ nguyên `DB_HOST=127.0.0.1` trong file `.env` của Backend. Chỉ cần mở cổng tường lửa (Firewall) của VPS cho cổng API Node.js (ví dụ: `5000`) để máy trạm của nhân viên kết nối tới.
+2. **Nếu kết nối database từ xa:** Cần đổi `DB_HOST` trong `.env` của Backend thành IP tĩnh công khai của VPS chứa database. Cần cấu hình MySQL trên VPS cho phép kết nối Remote và mở cổng `3306`.
+3. **Cập nhật URL API ở Frontend:** Đổi đường dẫn API gốc từ `http://localhost:5000` thành IP công khai hoặc tên miền của VPS Viettel trong tệp `src/firebase-mock.js` trước khi biên dịch (`npm run build`).
+
+---
+
+### 📝 Chính sách Đồng bộ & Phát triển mã nguồn (Development Rules)
+
+Để tránh xung đột dữ liệu và cấu hình giữa hai môi trường:
+* **Môi trường Cloud trực tuyến (`acp360`):** Mọi việc chỉnh sửa tính năng, nâng cấp giao diện sẽ được thực hiện trước tại thư mục `C:\Users\tranv\acp360` và đẩy trực tuyến lên Firebase Hosting (`acp360.web.app`).
+* **Môi trường Local offline (`SafeOne`):** Chỉ sau khi các tính năng trên trang trực tuyến hoạt động ổn định và được nghiệm thu, bạn mới yêu cầu đồng bộ mã nguồn sang thư mục `C:\Users\tranv\SafeOne` để chuyển đổi luồng dữ liệu sang MySQL + Node.js phục vụ chạy Offline.
 
 ---
 
 ## 🇬🇧 ENGLISH - PROJECT GUIDE
 
 ### 🌟 Key Features
-1. **Gemba & Self-Gemba Checklists**: Real-time safety/quality observation logger with dynamic scoring, photo attachments, and selective date-range CAP (Corrective Action Plan) Excel exports.
+1. **Gemba & Self-Gemba Checklists**: Real-time safety/quality observation logger with dynamic scoring, photo attachments, and selective date-range CAP Excel exports.
 2. **Walkie-Talkie & Break Chat (Bodam & GiaiLaoChat)**: Instant interior communication channels for field coordinators and staff.
-3. **Meal Registration (BaoCom)**: Structured 2-way approval pipeline: **Department (Request)** ➡️ **EHS (Approve & Forward)** ➡️ **Canteen (Confirm)**.
+3. **Meal Registration (BaoCom) with Overtime verification**: 
+   * Structured department ➡️ EHS ➡️ Canteen approval pipeline.
+   * **Overtime Verification:** Overtime noodles and milk numbers are only accumulated in the Excel export once the department explicitly clicks **"Confirm receipt"** (deptAck).
 4. **Targeted Safety Compliance**: Monitoring illegal smoking zones (`HutThuocToilet`) and factory waste station cleanliness (`GiamSatNhaRac`).
-5. **AI Chatbot EHS Assistant**: Powered by **Gemini 2.5 Flash**, natively fine-tuned with rigorous factory EHS handbooks and software layout guides.
-
-### 🛠️ Technology Stack
-* **Frontend**: React 19, Vite 7, Tailored CSS Design Tokens, React Icons, `@hello-pangea/dnd`, `exceljs` & `xlsx` (Excel export engines).
-* **Backend / DB**: Firebase v11 (Authentication, Firestore, Cloud Storage).
-* **Serverless Backend (AI)**: Firebase Cloud Functions running on Node 22, linked with `@google/generative-ai`.
-
-### 🚀 Step-by-Step Setup
-
-#### 1. Prerequisites
-* **Node.js**: v18+ (v22 recommended).
-* A Firebase account and project initialized.
-
-#### 2. Install Dependencies
-Run in the root folder:
-```bash
-npm install
-```
-Install functions dependencies (optional, for AI assistant backend):
-```bash
-cd functions
-npm install
-cd ..
-```
-
-#### 3. Configure Environment Variables
-Create a `.env` file in the root folder:
-```env
-VITE_ASKAI_URL=https://<region>-<project-id>.cloudfunctions.net/askAI
-```
-Configure your Gemini API key secret for Cloud Functions:
-```bash
-firebase functions:secrets:set GOOGLE_APIKEY="YOUR_GEMINI_API_KEY"
-```
-
-#### 4. Run Locally
-Start the development server:
-```bash
-npm run dev
-```
-Open your browser and visit: `http://localhost:5173`.
-
-#### 5. Build for Production
-To bundle and optimize the project for deployment:
-```bash
-npm run build
-```
+5. **Facebook-style Real-time Toast Notifications**: Instant, auto-dismissing notifications sliding from the bottom-right corner of the screen.
+6. **Specialized Canteen History Filter**: Suppresses general food logs and `Milk (Meal) (GS)` updates for the Canteen role, showing only EHS/Canteen actions and overtime details.
 
 ---
 
-## 📝 Nhật ký đổi tên (Migration Log)
-Dự án được đổi tên từ **ACP360** sang **SafeOne** vào tháng 05/2026. 
-* Toàn bộ nhãn UI, tiêu đề trang HTML, bản quyền chân trang và dữ liệu chỉ dẫn đào tạo AI Chatbot đều được đồng bộ hóa thống nhất dưới tên thương hiệu **SafeOne**.
-* Các liên kết kỹ thuật và cơ sở dữ liệu Firebase Firestore vẫn tiếp tục kế thừa từ hạ tầng hiện tại để bảo toàn tính toàn vẹn của dữ liệu cũ mà không gây gián đoạn hệ thống.
+### 🛠️ Architecture
+* **Frontend**: React 19, Vite, custom CSS. Uses a custom alias system inside `src/firebase-mock.js` to redirect all Firebase SDK calls into local Node.js REST API requests.
+* **Backend**: Node.js Express server running on port `5000`.
+* **Database**: MySQL database running on port `3306` via XAMPP.
+
+---
+
+### 🚀 Setup & Launch (Local)
+1. **MySQL Setup**: Install XAMPP. Start MySQL. Go to `http://localhost/phpmyadmin` and create a database named `safeone`. Import [backend/schema.sql](file:///C:/Users/tranv/SafeOne/backend/schema.sql).
+2. **Backend**:
+   * Navigate to `backend/` and run `npm install`.
+   * Configure `backend/.env` with your DB credentials.
+   * Start the server using `npm run dev` or `npm start`.
+3. **Frontend**:
+   * Navigate to the root directory and run `npm install`.
+   * Launch the dev server: `npm run dev`.
+   * Open `http://localhost:5173` in your browser.
