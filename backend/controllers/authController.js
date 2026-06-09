@@ -5,27 +5,35 @@ import jwt from "jsonwebtoken";
 
 const JWT_SECRET = process.env.JWT_SECRET || "safeone_super_secret_key_2026";
 
-// Auto-seed a default admin account if users table is empty
+// Auto-seed a default admin account and ensure it is loginable
 export async function seedDefaultAdmin() {
   try {
-    const [rows] = await pool.query("SELECT COUNT(*) as count FROM users");
-    if (rows[0].count === 0) {
-      console.log("MySQL users table is empty. Seeding default admin account...");
+    const [rows] = await pool.query("SELECT * FROM users WHERE email = ?", ["admin@safeone.com"]);
+    const passwordHash = await bcrypt.hash("admin", 10);
+    
+    if (rows.length === 0) {
+      console.log("🔄 Tài khoản admin@safeone.com chưa tồn tại. Đang tiến hành tạo mới...");
       const uid = "admin-uid-123456";
-      const email = "admin@safeone.com";
-      const passwordHash = await bcrypt.hash("admin", 10);
-      const name = "Admin Việt Trần";
-      const role = "admin";
+      const name = "Super Admin";
+      const role = "admin,ehs";
       await pool.query(
         "INSERT INTO users (uid, email, password_hash, name, role) VALUES (?, ?, ?, ?, ?)",
-        [uid, email, passwordHash, name, role]
+        [uid, "admin@safeone.com", passwordHash, name, role]
       );
-      console.log("Default admin account seeded successfully: admin@safeone.com / admin");
+      console.log("✅ Tài khoản Admin mặc định đã được tạo thành công: admin@safeone.com / admin");
+    } else {
+      console.log("🔄 Tài khoản admin@safeone.com đã tồn tại. Đang đồng bộ và đặt lại mật khẩu về mặc định...");
+      await pool.query(
+        "UPDATE users SET password_hash = ? WHERE email = ?",
+        [passwordHash, "admin@safeone.com"]
+      );
+      console.log("✅ Đã cập nhật mật khẩu mặc định thành công cho: admin@safeone.com / admin");
     }
   } catch (e) {
-    console.error("Failed to seed default admin user:", e.message);
+    console.error("❌ Lỗi khi tự động gieo hạt Admin:", e.message);
   }
 }
+
 
 // JWT verification middleware
 export function authenticateToken(req, res, next) {
