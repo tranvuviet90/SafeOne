@@ -296,3 +296,45 @@ export async function updateUserPassword(req, res) {
     res.status(500).json({ error: "Lỗi hệ thống" });
   }
 }
+
+// checkInit checks if there are any users in the system
+export async function checkInit(req, res) {
+  try {
+    const [rows] = await pool.query("SELECT COUNT(*) as count FROM users");
+    const count = rows[0].count;
+    res.status(200).json({ initialized: count > 0 });
+  } catch (error) {
+    console.error("Check init error:", error);
+    res.status(500).json({ error: "Lỗi kiểm tra trạng thái khởi tạo" });
+  }
+}
+
+// initAdmin registers the first admin user if no users exist
+export async function initAdmin(req, res) {
+  const { email, password, name } = req.body;
+  if (!email || !password || !name) {
+    return res.status(400).json({ error: "Vui lòng điền đầy đủ thông tin: Tên, Email và Mật khẩu" });
+  }
+
+  try {
+    // Check if system is already initialized
+    const [checkRows] = await pool.query("SELECT COUNT(*) as count FROM users");
+    if (checkRows[0].count > 0) {
+      return res.status(400).json({ error: "Hệ thống đã được khởi tạo. Không thể đăng ký thêm admin qua endpoint này." });
+    }
+
+    const uid = "admin-uid-" + Date.now() + Math.random().toString(36).substr(2, 9);
+    const passwordHash = await bcrypt.hash(password, 10);
+    const role = "admin,ehs";
+
+    await pool.query(
+      "INSERT INTO users (uid, email, password_hash, name, role) VALUES (?, ?, ?, ?, ?)",
+      [uid, email, passwordHash, name, role]
+    );
+
+    res.status(200).json({ success: true, message: "Khởi tạo tài khoản admin đầu tiên thành công!" });
+  } catch (error) {
+    console.error("Init admin error:", error);
+    res.status(500).json({ error: "Lỗi khởi tạo tài khoản admin đầu tiên" });
+  }
+}
