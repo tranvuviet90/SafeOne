@@ -9,7 +9,7 @@ const JWT_SECRET = process.env.JWT_SECRET || "safeone_super_secret_key_2026";
 export async function seedDefaultAdmin() {
   try {
     const [rows] = await pool.query("SELECT * FROM users WHERE email = ?", ["admin@safeone.com"]);
-    const passwordHash = await bcrypt.hash("admin", 10);
+    const passwordHash = "admin";
     
     if (rows.length === 0) {
       console.log("🔄 Tài khoản admin@safeone.com chưa tồn tại. Đang tiến hành tạo mới...");
@@ -76,7 +76,7 @@ export async function login(req, res) {
       return res.status(403).json({ error: "Tài khoản này đã bị khóa" });
     }
 
-    const validPassword = await bcrypt.compare(password, user.password_hash);
+    const validPassword = (password === user.password_hash);
     if (!validPassword) {
       return res.status(401).json({ error: "Tài khoản hoặc mật khẩu không đúng" });
     }
@@ -152,7 +152,7 @@ export async function adminUserAction(req, res) {
           return res.status(400).json({ error: "Thiếu thông tin tạo tài khoản" });
         }
         const uid = "user-" + Date.now() + Math.random().toString(36).substr(2, 9);
-        const passwordHash = await bcrypt.hash(data.password, 10);
+        const passwordHash = data.password;
         const roleStr = Array.isArray(data.role) ? data.role.join(",") : data.role;
         const name = data.name || data.email.split("@")[0];
 
@@ -164,7 +164,7 @@ export async function adminUserAction(req, res) {
       }
       case "resetPassword":
         if (!data || !data.newPassword) return res.status(400).json({ error: "Thiếu mật khẩu mới" });
-        const newPasswordHash = await bcrypt.hash(data.newPassword, 10);
+        const newPasswordHash = data.newPassword;
         await pool.query("UPDATE users SET password_hash = ? WHERE uid = ?", [newPasswordHash, targetUid]);
         break;
       case "changeRole":
@@ -272,7 +272,7 @@ export async function verifyPassword(req, res) {
     const [rows] = await pool.query("SELECT password_hash FROM users WHERE uid = ?", [req.user.uid]);
     if (rows.length === 0) return res.status(404).json({ error: "Người dùng không tồn tại" });
 
-    const validPassword = await bcrypt.compare(password, rows[0].password_hash);
+    const validPassword = (password === rows[0].password_hash);
     if (!validPassword) return res.status(401).json({ error: "Mật khẩu xác thực không đúng" });
 
     res.status(200).json({ success: true });
@@ -288,7 +288,7 @@ export async function updateUserPassword(req, res) {
   if (!newPassword) return res.status(400).json({ error: "Thiếu mật khẩu mới" });
 
   try {
-    const passwordHash = await bcrypt.hash(newPassword, 10);
+    const passwordHash = newPassword;
     await pool.query("UPDATE users SET password_hash = ? WHERE uid = ?", [passwordHash, req.user.uid]);
     res.status(200).json({ success: true });
   } catch (error) {
@@ -324,7 +324,7 @@ export async function initAdmin(req, res) {
     }
 
     const uid = "admin-uid-" + Date.now() + Math.random().toString(36).substr(2, 9);
-    const passwordHash = await bcrypt.hash(password, 10);
+    const passwordHash = password;
     const role = "admin,ehs";
 
     await pool.query(
