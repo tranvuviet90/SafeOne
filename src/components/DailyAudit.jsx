@@ -593,7 +593,7 @@ function ImprovementModal({ modalData, onClose, onSave }) {
         <h3 style={{ marginTop: 0, color: colors.primary, borderBottom: `2px solid ${colors.primaryLight}`, paddingBottom: 10 }}>Cập nhật Cải thiện & Khắc phục</h3>
         <p><b>Lỗi:</b> {modalData.error.desc}</p>
         <div style={{ display: 'grid', gap: 12 }}>
-          <div> <label style={labelStyle}>Người phụ trách</label> <input type="text" value={responsiblePerson} onChange={e => setResponsiblePerson(e.target.value)} style={inputStyle} /> </div>
+          <div> <label style={labelStyle}>Người nhận Thông tin</label> <input type="text" value={responsiblePerson} onChange={e => setResponsiblePerson(e.target.value)} style={inputStyle} /> </div>
           <div>
             <label style={labelStyle}>Ngày dự kiến hoàn thành</label>
             <DatePicker
@@ -1636,7 +1636,7 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
                            <div>{e.group === 'Lỗi Khác' ? 'Lỗi khác' : e.desc}</div>
                            {e.responsiblePerson && (
                              <div style={{ fontSize: '12px', color: '#b94a48', fontWeight: 600, marginTop: 4 }}>
-                               Phụ trách: {e.responsiblePerson}
+                             Người nhận Thông tin: {e.responsiblePerson}
                              </div>
                            )}
                            {e.addedBy && <div style={{fontSize: 11, color: colors.textSecondary, fontStyle:'italic', marginTop: 2}}>{t("gemba.by")} {e.addedBy}</div>}
@@ -1703,7 +1703,7 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
                         <div>{e.group === 'Lỗi Khác' ? 'Lỗi khác' : e.desc}</div>
                         {e.responsiblePerson && (
                           <div style={{ fontSize: '12px', color: '#b94a48', fontWeight: 600, marginTop: 4 }}>
-                            Phụ trách: {e.responsiblePerson}
+                            Người nhận Thông tin: {e.responsiblePerson}
                           </div>
                         )}
                         {e.addedBy && (
