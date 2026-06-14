@@ -1633,8 +1633,13 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
                           <div style={{ fontWeight: 700, color: colors.primary }}>{e.group}</div>
                         </div>
                         <div style={{ marginTop: 6, overflowWrap:'anywhere' }}>
-                          {e.group === 'Lỗi Khác' ? 'Lỗi khác' : e.desc}
-                          {e.addedBy && <div style={{fontSize: 11, color: colors.textSecondary, fontStyle:'italic'}}>{t("gemba.by")} {e.addedBy}</div>}
+                           <div>{e.group === 'Lỗi Khác' ? 'Lỗi khác' : e.desc}</div>
+                           {e.responsiblePerson && (
+                             <div style={{ fontSize: '12px', color: '#b94a48', fontWeight: 600, marginTop: 4 }}>
+                               Phụ trách: {e.responsiblePerson}
+                             </div>
+                           )}
+                           {e.addedBy && <div style={{fontSize: 11, color: colors.textSecondary, fontStyle:'italic', marginTop: 2}}>{t("gemba.by")} {e.addedBy}</div>}
                         </div>
                         {images.length > 0 && (
                           <div style={{ marginTop: 8 }}>
@@ -1694,7 +1699,19 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
                       <tr key={`${e.code}-${dateForkey ? dateForkey.getTime() : i}`}>
                       <td style={{ padding: "10px 14px", fontSize: 12 }}>{safeTsToDate(e.timestamp)?.toLocaleString("vi-VN")}</td>
                       <td style={{ padding: "10px 14px" }}>{e.group}</td>
-                      <td style={{ padding: "10px 14px" }}>{e.group === 'Lỗi Khác' ? 'Lỗi khác' : e.desc} {e.addedBy && <div style={{fontSize: '11px', color: colors.textSecondary, fontStyle: 'italic'}}>{t("gemba.by")} {e.addedBy}</div>}</td>
+                      <td style={{ padding: "10px 14px" }}>
+                        <div>{e.group === 'Lỗi Khác' ? 'Lỗi khác' : e.desc}</div>
+                        {e.responsiblePerson && (
+                          <div style={{ fontSize: '12px', color: '#b94a48', fontWeight: 600, marginTop: 4 }}>
+                            Phụ trách: {e.responsiblePerson}
+                          </div>
+                        )}
+                        {e.addedBy && (
+                          <div style={{ fontSize: '11px', color: colors.textSecondary, fontStyle: 'italic', marginTop: 2 }}>
+                            {t("gemba.by")} {e.addedBy}
+                          </div>
+                        )}
+                      </td>
                       <td style={{ padding: "10px 8px", textAlign: "center" }}>
                         {images.length > 0 && (
                           <div style={{ position: 'relative', display: 'inline-block', cursor: 'pointer' }} onClick={() => openViewer(images, 0)}>
