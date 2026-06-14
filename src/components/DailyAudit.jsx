@@ -500,7 +500,7 @@ function ExportModal({ onClose, departments }) {
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 1000 }}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 1200 }}>
       <div style={{ background: colors.surface, padding: 22, borderRadius: 12, width: 520, boxShadow: "0 4px 15px rgba(0,0,0,.2)" }}>
         <h3 style={{ marginTop: 0, color: colors.primary }}>Xuất báo cáo</h3>
         <div style={{ display: 'grid', gap: '15px' }}>
@@ -646,7 +646,8 @@ function ImprovementModal({ modalData, onClose, onSave }) {
 /* =========================
    GembaReportDashboard
    ========================= */
-function GembaReportDashboard({ onClose, departments, allDeptScores, selectedMonth: initialMonth, calcHeSo, isMobile }) {
+function GembaReportDashboard({ onClose, onExport, departments, allDeptScores, selectedMonth: initialMonth, calcHeSo, isMobile }) {
+  const { t } = useI18n();
   const [tooltip, setTooltip] = useState({ visible: false, x: 0, y: 0, dept: null, side: 'top' });
   const [activeMonth, setActiveMonth] = useState(initialMonth);
   const [animated, setAnimated] = useState(false);
@@ -868,6 +869,24 @@ function GembaReportDashboard({ onClose, departments, allDeptScores, selectedMon
               onChange={e => setActiveMonth(e.target.value)}
               style={{ padding: '6px 10px', borderRadius: 8, border: '1.5px solid #2e4070', background: '#1e2e54', color: '#c8d8f8', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
             />
+            <button
+              onClick={onExport}
+              style={{
+                background: colors.success,
+                color: colors.white,
+                border: "none",
+                padding: "6px 15px",
+                borderRadius: 8,
+                fontWeight: "bold",
+                cursor: "pointer",
+                fontSize: 14,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 5
+              }}
+            >
+              📥 {t("common.export")}
+            </button>
             <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.08)', border: 'none', fontSize: 18, cursor: 'pointer', color: '#8a9fc8', borderRadius: 8, width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
           </div>
         </div>
@@ -1450,6 +1469,7 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
         {showReportDashboard && (
           <GembaReportDashboard
             onClose={() => setShowReportDashboard(false)}
+            onExport={() => setShowExportModal(true)}
             departments={departments}
             allDeptScores={allDeptScores}
             selectedMonth={selectedMonth}
@@ -1515,9 +1535,6 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
                   <input type="month" value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} style={{ padding: 8, borderRadius: 6, border: `1px solid ${colors.border}` }} />
                   <button onClick={() => setShowReportDashboard(true)} style={{ background: '#1565c0', color: colors.white, border: "none", padding: "8px 15px", borderRadius: 6, fontWeight: "bold", cursor: "pointer", marginTop: isMobile ? 10 : 0 }}>
                     📊 Báo cáo
-                  </button>
-                  <button onClick={() => setShowExportModal(true)} style={{ background: colors.success, color: colors.white, border: "none", padding: "8px 15px", borderRadius: 6, fontWeight: "bold", cursor: "pointer", marginTop: isMobile ? 10 : 0 }}>
-                   {t("common.export")}
                   </button>
               </div>
             </div>
