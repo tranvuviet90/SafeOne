@@ -15,7 +15,8 @@ export const GEMBA_DEPARTMENTS = [
   { name: "Graphics", defaultPeople: 12 },
   { name: "QC", defaultPeople: 34 },
   { name: "Warehouse", defaultPeople: 72 },
-  { name: "Arrow", defaultPeople: 17 },
+  { name: "A_Blank", defaultPeople: 17 },
+  { name: "A_Cosmetic", defaultPeople: 20 },
   { name: "MTN", defaultPeople: 95 },
   { name: "ENG", defaultPeople: 110 },
 ];

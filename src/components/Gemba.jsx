@@ -28,7 +28,8 @@ function ImprovementIcon({ color = 'currentColor', size = 18 }) {
 /* ====================== CẤU HÌNH BỘ PHẬN ====================== */
 const departments = [
   { name: "Cutting" }, { name: "Rolling" }, { name: "Finishing" }, { name: "Dipping" },
-  { name: "Graphics" }, { name: "QC" }, { name: "Warehouse" }, { name: "Arrow" },
+  { name: "Graphics" }, { name: "QC" }, { name: "Warehouse" }, { name: "A_Blank" },
+  { name: "A_Cosmetic" },
   { name: "MTN" }, { name: "ENG" },
 ];
 
