@@ -1,0 +1,194 @@
+Workbook Sheets Summary:
+
+========================================
+Sheet: "Summary1"
+Total Rows: 563
+Row 0: ["DANH SÁCH CHỨNG NHẬN VẬN HÀNH",null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,"Số (Form Code): ADL/F/EHS/022-04"]
+Row 1: [null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,"Lần hiệu chỉnh (Revision No.): 00"]
+Row 2: [null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,"Lần ban hành (Issuance No.): 01"]
+Row 3: [null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,"Ngày hiệu lực (Effective date): 01/04/2025"]
+Row 4: []
+Row 5: ["STT","MSNV","TÊN","BỘ PHẬN","NGÀY ĐÁNH GIÁ","HẠNG MỤC ĐƯỢC ĐÀO TẠO"]
+Row 6 (sample data): [null,null,null,null,null,"Materials + Paint Blending",null,null,null,null,null,null,null,null,null,"G_Cutting",null,null,null,null,null,null,"G_Rolling",null,null,null,null,null,null,null,null,null,null,"G_Finishing",null,null,null,null,null,null,"G_Dipping",null,null,null,null,null,null,null,null,"G_Graphics",null,null,null,null,null,null,"A_Blank",null,null,null,null,null,null,null,null,null,null,null,null,"A_Graphics",null,null,"Kayak",null,null,null,null,null,null,null,null,null,null,null,null,"A_QC",null,null,null,null,"G_QC Blank",null,null,null,null,"G_QC Cosmetics",null,null,null,null,"MTN",null,null,null,"Note"]
+========================================
+
+========================================
+Sheet: "Summary"
+Total Rows: 24
+Row 0: ["TỔNG HỢP TÌNH TRẠNG CHỨNG NHẬN VẬN HÀNH"]
+Row 1: ["Date Update: 06/10/2026"]
+Row 2: []
+Row 3: ["BỘ PHẬN","TỔNG HẠNG MỤC","TỔNG NHÂN SỰ","ĐỦ ĐIỀU KIỆN","THIẾU CHỨNG NHẬN","TỶ LỆ TUÂN THỦ"]
+Row 4: ["Golf Cutting",12,67,67,0,1]
+Row 5: ["Golf Rolling",14,144,138,6,0.9583333333333334]
+Row 6 (sample data): ["Golf Finishing",12,47,47,0,1]
+========================================
+
+========================================
+Sheet: "Data"
+Total Rows: 87
+Row 0: ["Week","Ngày đánh giá","G_Cutting","G_Rolling","G_Finishing","G_Buffing","G_Dipping","G_Graphics","A_Blank","A_Graphics","Kayak",null,"Week","G_Cutting","G_Rolling","G_Finishing","G_Buffing","G_Dipping","G_Graphics","A_Blank","A_Graphics","Kayak","Total"]
+Row 1: ["2025-T07",45858,0,1,0,0,0,0,0,0,0,null,"2025-T07","",2,1,"","","","","","",3]
+Row 2: ["2025-T07",45866,0,1,0,0,0,0,0,0,0,null,"2025-T08","",1,"","","","","","","",1]
+Row 3: ["2025-T07",45869,0,0,1,0,0,0,0,0,0,null,"2025-T10","",2,2,3,3,"","","","",10]
+Row 4: ["2025-T08",45892,0,1,0,0,0,0,0,0,0,null,"2025-T11",1,6,"","","",1,"","","",8]
+Row 5: ["2025-T10",45937,0,0,1,0,0,0,0,0,0,null,"2025-T12",8,3,3,8,2,"","","","",24]
+Row 6 (sample data): ["2025-T10",45945,0,0,1,0,0,0,0,0,0,null,"2026-T01","",3,"",1,2,2,"","","",8]
+========================================
+
+========================================
+Sheet: "Cert_Matrix"
+Total Rows: 68
+Row 0: ["CERTIFICATION MATRIX",null,null,null,null,null,null,null,null,null,null,null,null,"[X] = Bắt buộc phải được cấp chứng nhận vận hành"]
+Row 1: ["Date update: 05/02/2026",null,null,null,null,null,null,null,null,null,null,null,null,"[Ô trống] = Không yêu cầu chứng nhận an toàn"]
+Row 2: []
+Row 3: ["BỘ PHẬN","CUTTING",null,null,null,null,null,null,null,null,null,"GOLF ROLLING",null,null,null,null,null,null,null,null,null,null,null,"GOLF FINISHING",null,null,null,null,null,null,null,null,null,"GOLF BUFFING",null,null,null,null,null,null,null,null,null,"GOLF DIPPING",null,null,null,null,null,null,null,"GOLF GRAPHICS",null,null,null,null,null,null,null,null,"ARROW BLANK",null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,"ARROW GRAPHICS",null,null,null,null,"KAYAK",null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,"QC",null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,"CHUNG"]
+Row 4: ["HẠNG MỤC ĐÀO TẠO\r\n/VỊ TRÍ CÔNG VIỆC","Máy \r\nSheet 45°","Máy \r\nSheet 90°","Máy \r\nSheet 135°","Xe \r\nNâng \r\nPrepreg","Máy \r\nShear","Máy \r\nDie Cut","Splicing","Máy Inkjet","Máy Ép \r\nHashima","Máy Hút \r\nChân \r\nKhông","Bàn\r\n Nhiệt","Máy CDI","Máy Revo","Máy \r\nAuto \r\nRolling ","Máy \r\nCello\r\n Ngang","Máy \r\nCello\r\n Đứng","Máy Rút \r\nDây Cello ","Máy \r\nRút \r\nMandrel ","Máy \r\nRửa \r\nMandrel","Máy Đo/Uốn Thẳng Mandrel ","Lò Sấy","Máy \r\nKhắc \r\nLaser","Máy \r\nDual \r\nSaw","Máy \r\nĐo \r\nOD","Máy\r\n Soi \r\nĐầu TIP","Máy Mài Đánh Bóng","Auto \r\nSanding","Máy Rửa -\r\n Sấy Tự Động","Máy \r\nParagon","Máy\r\n Khắc\r\n Laser","Máy \r\nFrequency","Máy/Bảng \r\nĐo \r\nOrtho Flex","Máy Rửa - \r\nSấy Tự Động","Máy Bom \r\nÁp Lực","Máy Mài \r\nĐánh Bóng","Máy \r\nTip - Blast","Máy \r\nĐánh Bóng","Máy \r\nScrap Shaft","Máy \r\nBắn Cát ","Máy \r\nĐo OD","Cân \r\nWeight","Máy \r\nStraightness","Máy \r\nLắc Sơn","Máy/Kệ \r\nKhuấy Sơn","Máy Phun \r\nSơn Tự động","Máy Rửa Mắt Đứng/\r\nVòi Tắm Khẩn Cấp","Máy Auto Dipping","Lò \r\nSấy","Máy \r\nScrap Shaft","Máy \r\nBắn Cát","Máy \r\nDecal","Máy \r\nIn Lụa","Băng \r\nTải","Lò \r\nSấy","Thước \r\nĐo Laser","Máy \r\nKhắc Laser","Máy \r\nĐo OD","Cân \r\nWeight ","Máy \r\nStraightness","Máy\r\n CDI","Máy\r\n Revo","Bàn \r\nNhiệt","Máy Cello \r\nNgang","Sử Dụng \r\nỐng Tool","Lò \r\nSấy","Lò Sấy Nhỏ","Máy Rút \r\nDây Cello ","Máy Rút \r\nMandrel ","Máy Đo/Uốn \r\nThẳng Mandrel ","Máy \r\nDual Saw","Máy \r\nParagon","Máy Mài \r\nĐánh Bóng","Máy \r\nKhắc Laser","Máy Cắt \r\n(Apple)","Máy Đo\r\nĐầu Cong","Máy Xác Định\r\nĐiểm Cong","Máy\r\n Decal","Máy \r\nIn Lụa","Lò \r\nSấy","Máy Cắt","Máy Mài","Máy \r\nSheet","Máy \r\nShear","Xe Nâng Prepreg","Máy \r\nDie Cut","Máy ép Hashima","Máy \r\nCDI   ","Máy Cello \r\nNgang","Lò \r\nSấy","Máy Rút Mandrel","Máy \r\nCắt Đầu","Máy \r\nCắt","Máy Rút\r\n Dây Cello","Máy Paragon","Máy Mài \r\nĐánh Bóng","Máy \r\nMài","Máy \r\nĐánh Bóng","Máy Phun \r\nSơn Tự động","Máy Đo Độ Võng (SPINE)","Máy Tìm Điểm Cứng (SPINE FINDER)","Máy Kiểm Tra Độ Bền (PROOF LOAD)","Cân Weight Đơn (CG)","Cân Weight Tự Động (CG)","Máy Đo Độ Cong (ZONE)","Máy Soi Đầu TIP - Apple","Máy Đo OD (Z-Mike)","Máy Đo Ortho Flex","Bảng Đo Ortho Flex","Máy Kiểm Tra Giao Động (FREQUENCY)","Máy Kiểm Tra Độ Gãy (BENDING TEST)","Máy Kiểm Tra Độ Xoắn (TORQUE)","Máy Auto Inspection Golf Shaft","Máy Đo Độ Cong 3 Điểm","Máy Cắt Đầu Flex","Máy Đo HST Flex","Máy Kiểm Tra Độ Bền Sơn","Máy Kiểm Tra Độ Bền Sơn (RUBTEST)","Máy Kiểm Tra Độ Bền Sơn (FALLING SAND)","Máy Đo Mandrel","Máy Kiểm Tra Giao Động (FREQUENCY)","Thước Đo Laser","Máy Đo OD KAYAK","Sử Dụng \r\nVật \r\nSắc Nhọn","Xử Lý \r\nPhân Loại \r\nRác Thải"]
+Row 5: ["Sheeting","X","X","X","X",null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,"X","X"]
+Row 6 (sample data): ["Shearing",null,null,null,null,"X",null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,"X","X"]
+========================================
+
+========================================
+Sheet: "G_Cutting"
+Total Rows: 73
+Row 0: [null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,"Số (Form Code): ADL/F/EHS/022-04"]
+Row 1: ["DANH SÁCH CHỨNG NHẬN VẬN HÀNH",null,null,null,null,null,null,null,null,null,null,null,null,null,null,"Lần hiệu chỉnh (Revision No.): 00"]
+Row 2: [null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,"Lần ban hành (Issuance No.): 01"]
+Row 3: [null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,"Ngày hiệu lực (Effective date): 01/04/2025"]
+Row 4: ["STT","MSNV","HỌ TÊN","CHỨC VỤ","VỊ TRÍ \r\nCÔNG VIỆC","BỘ PHẬN","NGÀY\r\nĐÁNH GIÁ","HẠNG MỤC ĐÀO TẠO"]
+Row 5: [null,null,null,null,null,null,null,"Máy \r\nSheet 45°","Máy \r\nSheet 90°","Máy \r\nSheet 135°","Xe Nâng \r\nPrepreg","Máy \r\nShear","Máy \r\nDie Cut","Splicing","Máy \r\nInkjet","Máy Ép \r\nHashima","Máy Hút \r\nChân Không","Sử Dụng \r\nVật Sắc Nhọn","Xử Lý Phân \r\nLoại Rác Thải","HIỆN TRẠNG","LÝ DO","NGÀY DỰ KIẾN \r\nHOÀN THÀNH"]
+Row 6 (sample data): [1,"5027","Trần Quốc Cường","Manufacturing Supervisor",null,"Golf Cutting",null,true,true,true,true,true,true,true,false,true,true,true,true,"Đủ điều kiện"]
+========================================
+
+========================================
+Sheet: "G_Rolling"
+Total Rows: 153
+Row 0: [null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,"Số (Form Code): ADL/F/EHS/022-04"]
+Row 1: ["DANH SÁCH CHỨNG NHẬN VẬN HÀNH",null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,"Lần hiệu chỉnh (Revision No.): 00"]
+Row 2: [null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,"Lần ban hành (Issuance No.): 01"]
+Row 3: [null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,"Ngày hiệu lực (Effective date): 01/04/2025"]
+Row 4: ["STT","MSNV","HỌ TÊN","CHỨC VỤ","VỊ TRÍ \r\nCÔNG VIỆC","BỘ PHẬN","NGÀY\r\nĐÁNH GIÁ",null,"HẠNG MỤC ĐƯỢC ĐÀO TẠO"]
+Row 5: [null,null,null,null,null,null,null,"Bàn \r\nNhiệt","Máy \r\nCDI","Máy \r\nRevo","Máy Auto \r\nRolling ","Máy Cello \r\nNgang","Máy \r\nCello Đứng","Máy Rút \r\nDây Cello ","Máy Rút \r\nMandrel ","Máy Rửa \r\nMandrel","Máy Đo/Uốn \r\nThẳng Mandrel ","Lò \r\nSấy","Máy \r\nKhắc Laser","Sử Dụng \r\nVật Sắc Nhọn","Xử Lý Phân \r\nLoại Rác Thải","HIỆN TRẠNG","LÝ DO","NGÀY DỰ KIẾN \r\nHOÀN THÀNH"]
+Row 6 (sample data): [1,"3504","Tô Văn Sơn","Leader",null,"Golf Rolling",null,true,true,true,true,true,true,true,true,true,true,true,true,true,true,"Đủ điều kiện",null,null,"S2"]
+========================================
+
+========================================
+Sheet: "G_Finishing"
+Total Rows: 53
+Row 0: [null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,"Số (Form Code): ADL/F/EHS/022-04"]
+Row 1: ["DANH SÁCH CHỨNG NHẬN VẬN HÀNH",null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,"Lần hiệu chỉnh (Revision No.): 00"]
+Row 2: [null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,"Lần ban hành (Issuance No.): 01"]
+Row 3: [null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,"Ngày hiệu lực (Effective date): 01/04/2025"]
+Row 4: ["STT","MSNV","HỌ TÊN","CHỨC VỤ","VỊ TRÍ \r\nCÔNG VIỆC","BỘ PHẬN","NGÀY\r\nĐÁNH GIÁ","HẠNG MỤC ĐƯỢC ĐÀO TẠO"]
+Row 5: [null,null,null,null,null,null,null,"Máy \r\nDual Saw","Máy \r\nĐo OD","Máy Soi \r\nĐầu TIP","Máy Mài\r\nĐánh Bóng","Auto \r\nSanding","Máy Rửa -\r\n Sấy Tự Động","Máy \r\nParagon","Máy\r\n Khắc Laser","Máy \r\nFrequency","Máy/Bảng Đo \r\nOrtho Flex","Sử Dụng \r\nVật Sắc Nhọn ","Xử Lý Phân \r\nLoại Rác Thải","HIỆN TRẠNG","LÝ DO","NGÀY DỰ KIẾN \r\nHOÀN THÀNH"]
+Row 6 (sample data): [1,"2272","Nguyễn Ngọc Thuận","Leader",null,"Golf Finishing",null,true,true,false,true,true,true,true,true,true,true,true,false,"Đủ điều kiện",null,null,"S2"]
+========================================
+
+========================================
+Sheet: "G_Buffing"
+Total Rows: 51
+Row 0: [null,null,null,null,null,null,null,null,null,null,null,null,null,null,"Số (Form Code): ADL/F/EHS/022-04"]
+Row 1: ["DANH SÁCH CHỨNG NHẬN VẬN HÀNH",null,null,null,null,null,null,null,null,null,null,null,null,null,"Lần hiệu chỉnh (Revision No.): 00"]
+Row 2: [null,null,null,null,null,null,null,null,null,null,null,null,null,null,"Lần ban hành (Issuance No.): 01"]
+Row 3: [null,null,null,null,null,null,null,null,null,null,null,null,null,null,"Ngày hiệu lực (Effective date): 01/04/2025"]
+Row 4: ["STT","MSNV","HỌ TÊN","CHỨC VỤ","VỊ TRÍ \r\nCÔNG VIỆC","BỘ PHẬN","NGÀY\r\nĐÁNH GIÁ","HẠNG MỤC ĐƯỢC ĐÀO TẠO"]
+Row 5: [null,null,null,null,null,null,null,"Máy Rửa - \r\nSấy Tự Động","Máy Bom \r\nÁp Lực","Máy Mài \r\nĐánh Bóng","Máy \r\nTip - Blast","Máy \r\nĐánh Bóng","Máy \r\nScrap Shaft","Máy \r\nBắn Cát ","Máy \r\nĐo OD","Cân \r\nWeight","Máy \r\nStraightness","Sử Dụng \r\nVật Sắc Nhọn","Xử Lý Phân \r\nLoại Rác Thải","HIỆN TRẠNG","LÝ DO","NGÀY DỰ KIẾN \r\nHOÀN THÀNH"]
+Row 6 (sample data): [1,"4839","Trần Văn Hận","Buffing Operator B","Buffing Operator","Golf Buffing",null,true,false,true,false,true,false,false,false,false,false,false,false,"Đủ điều kiện",null,null,"S2"]
+========================================
+
+========================================
+Sheet: "G_Dipping"
+Total Rows: 80
+Row 0: [null,null,null,null,null,null,null,null,null,null,null,null,null,"Số (Form Code): ADL/F/EHS/022-04"]
+Row 1: ["DANH SÁCH CHỨNG NHẬN VẬN HÀNH",null,null,null,null,null,null,null,null,null,null,null,null,"Lần hiệu chỉnh (Revision No.): 00"]
+Row 2: [null,null,null,null,null,null,null,null,null,null,null,null,null,"Lần ban hành (Issuance No.): 01"]
+Row 3: [null,null,null,null,null,null,null,null,null,null,null,null,null,"Ngày hiệu lực (Effective date): 01/04/2025"]
+Row 4: ["STT","MSNV","HỌ TÊN","CHỨC VỤ","VỊ TRÍ CÔNG VIỆC","BỘ PHẬN","NGÀY\r\nĐÁNH GIÁ","HẠNG MỤC ĐƯỢC ĐÀO TẠO"]
+Row 5: [null,null,null,null,null,null,null,"Máy \r\nLắc Sơn","Máy/Kệ \r\nKhuấy Sơn","Máy Phun \r\nSơn Tự động","Máy Rửa Mắt Đứng/\r\nVòi Tắm Khẩn Cấp","Máy Auto Dipping","Lò \r\nSấy","Máy \r\nScrap Shaft","Máy \r\nBắn Cát","Sử Dụng \r\nVật Sắc Nhọn ","Xử Lý Phân \r\nLoại Rác Thải","HIỆN TRẠNG","LÝ DO","NGÀY DỰ KIẾN \r\nHOÀN THÀNH"]
+Row 6 (sample data): [1,"4394","Lê Hoàng Phong","Leader","Manual Dipper","Golf Dipping",null,true,true,true,true,true,true,false,false,false,false,"Đủ điều kiện",null,null,"S2"]
+========================================
+
+========================================
+Sheet: "G_Graphics"
+Total Rows: 83
+Row 0: [null,null,null,null,null,null,null,null,null,null,null,null,null,null,"Số (Form Code): ADL/F/EHS/022-04"]
+Row 1: ["DANH SÁCH CHỨNG NHẬN VẬN HÀNH",null,null,null,null,null,null,null,null,null,null,null,null,null,"Lần hiệu chỉnh (Revision No.): 00"]
+Row 2: [null,null,null,null,null,null,null,null,null,null,null,null,null,null,"Lần ban hành (Issuance No.): 01"]
+Row 3: [null,null,null,null,null,null,null,null,null,null,null,null,null,null,"Ngày hiệu lực (Effective date): 01/04/2025"]
+Row 4: ["STT","MSNV","HỌ TÊN","CHỨC VỤ","VỊ TRÍ CÔNG VIỆC","BỘ PHẬN","NGÀY\r\nĐÁNH GIÁ","HẠNG MỤC ĐƯỢC ĐÀO TẠO"]
+Row 5: [null,null,null,null,null,null,null,"Máy \r\nDecal","Máy \r\nIn Lụa","Băng \r\nTải","Lò \r\nSấy","Thước \r\nĐo Laser","Máy \r\nKhắc Laser","Máy \r\nĐo OD","Cân \r\nWeight ","Máy \r\nStraightness","Sử Dụng Vật \r\nSắc Nhọn ","Xử Lý Phân \r\nLoại Rác Thải","HIỆN TRẠNG","LÝ DO","NGÀY DỰ KIẾN \r\nHOÀN THÀNH"]
+Row 6 (sample data): [1,"4383","Thái Văn Tài","Leader","Printer","Golf Graphics",null,true,true,true,true,true,false,false,false,false,true,false,"Đủ điều kiện",null,null,"S2"]
+========================================
+
+========================================
+Sheet: "A_Blank"
+Total Rows: 55
+Row 0: [null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,"Số (Form Code): ADL/F/EHS/022-04"]
+Row 1: ["DANH SÁCH CHỨNG NHẬN VẬN HÀNH",null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,"Lần hiệu chỉnh (Revision No.): 00"]
+Row 2: [null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,"Lần ban hành (Issuance No.): 01"]
+Row 3: [null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,"Ngày hiệu lực (Effective date): 01/04/2025"]
+Row 4: ["STT","MSNV","HỌ TÊN","CHỨC VỤ","VỊ TRÍ CÔNG VIỆC","BỘ PHẬN","NGÀY\r\nĐÁNH GIÁ","HẠNG MỤC ĐƯỢC ĐÀO TẠO"]
+Row 5: [null,null,null,null,null,null,null,"Máy\r\n CDI","Máy\r\n Revo","Bàn \r\nNhiệt","Máy Cello \r\nNgang","Sử Dụng \r\nỐng Tool","Lò \r\nSấy","Lò sấy nhỏ","Máy Rút \r\nDây Cello ","Máy Rút \r\nMandrel ","Máy Đo/Uốn \r\nThẳng Mandrel ","Máy \r\nDual Saw","Máy \r\nParagon","Máy Mài \r\nĐánh Bóng","Máy \r\nKhắc Laser","Máy Cắt \r\n(Apple)","Máy Đo\r\nĐầu Cong","Máy Xác Định\r\nĐiểm Cong","Sử Dụng \r\nVật Sắc Nhọn","Xử Lý Phân \r\nLoại Rác Thải","HIỆN TRẠNG","LÝ DO","NGÀY DỰ KIẾN \r\nHOÀN THÀNH"]
+Row 6 (sample data): [1,"0398","Nguyễn Trung Hiếu","Leader","Zigzag Rolling","Arrow Rolling",null,true,true,true,true,true,true,false,true,true,false,true,true,false,true,false,true,true,true,true,"Đủ điều kiện",null,null,"S1"]
+========================================
+
+========================================
+Sheet: "A_Graphics"
+Total Rows: 39
+Row 0: [null,null,null,null,null,null,null,null,null,null,"Số (Form Code): ADL/F/EHS/022-04"]
+Row 1: ["DANH SÁCH CHỨNG NHẬN VẬN HÀNH",null,null,null,null,null,null,null,null,null,"Lần hiệu chỉnh (Revision No.): 00"]
+Row 2: [null,null,null,null,null,null,null,null,null,null,"Lần ban hành (Issuance No.): 01"]
+Row 3: [null,null,null,null,null,null,null,null,null,null,"Ngày hiệu lực (Effective date): 01/04/2025"]
+Row 4: ["STT","MSNV","HỌ TÊN","CHỨC VỤ","VỊ TRÍ CÔNG VIỆC","BỘ PHẬN","NGÀY\r\nĐÁNH GIÁ","HẠNG MỤC ĐƯỢC ĐÀO TẠO"]
+Row 5: [null,null,null,null,null,null,null,"Máy\r\n Decal","Máy \r\nIn Lụa","Lò \r\nSấy","Máy Cắt","Máy Mài","Sử Dụng Vật \r\nSắc Nhọn ","Xử Lý Phân \r\nLoại Rác Thải","HIỆN TRẠNG","LÝ DO","NGÀY DỰ KIẾN \r\nHOÀN THÀNH"]
+Row 6 (sample data): [1,"4119","Nguyễn Thanh Hùng","Leader","Printer","Arrow Graphics",null,true,true,true,true,true,false,false,"Đủ điều kiện",null,null,"S1"]
+========================================
+
+========================================
+Sheet: "Kayak"
+Total Rows: 22
+Row 0: [null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,"Số (Form Code): ADL/F/EHS/022-04"]
+Row 1: ["DANH SÁCH CHỨNG NHẬN VẬN HÀNH",null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,"Lần hiệu chỉnh (Revision No.): 00"]
+Row 2: [null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,"Lần ban hành (Issuance No.): 01"]
+Row 3: [null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,"Ngày hiệu lực (Effective date): 01/04/2025"]
+Row 4: ["STT","MSNV","HỌ TÊN","CHỨC VỤ","BỘ PHẬN","VỊ TRÍ CÔNG VIỆC","NGÀY\r\nĐÁNH GIÁ","HẠNG MỤC ĐƯỢC ĐÀO TẠO"]
+Row 5: [null,null,null,null,null,null,null,"Máy \r\nSheet","Máy \r\nShear","Xe nâng \r\nPrepreg","Máy \r\nDie Cut","Máy ép Hashima","Máy \r\nCDI   ","Máy Cello \r\nNgang","Lò \r\nSấy","Máy Rút Mandrel","Máy \r\nCắt Đầu","Máy \r\nCắt","Máy Rút\r\n Dây Cello","Máy Paragon","Máy Mài \r\nĐánh Bóng","Máy \r\nMài","Máy \r\nĐánh Bóng","Máy Phun \r\nSơn Tự động","Sử Dụng \r\nVật Sắc Nhọn","Xử Lý Phân \r\nLoại Rác Thải","HIỆN TRẠNG","LÝ DO","NGÀY DỰ KIẾN \r\nHOÀN THÀNH"]
+Row 6 (sample data): [1,"5216","Nguyễn Hoàng Phong","CDI Rolling Operator B","Kayak Blank",null,46128,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,false,true,false,"Đủ điều kiện",null,null,"S1"]
+========================================
+
+========================================
+Sheet: "QC"
+Total Rows: 125
+Row 0: [null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,"Số (Form Code): ADL/F/EHS/022-04"]
+Row 1: ["DANH SÁCH CHỨNG NHẬN VẬN HÀNH",null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,"Lần hiệu chỉnh (Revision No.): 00"]
+Row 2: [null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,"Lần ban hành (Issuance No.): 01"]
+Row 3: [null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,"Ngày hiệu lực (Effective date): 01/04/2025"]
+Row 4: ["STT","MSNV","HỌ TÊN","CHỨC VỤ","BỘ PHẬN","NGÀY\r\nĐÁNH GIÁ","HẠNG MỤC ĐƯỢC ĐÀO TẠO"]
+Row 5: [null,null,null,null,null,null,"Máy Đo \r\nĐộ Võng\r\n (SPINE)","Máy Tìm \r\nĐiểm Cứng \r\n(SPINE FINDER)","Máy Kiểm \r\nTra Độ Bền\r\n (PROOF LOAD)","Cân Weight \r\nĐơn (CG)","Cân Weight \r\nTự Động \r\n(CG)","Máy Đo \r\nĐộ Cong \r\n(ZONE)","Máy \r\nSoi Đầu\r\n TIP - Apple","Máy Đo \r\nOD (Z-Mike)","Máy Đo \r\nOrtho Flex","Bảng Đo \r\nOrtho Flex","Máy Kiểm Tra \r\nGiao Động \r\n(FREQUENCY)","Máy Kiểm Tra \r\nĐộ Gãy \r\n(BENDING TEST)","Máy Kiểm Tra \r\nĐộ Xoắn \r\n(TORQUE)","Máy \r\nAuto Inspection \r\nGolf Shaft","Máy Đo \r\nĐộ Cong\r\n 3 Điểm","Máy Cắt\r\n Đầu Flex","Máy Đo \r\nHST Flex","Máy Kiểm Tra \r\nĐộ Bền Sơn","Máy Kiểm Tra \r\nĐộ Bền Sơn \r\n(RUBTEST)","Máy Kiểm Tra \r\nĐộ Bền Sơn \r\n(FALLING SAND)","Máy Đo \r\nMandrel","Thước Đo Laser","Máy Đo OD KAYAK","HIỆN TRẠNG","LÝ DO","NGÀY DỰ KIẾN \r\nHOÀN THÀNH"]
+Row 6 (sample data): [1,4347,"Lê Công Thành","In Process QC Inspector B","Arrow QC Blank",null,true,true,true,true,true,true,false,true,false,false,true,false,false,false,false,false,false,false,false,false,false,false,false,"Đủ điều kiện"]
+========================================
+
+========================================
+Sheet: "HC Golf"
+Total Rows: 457
+Row 0: ["No.","Joint Date","ID","Full Name","Job Tittle ","Dept.","Shift","Note","Update: 06/08/2026"]
+Row 1: [1,44378,"4642","Vi Thị Chanh","CDI Rolling Operator B","Golf Rolling","TS home","Đang nghỉ thai sản 2/1/2026-2/7/2026"]
+Row 2: [2,45444,"5141","Nguyễn Thị Thanh Thảo","CDI Rolling Operator B","Golf Rolling","TS home","Đang nghỉ thai sản 2/2/2026->31/7/2026"]
+Row 3: [3,45717,"39484","Lê Thị Ngọc","Production Helper","Golf Graphics","TS home","Đang nghỉ thai sản 2/2/2026->31/7/2026"]
+Row 4: [4,44621,"4737","Nguyễn Thị Kiều Nghi","Graphics Inspector/Repair Man","Golf Graphics","TS home","Đang nghỉ thai sản 23/2/2026->23/8/2026"]
+Row 5: [5,44652,"4776","Nguyễn Thị Cẩm Hiền","CDI Rolling Operator B","Golf Rolling","TS home","Đang nghỉ thai sản 13/3/2026-13/9/2026"]
+Row 6 (sample data): [6,46083,"5365","Huỳnh Trần Thanh Bình","Manufacturing Manager","Manufacturing","NS"]
+========================================
+
+========================================
+Sheet: "HC Arrow"
+Total Rows: 146
+Row 0: ["No.","Joint Date","ID","Full Name","Job Tittle ","Dept.","Shift","Note","Update: 06/08/2026"]
+Row 1: [1,44692,"4809","Nguyễn Hữu Sáng","Manufacturing Arrow Supervisor","Manufacturing Arrow","S1"]
+Row 2: [2,46090,"5366","Khưu Khánh Tường","Manufacturing Arrow Supervisor","Manufacturing Arrow","S2"]
+Row 3: [3,44805,"4940","Liêu Kim Tuyến","Production Helper","Manufacturing Arrow","TS","Thai sản vào làm lại 17/1/2026"]
+Row 4: [4,44378,"4611","Nguyễn Hữu Đức","Shear Operator B","Arrow Cutting","S2"]
+Row 5: [5,44378,"4635","Nguyễn Thúy Huyền","Lay Up Assembler","Arrow Cutting","S2"]
+Row 6 (sample data): [6,45566,"5188","Lê Minh Đường","Zero/Angle Ply Sheeter B","Arrow Cutting","S1"]
+========================================
+

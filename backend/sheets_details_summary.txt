@@ -1,0 +1,192 @@
+Detailed Data Inspection:
+
+========================================
+Sheet: G_Cutting
+Total Rows: 73
+Header Row (Row 4): ["STT","MSNV","HỌ TÊN","CHỨC VỤ","VỊ TRÍ \r\nCÔNG VIỆC","BỘ PHẬN","NGÀY\r\nĐÁNH GIÁ","HẠNG MỤC ĐÀO TẠO"]
+Sub-Header Row (Row 5): [null,null,null,null,null,null,null,"Máy \r\nSheet 45°","Máy \r\nSheet 90°","Máy \r\nSheet 135°","Xe Nâng \r\nPrepreg","Máy \r\nShear","Máy \r\nDie Cut","Splicing","Máy \r\nInkjet","Máy Ép \r\nHashima","Máy Hút \r\nChân Không","Sử Dụng \r\nVật Sắc Nhọn","Xử Lý Phân \r\nLoại Rác Thải","HIỆN TRẠNG","LÝ DO","NGÀY DỰ KIẾN \r\nHOÀN THÀNH"]
+Index of 'HIỆN TRẠNG': 19
+Index of 'LÝ DO': 20
+Index of 'NGÀY DỰ KIẾN HOÀN THÀNH': 21
+Training Items (12): ["Máy  Sheet 45°","Máy  Sheet 90°","Máy  Sheet 135°","Xe Nâng  Prepreg","Máy  Shear","Máy  Die Cut","Splicing","Máy  Inkjet","Máy Ép  Hashima","Máy Hút  Chân Không","Sử Dụng  Vật Sắc Nhọn","Xử Lý Phân  Loại Rác Thải"]
+  Example Record 1: MSNV: 5027, Name: Trần Quốc Cường, Dept: Golf Cutting, Date: undefined, Status: Đủ điều kiện
+    Training values: ["Máy  Sheet 45°: true","Máy  Sheet 90°: true","Máy  Sheet 135°: true","Xe Nâng  Prepreg: true","Máy  Shear: true","Máy  Die Cut: true","Splicing: true","Máy  Inkjet: false","Máy Ép  Hashima: true","Máy Hút  Chân Không: true","Sử Dụng  Vật Sắc Nhọn: true","Xử Lý Phân  Loại Rác Thải: true"]
+  Example Record 2: MSNV: 4259, Name: Trần Văn Bình, Dept: Golf Cutting, Date: undefined, Status: Đủ điều kiện
+    Training values: ["Máy  Sheet 45°: true","Máy  Sheet 90°: true","Máy  Sheet 135°: true","Xe Nâng  Prepreg: true","Máy  Shear: true","Máy  Die Cut: true","Splicing: true","Máy  Inkjet: false","Máy Ép  Hashima: true","Máy Hút  Chân Không: true","Sử Dụng  Vật Sắc Nhọn: true","Xử Lý Phân  Loại Rác Thải: true"]
+  Example Record 3: MSNV: 4638, Name: Huỳnh Thị Mộng Kha, Dept: Golf Cutting, Date: undefined, Status: Đủ điều kiện
+    Training values: ["Máy  Sheet 45°: false","Máy  Sheet 90°: false","Máy  Sheet 135°: false","Xe Nâng  Prepreg: false","Máy  Shear: false","Máy  Die Cut: false","Splicing: true","Máy  Inkjet: false","Máy Ép  Hashima: false","Máy Hút  Chân Không: true","Sử Dụng  Vật Sắc Nhọn: true","Xử Lý Phân  Loại Rác Thải: false"]
+Valid Employee Records: 67
+Unique HIỆN TRẠNG values and counts: {"Đủ điều kiện":67}
+========================================
+
+========================================
+Sheet: G_Rolling
+Total Rows: 153
+Header Row (Row 4): ["STT","MSNV","HỌ TÊN","CHỨC VỤ","VỊ TRÍ \r\nCÔNG VIỆC","BỘ PHẬN","NGÀY\r\nĐÁNH GIÁ",null,"HẠNG MỤC ĐƯỢC ĐÀO TẠO"]
+Sub-Header Row (Row 5): [null,null,null,null,null,null,null,"Bàn \r\nNhiệt","Máy \r\nCDI","Máy \r\nRevo","Máy Auto \r\nRolling ","Máy Cello \r\nNgang","Máy \r\nCello Đứng","Máy Rút \r\nDây Cello ","Máy Rút \r\nMandrel ","Máy Rửa \r\nMandrel","Máy Đo/Uốn \r\nThẳng Mandrel ","Lò \r\nSấy","Máy \r\nKhắc Laser","Sử Dụng \r\nVật Sắc Nhọn","Xử Lý Phân \r\nLoại Rác Thải","HIỆN TRẠNG","LÝ DO","NGÀY DỰ KIẾN \r\nHOÀN THÀNH"]
+Index of 'HIỆN TRẠNG': 21
+Index of 'LÝ DO': 22
+Index of 'NGÀY DỰ KIẾN HOÀN THÀNH': 23
+Training Items (14): ["Bàn  Nhiệt","Máy  CDI","Máy  Revo","Máy Auto  Rolling","Máy Cello  Ngang","Máy  Cello Đứng","Máy Rút  Dây Cello","Máy Rút  Mandrel","Máy Rửa  Mandrel","Máy Đo/Uốn  Thẳng Mandrel","Lò  Sấy","Máy  Khắc Laser","Sử Dụng  Vật Sắc Nhọn","Xử Lý Phân  Loại Rác Thải"]
+  Example Record 1: MSNV: 3504, Name: Tô Văn Sơn, Dept: Golf Rolling, Date: undefined, Status: Đủ điều kiện
+    Training values: ["Bàn  Nhiệt: true","Máy  CDI: true","Máy  Revo: true","Máy Auto  Rolling: true","Máy Cello  Ngang: true","Máy  Cello Đứng: true","Máy Rút  Dây Cello: true","Máy Rút  Mandrel: true","Máy Rửa  Mandrel: true","Máy Đo/Uốn  Thẳng Mandrel: true","Lò  Sấy: true","Máy  Khắc Laser: true","Sử Dụng  Vật Sắc Nhọn: true","Xử Lý Phân  Loại Rác Thải: true"]
+  Example Record 2: MSNV: 4250, Name: Trần Thị Mai, Dept: Golf Rolling, Date: undefined, Status: Đủ điều kiện
+    Training values: ["Bàn  Nhiệt: true","Máy  CDI: true","Máy  Revo: true","Máy Auto  Rolling: false","Máy Cello  Ngang: false","Máy  Cello Đứng: false","Máy Rút  Dây Cello: false","Máy Rút  Mandrel: false","Máy Rửa  Mandrel: false","Máy Đo/Uốn  Thẳng Mandrel: false","Lò  Sấy: false","Máy  Khắc Laser: false","Sử Dụng  Vật Sắc Nhọn: true","Xử Lý Phân  Loại Rác Thải: false"]
+  Example Record 3: MSNV: 4552, Name: Lê Thị Ngọc Yến, Dept: Golf Rolling, Date: undefined, Status: Đủ điều kiện
+    Training values: ["Bàn  Nhiệt: true","Máy  CDI: true","Máy  Revo: true","Máy Auto  Rolling: false","Máy Cello  Ngang: false","Máy  Cello Đứng: false","Máy Rút  Dây Cello: false","Máy Rút  Mandrel: false","Máy Rửa  Mandrel: false","Máy Đo/Uốn  Thẳng Mandrel: false","Lò  Sấy: false","Máy  Khắc Laser: false","Sử Dụng  Vật Sắc Nhọn: true","Xử Lý Phân  Loại Rác Thải: false"]
+Valid Employee Records: 144
+Unique HIỆN TRẠNG values and counts: {"Đủ điều kiện":138,"Thiếu chứng nhận":6}
+========================================
+
+========================================
+Sheet: G_Finishing
+Total Rows: 53
+Header Row (Row 4): ["STT","MSNV","HỌ TÊN","CHỨC VỤ","VỊ TRÍ \r\nCÔNG VIỆC","BỘ PHẬN","NGÀY\r\nĐÁNH GIÁ","HẠNG MỤC ĐƯỢC ĐÀO TẠO"]
+Sub-Header Row (Row 5): [null,null,null,null,null,null,null,"Máy \r\nDual Saw","Máy \r\nĐo OD","Máy Soi \r\nĐầu TIP","Máy Mài\r\nĐánh Bóng","Auto \r\nSanding","Máy Rửa -\r\n Sấy Tự Động","Máy \r\nParagon","Máy\r\n Khắc Laser","Máy \r\nFrequency","Máy/Bảng Đo \r\nOrtho Flex","Sử Dụng \r\nVật Sắc Nhọn ","Xử Lý Phân \r\nLoại Rác Thải","HIỆN TRẠNG","LÝ DO","NGÀY DỰ KIẾN \r\nHOÀN THÀNH"]
+Index of 'HIỆN TRẠNG': 19
+Index of 'LÝ DO': 20
+Index of 'NGÀY DỰ KIẾN HOÀN THÀNH': 21
+Training Items (12): ["Máy  Dual Saw","Máy  Đo OD","Máy Soi  Đầu TIP","Máy Mài Đánh Bóng","Auto  Sanding","Máy Rửa -  Sấy Tự Động","Máy  Paragon","Máy  Khắc Laser","Máy  Frequency","Máy/Bảng Đo  Ortho Flex","Sử Dụng  Vật Sắc Nhọn","Xử Lý Phân  Loại Rác Thải"]
+  Example Record 1: MSNV: 2272, Name: Nguyễn Ngọc Thuận, Dept: Golf Finishing, Date: undefined, Status: Đủ điều kiện
+    Training values: ["Máy  Dual Saw: true","Máy  Đo OD: true","Máy Soi  Đầu TIP: false","Máy Mài Đánh Bóng: true","Auto  Sanding: true","Máy Rửa -  Sấy Tự Động: true","Máy  Paragon: true","Máy  Khắc Laser: true","Máy  Frequency: true","Máy/Bảng Đo  Ortho Flex: true","Sử Dụng  Vật Sắc Nhọn: true","Xử Lý Phân  Loại Rác Thải: false"]
+  Example Record 2: MSNV: 5031, Name: Lê Chí Hải, Dept: Golf Finishing, Date: undefined, Status: Đủ điều kiện
+    Training values: ["Máy  Dual Saw: true","Máy  Đo OD: true","Máy Soi  Đầu TIP: false","Máy Mài Đánh Bóng: true","Auto  Sanding: true","Máy Rửa -  Sấy Tự Động: true","Máy  Paragon: true","Máy  Khắc Laser: true","Máy  Frequency: true","Máy/Bảng Đo  Ortho Flex: true","Sử Dụng  Vật Sắc Nhọn: true","Xử Lý Phân  Loại Rác Thải: false"]
+  Example Record 3: MSNV: 5110, Name: Thiều Quang Phụng, Dept: Golf Finishing, Date: undefined, Status: Đủ điều kiện
+    Training values: ["Máy  Dual Saw: false","Máy  Đo OD: false","Máy Soi  Đầu TIP: false","Máy Mài Đánh Bóng: true","Auto  Sanding: true","Máy Rửa -  Sấy Tự Động: true","Máy  Paragon: true","Máy  Khắc Laser: false","Máy  Frequency: true","Máy/Bảng Đo  Ortho Flex: true","Sử Dụng  Vật Sắc Nhọn: true","Xử Lý Phân  Loại Rác Thải: false"]
+Valid Employee Records: 47
+Unique HIỆN TRẠNG values and counts: {"Đủ điều kiện":47}
+========================================
+
+========================================
+Sheet: G_Buffing
+Total Rows: 51
+Header Row (Row 4): ["STT","MSNV","HỌ TÊN","CHỨC VỤ","VỊ TRÍ \r\nCÔNG VIỆC","BỘ PHẬN","NGÀY\r\nĐÁNH GIÁ","HẠNG MỤC ĐƯỢC ĐÀO TẠO"]
+Sub-Header Row (Row 5): [null,null,null,null,null,null,null,"Máy Rửa - \r\nSấy Tự Động","Máy Bom \r\nÁp Lực","Máy Mài \r\nĐánh Bóng","Máy \r\nTip - Blast","Máy \r\nĐánh Bóng","Máy \r\nScrap Shaft","Máy \r\nBắn Cát ","Máy \r\nĐo OD","Cân \r\nWeight","Máy \r\nStraightness","Sử Dụng \r\nVật Sắc Nhọn","Xử Lý Phân \r\nLoại Rác Thải","HIỆN TRẠNG","LÝ DO","NGÀY DỰ KIẾN \r\nHOÀN THÀNH"]
+Index of 'HIỆN TRẠNG': 19
+Index of 'LÝ DO': 20
+Index of 'NGÀY DỰ KIẾN HOÀN THÀNH': 21
+Training Items (12): ["Máy Rửa -  Sấy Tự Động","Máy Bom  Áp Lực","Máy Mài  Đánh Bóng","Máy  Tip - Blast","Máy  Đánh Bóng","Máy  Scrap Shaft","Máy  Bắn Cát","Máy  Đo OD","Cân  Weight","Máy  Straightness","Sử Dụng  Vật Sắc Nhọn","Xử Lý Phân  Loại Rác Thải"]
+  Example Record 1: MSNV: 4839, Name: Trần Văn Hận, Dept: Golf Buffing, Date: undefined, Status: Đủ điều kiện
+    Training values: ["Máy Rửa -  Sấy Tự Động: true","Máy Bom  Áp Lực: false","Máy Mài  Đánh Bóng: true","Máy  Tip - Blast: false","Máy  Đánh Bóng: true","Máy  Scrap Shaft: false","Máy  Bắn Cát: false","Máy  Đo OD: false","Cân  Weight: false","Máy  Straightness: false","Sử Dụng  Vật Sắc Nhọn: false","Xử Lý Phân  Loại Rác Thải: false"]
+  Example Record 2: MSNV: 5112, Name: Nguyễn Thành Đô, Dept: Golf Buffing, Date: 46116, Status: Đủ điều kiện
+    Training values: ["Máy Rửa -  Sấy Tự Động: true","Máy Bom  Áp Lực: false","Máy Mài  Đánh Bóng: true","Máy  Tip - Blast: false","Máy  Đánh Bóng: true","Máy  Scrap Shaft: false","Máy  Bắn Cát: false","Máy  Đo OD: false","Cân  Weight: false","Máy  Straightness: false","Sử Dụng  Vật Sắc Nhọn: true","Xử Lý Phân  Loại Rác Thải: false"]
+  Example Record 3: MSNV: 5146, Name: Phan Trung Hiếu, Dept: Golf Buffing, Date: undefined, Status: Đủ điều kiện
+    Training values: ["Máy Rửa -  Sấy Tự Động: false","Máy Bom  Áp Lực: false","Máy Mài  Đánh Bóng: false","Máy  Tip - Blast: true","Máy  Đánh Bóng: true","Máy  Scrap Shaft: false","Máy  Bắn Cát: false","Máy  Đo OD: true","Cân  Weight: true","Máy  Straightness: false","Sử Dụng  Vật Sắc Nhọn: true","Xử Lý Phân  Loại Rác Thải: false"]
+Valid Employee Records: 45
+Unique HIỆN TRẠNG values and counts: {"Đủ điều kiện":45}
+========================================
+
+========================================
+Sheet: G_Dipping
+Total Rows: 80
+Header Row (Row 4): ["STT","MSNV","HỌ TÊN","CHỨC VỤ","VỊ TRÍ CÔNG VIỆC","BỘ PHẬN","NGÀY\r\nĐÁNH GIÁ","HẠNG MỤC ĐƯỢC ĐÀO TẠO"]
+Sub-Header Row (Row 5): [null,null,null,null,null,null,null,"Máy \r\nLắc Sơn","Máy/Kệ \r\nKhuấy Sơn","Máy Phun \r\nSơn Tự động","Máy Rửa Mắt Đứng/\r\nVòi Tắm Khẩn Cấp","Máy Auto Dipping","Lò \r\nSấy","Máy \r\nScrap Shaft","Máy \r\nBắn Cát","Sử Dụng \r\nVật Sắc Nhọn ","Xử Lý Phân \r\nLoại Rác Thải","HIỆN TRẠNG","LÝ DO","NGÀY DỰ KIẾN \r\nHOÀN THÀNH"]
+Index of 'HIỆN TRẠNG': 17
+Index of 'LÝ DO': 18
+Index of 'NGÀY DỰ KIẾN HOÀN THÀNH': 19
+Training Items (10): ["Máy  Lắc Sơn","Máy/Kệ  Khuấy Sơn","Máy Phun  Sơn Tự động","Máy Rửa Mắt Đứng/ Vòi Tắm Khẩn Cấp","Máy Auto Dipping","Lò  Sấy","Máy  Scrap Shaft","Máy  Bắn Cát","Sử Dụng  Vật Sắc Nhọn","Xử Lý Phân  Loại Rác Thải"]
+  Example Record 1: MSNV: 4394, Name: Lê Hoàng Phong, Dept: Golf Dipping, Date: undefined, Status: Đủ điều kiện
+    Training values: ["Máy  Lắc Sơn: true","Máy/Kệ  Khuấy Sơn: true","Máy Phun  Sơn Tự động: true","Máy Rửa Mắt Đứng/ Vòi Tắm Khẩn Cấp: true","Máy Auto Dipping: true","Lò  Sấy: true","Máy  Scrap Shaft: false","Máy  Bắn Cát: false","Sử Dụng  Vật Sắc Nhọn: false","Xử Lý Phân  Loại Rác Thải: false"]
+  Example Record 2: MSNV: 5157, Name: Nguyễn Văn Trung Nguyên, Dept: Golf Dipping, Date: undefined, Status: Đủ điều kiện
+    Training values: ["Máy  Lắc Sơn: true","Máy/Kệ  Khuấy Sơn: true","Máy Phun  Sơn Tự động: true","Máy Rửa Mắt Đứng/ Vòi Tắm Khẩn Cấp: true","Máy Auto Dipping: true","Lò  Sấy: true","Máy  Scrap Shaft: false","Máy  Bắn Cát: false","Sử Dụng  Vật Sắc Nhọn: true","Xử Lý Phân  Loại Rác Thải: true"]
+  Example Record 3: MSNV: 4280, Name: Nguyễn Văn Tel, Dept: Golf Dipping, Date: undefined, Status: Đủ điều kiện
+    Training values: ["Máy  Lắc Sơn: false","Máy/Kệ  Khuấy Sơn: false","Máy Phun  Sơn Tự động: false","Máy Rửa Mắt Đứng/ Vòi Tắm Khẩn Cấp: false","Máy Auto Dipping: false","Lò  Sấy: false","Máy  Scrap Shaft: false","Máy  Bắn Cát: false","Sử Dụng  Vật Sắc Nhọn: false","Xử Lý Phân  Loại Rác Thải: false"]
+Valid Employee Records: 74
+Unique HIỆN TRẠNG values and counts: {"Đủ điều kiện":74}
+========================================
+
+========================================
+Sheet: G_Graphics
+Total Rows: 83
+Header Row (Row 4): ["STT","MSNV","HỌ TÊN","CHỨC VỤ","VỊ TRÍ CÔNG VIỆC","BỘ PHẬN","NGÀY\r\nĐÁNH GIÁ","HẠNG MỤC ĐƯỢC ĐÀO TẠO"]
+Sub-Header Row (Row 5): [null,null,null,null,null,null,null,"Máy \r\nDecal","Máy \r\nIn Lụa","Băng \r\nTải","Lò \r\nSấy","Thước \r\nĐo Laser","Máy \r\nKhắc Laser","Máy \r\nĐo OD","Cân \r\nWeight ","Máy \r\nStraightness","Sử Dụng Vật \r\nSắc Nhọn ","Xử Lý Phân \r\nLoại Rác Thải","HIỆN TRẠNG","LÝ DO","NGÀY DỰ KIẾN \r\nHOÀN THÀNH"]
+Index of 'HIỆN TRẠNG': 18
+Index of 'LÝ DO': 19
+Index of 'NGÀY DỰ KIẾN HOÀN THÀNH': 20
+Training Items (11): ["Máy  Decal","Máy  In Lụa","Băng  Tải","Lò  Sấy","Thước  Đo Laser","Máy  Khắc Laser","Máy  Đo OD","Cân  Weight","Máy  Straightness","Sử Dụng Vật  Sắc Nhọn","Xử Lý Phân  Loại Rác Thải"]
+  Example Record 1: MSNV: 4383, Name: Thái Văn Tài, Dept: Golf Graphics, Date: undefined, Status: Đủ điều kiện
+    Training values: ["Máy  Decal: true","Máy  In Lụa: true","Băng  Tải: true","Lò  Sấy: true","Thước  Đo Laser: true","Máy  Khắc Laser: false","Máy  Đo OD: false","Cân  Weight: false","Máy  Straightness: false","Sử Dụng Vật  Sắc Nhọn: true","Xử Lý Phân  Loại Rác Thải: false"]
+  Example Record 2: MSNV: 4834, Name: Nguyễn Thị Bích Liễu, Dept: Golf Graphics, Date: undefined, Status: Đủ điều kiện
+    Training values: ["Máy  Decal: false","Máy  In Lụa: false","Băng  Tải: false","Lò  Sấy: false","Thước  Đo Laser: false","Máy  Khắc Laser: false","Máy  Đo OD: false","Cân  Weight: false","Máy  Straightness: false","Sử Dụng Vật  Sắc Nhọn: false","Xử Lý Phân  Loại Rác Thải: false"]
+  Example Record 3: MSNV: 4289, Name: Nguyễn Thị Ngọc Mai, Dept: Golf Graphics, Date: undefined, Status: Đủ điều kiện
+    Training values: ["Máy  Decal: false","Máy  In Lụa: true","Băng  Tải: true","Lò  Sấy: true","Thước  Đo Laser: true","Máy  Khắc Laser: false","Máy  Đo OD: false","Cân  Weight: false","Máy  Straightness: false","Sử Dụng Vật  Sắc Nhọn: false","Xử Lý Phân  Loại Rác Thải: false"]
+Valid Employee Records: 77
+Unique HIỆN TRẠNG values and counts: {"Đủ điều kiện":74,"Thiếu chứng nhận":3}
+========================================
+
+========================================
+Sheet: A_Blank
+Total Rows: 55
+Header Row (Row 4): ["STT","MSNV","HỌ TÊN","CHỨC VỤ","VỊ TRÍ CÔNG VIỆC","BỘ PHẬN","NGÀY\r\nĐÁNH GIÁ","HẠNG MỤC ĐƯỢC ĐÀO TẠO"]
+Sub-Header Row (Row 5): [null,null,null,null,null,null,null,"Máy\r\n CDI","Máy\r\n Revo","Bàn \r\nNhiệt","Máy Cello \r\nNgang","Sử Dụng \r\nỐng Tool","Lò \r\nSấy","Lò sấy nhỏ","Máy Rút \r\nDây Cello ","Máy Rút \r\nMandrel ","Máy Đo/Uốn \r\nThẳng Mandrel ","Máy \r\nDual Saw","Máy \r\nParagon","Máy Mài \r\nĐánh Bóng","Máy \r\nKhắc Laser","Máy Cắt \r\n(Apple)","Máy Đo\r\nĐầu Cong","Máy Xác Định\r\nĐiểm Cong","Sử Dụng \r\nVật Sắc Nhọn","Xử Lý Phân \r\nLoại Rác Thải","HIỆN TRẠNG","LÝ DO","NGÀY DỰ KIẾN \r\nHOÀN THÀNH"]
+Index of 'HIỆN TRẠNG': 26
+Index of 'LÝ DO': 27
+Index of 'NGÀY DỰ KIẾN HOÀN THÀNH': 28
+Training Items (19): ["Máy  CDI","Máy  Revo","Bàn  Nhiệt","Máy Cello  Ngang","Sử Dụng  Ống Tool","Lò  Sấy","Lò sấy nhỏ","Máy Rút  Dây Cello","Máy Rút  Mandrel","Máy Đo/Uốn  Thẳng Mandrel","Máy  Dual Saw","Máy  Paragon","Máy Mài  Đánh Bóng","Máy  Khắc Laser","Máy Cắt  (Apple)","Máy Đo Đầu Cong","Máy Xác Định Điểm Cong","Sử Dụng  Vật Sắc Nhọn","Xử Lý Phân  Loại Rác Thải"]
+  Example Record 1: MSNV: 0398, Name: Nguyễn Trung Hiếu, Dept: Arrow Rolling, Date: undefined, Status: Đủ điều kiện
+    Training values: ["Máy  CDI: true","Máy  Revo: true","Bàn  Nhiệt: true","Máy Cello  Ngang: true","Sử Dụng  Ống Tool: true","Lò  Sấy: true","Lò sấy nhỏ: false","Máy Rút  Dây Cello: true","Máy Rút  Mandrel: true","Máy Đo/Uốn  Thẳng Mandrel: false","Máy  Dual Saw: true","Máy  Paragon: true","Máy Mài  Đánh Bóng: false","Máy  Khắc Laser: true","Máy Cắt  (Apple): false","Máy Đo Đầu Cong: true","Máy Xác Định Điểm Cong: true","Sử Dụng  Vật Sắc Nhọn: true","Xử Lý Phân  Loại Rác Thải: true"]
+  Example Record 2: MSNV: 4962, Name: Nguyễn Văn Đạt, Dept: Arrow Rolling, Date: undefined, Status: Đủ điều kiện
+    Training values: ["Máy  CDI: true","Máy  Revo: true","Bàn  Nhiệt: true","Máy Cello  Ngang: true","Sử Dụng  Ống Tool: false","Lò  Sấy: false","Lò sấy nhỏ: false","Máy Rút  Dây Cello: false","Máy Rút  Mandrel: false","Máy Đo/Uốn  Thẳng Mandrel: false","Máy  Dual Saw: false","Máy  Paragon: false","Máy Mài  Đánh Bóng: false","Máy  Khắc Laser: false","Máy Cắt  (Apple): false","Máy Đo Đầu Cong: false","Máy Xác Định Điểm Cong: false","Sử Dụng  Vật Sắc Nhọn: true","Xử Lý Phân  Loại Rác Thải: false"]
+  Example Record 3: MSNV: 5005, Name: Thị Ngọc Duyên, Dept: Arrow Rolling, Date: undefined, Status: Đủ điều kiện
+    Training values: ["Máy  CDI: false","Máy  Revo: true","Bàn  Nhiệt: true","Máy Cello  Ngang: false","Sử Dụng  Ống Tool: false","Lò  Sấy: false","Lò sấy nhỏ: false","Máy Rút  Dây Cello: false","Máy Rút  Mandrel: false","Máy Đo/Uốn  Thẳng Mandrel: false","Máy  Dual Saw: false","Máy  Paragon: false","Máy Mài  Đánh Bóng: false","Máy  Khắc Laser: false","Máy Cắt  (Apple): false","Máy Đo Đầu Cong: false","Máy Xác Định Điểm Cong: false","Sử Dụng  Vật Sắc Nhọn: true","Xử Lý Phân  Loại Rác Thải: false"]
+Valid Employee Records: 49
+Unique HIỆN TRẠNG values and counts: {"Đủ điều kiện":49}
+========================================
+
+========================================
+Sheet: A_Graphics
+Total Rows: 39
+Header Row (Row 4): ["STT","MSNV","HỌ TÊN","CHỨC VỤ","VỊ TRÍ CÔNG VIỆC","BỘ PHẬN","NGÀY\r\nĐÁNH GIÁ","HẠNG MỤC ĐƯỢC ĐÀO TẠO"]
+Sub-Header Row (Row 5): [null,null,null,null,null,null,null,"Máy\r\n Decal","Máy \r\nIn Lụa","Lò \r\nSấy","Máy Cắt","Máy Mài","Sử Dụng Vật \r\nSắc Nhọn ","Xử Lý Phân \r\nLoại Rác Thải","HIỆN TRẠNG","LÝ DO","NGÀY DỰ KIẾN \r\nHOÀN THÀNH"]
+Index of 'HIỆN TRẠNG': 14
+Index of 'LÝ DO': 15
+Index of 'NGÀY DỰ KIẾN HOÀN THÀNH': 16
+Training Items (7): ["Máy  Decal","Máy  In Lụa","Lò  Sấy","Máy Cắt","Máy Mài","Sử Dụng Vật  Sắc Nhọn","Xử Lý Phân  Loại Rác Thải"]
+  Example Record 1: MSNV: 4119, Name: Nguyễn Thanh Hùng, Dept: Arrow Graphics, Date: undefined, Status: Đủ điều kiện
+    Training values: ["Máy  Decal: true","Máy  In Lụa: true","Lò  Sấy: true","Máy Cắt: true","Máy Mài: true","Sử Dụng Vật  Sắc Nhọn: false","Xử Lý Phân  Loại Rác Thải: false"]
+  Example Record 2: MSNV: 4122, Name: Nguyễn Thị Hoàng Oanh, Dept: Arrow Graphics, Date: undefined, Status: Đủ điều kiện
+    Training values: ["Máy  Decal: false","Máy  In Lụa: true","Lò  Sấy: true","Máy Cắt: true","Máy Mài: true","Sử Dụng Vật  Sắc Nhọn: false","Xử Lý Phân  Loại Rác Thải: false"]
+  Example Record 3: MSNV: 5212, Name: Nguyễn Thị Hồng Thắm, Dept: Arrow Graphics, Date: 46126, Status: Đủ điều kiện
+    Training values: ["Máy  Decal: false","Máy  In Lụa: true","Lò  Sấy: false","Máy Cắt: false","Máy Mài: false","Sử Dụng Vật  Sắc Nhọn: false","Xử Lý Phân  Loại Rác Thải: false"]
+Valid Employee Records: 33
+Unique HIỆN TRẠNG values and counts: {"Đủ điều kiện":33}
+========================================
+
+========================================
+Sheet: Kayak
+Total Rows: 22
+Header Row (Row 4): ["STT","MSNV","HỌ TÊN","CHỨC VỤ","BỘ PHẬN","VỊ TRÍ CÔNG VIỆC","NGÀY\r\nĐÁNH GIÁ","HẠNG MỤC ĐƯỢC ĐÀO TẠO"]
+Sub-Header Row (Row 5): [null,null,null,null,null,null,null,"Máy \r\nSheet","Máy \r\nShear","Xe nâng \r\nPrepreg","Máy \r\nDie Cut","Máy ép Hashima","Máy \r\nCDI   ","Máy Cello \r\nNgang","Lò \r\nSấy","Máy Rút Mandrel","Máy \r\nCắt Đầu","Máy \r\nCắt","Máy Rút\r\n Dây Cello","Máy Paragon","Máy Mài \r\nĐánh Bóng","Máy \r\nMài","Máy \r\nĐánh Bóng","Máy Phun \r\nSơn Tự động","Sử Dụng \r\nVật Sắc Nhọn","Xử Lý Phân \r\nLoại Rác Thải","HIỆN TRẠNG","LÝ DO","NGÀY DỰ KIẾN \r\nHOÀN THÀNH"]
+Index of 'HIỆN TRẠNG': 26
+Index of 'LÝ DO': 27
+Index of 'NGÀY DỰ KIẾN HOÀN THÀNH': 28
+Training Items (19): ["Máy  Sheet","Máy  Shear","Xe nâng  Prepreg","Máy  Die Cut","Máy ép Hashima","Máy  CDI","Máy Cello  Ngang","Lò  Sấy","Máy Rút Mandrel","Máy  Cắt Đầu","Máy  Cắt","Máy Rút  Dây Cello","Máy Paragon","Máy Mài  Đánh Bóng","Máy  Mài","Máy  Đánh Bóng","Máy Phun  Sơn Tự động","Sử Dụng  Vật Sắc Nhọn","Xử Lý Phân  Loại Rác Thải"]
+  Example Record 1: MSNV: 5216, Name: Nguyễn Hoàng Phong, Dept: Kayak Blank, Date: 46128, Status: Đủ điều kiện
+    Training values: ["Máy  Sheet: true","Máy  Shear: true","Xe nâng  Prepreg: true","Máy  Die Cut: true","Máy ép Hashima: true","Máy  CDI: true","Máy Cello  Ngang: true","Lò  Sấy: true","Máy Rút Mandrel: true","Máy  Cắt Đầu: true","Máy  Cắt: true","Máy Rút  Dây Cello: true","Máy Paragon: true","Máy Mài  Đánh Bóng: true","Máy  Mài: true","Máy  Đánh Bóng: true","Máy Phun  Sơn Tự động: false","Sử Dụng  Vật Sắc Nhọn: true","Xử Lý Phân  Loại Rác Thải: false"]
+  Example Record 2: MSNV: 5231, Name: Đặng Thị Bích Thủy, Dept: Kayak Blank, Date: 46120, Status: Đủ điều kiện
+    Training values: ["Máy  Sheet: false","Máy  Shear: false","Xe nâng  Prepreg: false","Máy  Die Cut: true","Máy ép Hashima: true","Máy  CDI: true","Máy Cello  Ngang: false","Lò  Sấy: false","Máy Rút Mandrel: false","Máy  Cắt Đầu: true","Máy  Cắt: true","Máy Rút  Dây Cello: true","Máy Paragon: false","Máy Mài  Đánh Bóng: false","Máy  Mài: false","Máy  Đánh Bóng: false","Máy Phun  Sơn Tự động: false","Sử Dụng  Vật Sắc Nhọn: true","Xử Lý Phân  Loại Rác Thải: false"]
+  Example Record 3: MSNV: 40346, Name: Nguyễn Duy Khang, Dept: Kayak Blank, Date: 46135, Status: Đủ điều kiện
+    Training values: ["Máy  Sheet: false","Máy  Shear: false","Xe nâng  Prepreg: false","Máy  Die Cut: true","Máy ép Hashima: true","Máy  CDI: true","Máy Cello  Ngang: true","Lò  Sấy: true","Máy Rút Mandrel: true","Máy  Cắt Đầu: true","Máy  Cắt: true","Máy Rút  Dây Cello: true","Máy Paragon: true","Máy Mài  Đánh Bóng: true","Máy  Mài: true","Máy  Đánh Bóng: true","Máy Phun  Sơn Tự động: false","Sử Dụng  Vật Sắc Nhọn: true","Xử Lý Phân  Loại Rác Thải: true"]
+Valid Employee Records: 16
+Unique HIỆN TRẠNG values and counts: {"Đủ điều kiện":16}
+========================================
+
+========================================
+Sheet: QC
+Total Rows: 125
+Header Row (Row 4): ["STT","MSNV","HỌ TÊN","CHỨC VỤ","BỘ PHẬN","NGÀY\r\nĐÁNH GIÁ","HẠNG MỤC ĐƯỢC ĐÀO TẠO"]
+Sub-Header Row (Row 5): [null,null,null,null,null,null,"Máy Đo \r\nĐộ Võng\r\n (SPINE)","Máy Tìm \r\nĐiểm Cứng \r\n(SPINE FINDER)","Máy Kiểm \r\nTra Độ Bền\r\n (PROOF LOAD)","Cân Weight \r\nĐơn (CG)","Cân Weight \r\nTự Động \r\n(CG)","Máy Đo \r\nĐộ Cong \r\n(ZONE)","Máy \r\nSoi Đầu\r\n TIP - Apple","Máy Đo \r\nOD (Z-Mike)","Máy Đo \r\nOrtho Flex","Bảng Đo \r\nOrtho Flex","Máy Kiểm Tra \r\nGiao Động \r\n(FREQUENCY)","Máy Kiểm Tra \r\nĐộ Gãy \r\n(BENDING TEST)","Máy Kiểm Tra \r\nĐộ Xoắn \r\n(TORQUE)","Máy \r\nAuto Inspection \r\nGolf Shaft","Máy Đo \r\nĐộ Cong\r\n 3 Điểm","Máy Cắt\r\n Đầu Flex","Máy Đo \r\nHST Flex","Máy Kiểm Tra \r\nĐộ Bền Sơn","Máy Kiểm Tra \r\nĐộ Bền Sơn \r\n(RUBTEST)","Máy Kiểm Tra \r\nĐộ Bền Sơn \r\n(FALLING SAND)","Máy Đo \r\nMandrel","Thước Đo Laser","Máy Đo OD KAYAK","HIỆN TRẠNG","LÝ DO","NGÀY DỰ KIẾN \r\nHOÀN THÀNH"]
+Index of 'HIỆN TRẠNG': 29
+Index of 'LÝ DO': 30
+Index of 'NGÀY DỰ KIẾN HOÀN THÀNH': 31
+Training Items (22): ["Máy Tìm  Điểm Cứng  (SPINE FINDER)","Máy Kiểm  Tra Độ Bền  (PROOF LOAD)","Cân Weight  Đơn (CG)","Cân Weight  Tự Động  (CG)","Máy Đo  Độ Cong  (ZONE)","Máy  Soi Đầu  TIP - Apple","Máy Đo  OD (Z-Mike)","Máy Đo  Ortho Flex","Bảng Đo  Ortho Flex","Máy Kiểm Tra  Giao Động  (FREQUENCY)","Máy Kiểm Tra  Độ Gãy  (BENDING TEST)","Máy Kiểm Tra  Độ Xoắn  (TORQUE)","Máy  Auto Inspection  Golf Shaft","Máy Đo  Độ Cong  3 Điểm","Máy Cắt  Đầu Flex","Máy Đo  HST Flex","Máy Kiểm Tra  Độ Bền Sơn","Máy Kiểm Tra  Độ Bền Sơn  (RUBTEST)","Máy Kiểm Tra  Độ Bền Sơn  (FALLING SAND)","Máy Đo  Mandrel","Thước Đo Laser","Máy Đo OD KAYAK"]
+  Example Record 1: MSNV: 4347, Name: Lê Công Thành, Dept: Arrow QC Blank, Date: true, Status: Đủ điều kiện
+    Training values: ["Máy Tìm  Điểm Cứng  (SPINE FINDER): true","Máy Kiểm  Tra Độ Bền  (PROOF LOAD): true","Cân Weight  Đơn (CG): true","Cân Weight  Tự Động  (CG): true","Máy Đo  Độ Cong  (ZONE): true","Máy  Soi Đầu  TIP - Apple: false","Máy Đo  OD (Z-Mike): true","Máy Đo  Ortho Flex: false","Bảng Đo  Ortho Flex: false","Máy Kiểm Tra  Giao Động  (FREQUENCY): true","Máy Kiểm Tra  Độ Gãy  (BENDING TEST): false","Máy Kiểm Tra  Độ Xoắn  (TORQUE): false","Máy  Auto Inspection  Golf Shaft: false","Máy Đo  Độ Cong  3 Điểm: false","Máy Cắt  Đầu Flex: false","Máy Đo  HST Flex: false","Máy Kiểm Tra  Độ Bền Sơn: false","Máy Kiểm Tra  Độ Bền Sơn  (RUBTEST): false","Máy Kiểm Tra  Độ Bền Sơn  (FALLING SAND): false","Máy Đo  Mandrel: false","Thước Đo Laser: false","Máy Đo OD KAYAK: false"]
+  Example Record 2: MSNV: 4973, Name: Lê Thị Tâm, Dept: Arrow QC Blank, Date: true, Status: Đủ điều kiện
+    Training values: ["Máy Tìm  Điểm Cứng  (SPINE FINDER): true","Máy Kiểm  Tra Độ Bền  (PROOF LOAD): true","Cân Weight  Đơn (CG): true","Cân Weight  Tự Động  (CG): true","Máy Đo  Độ Cong  (ZONE): true","Máy  Soi Đầu  TIP - Apple: false","Máy Đo  OD (Z-Mike): true","Máy Đo  Ortho Flex: false","Bảng Đo  Ortho Flex: false","Máy Kiểm Tra  Giao Động  (FREQUENCY): false","Máy Kiểm Tra  Độ Gãy  (BENDING TEST): false","Máy Kiểm Tra  Độ Xoắn  (TORQUE): false","Máy  Auto Inspection  Golf Shaft: false","Máy Đo  Độ Cong  3 Điểm: false","Máy Cắt  Đầu Flex: false","Máy Đo  HST Flex: false","Máy Kiểm Tra  Độ Bền Sơn: false","Máy Kiểm Tra  Độ Bền Sơn  (RUBTEST): false","Máy Kiểm Tra  Độ Bền Sơn  (FALLING SAND): false","Máy Đo  Mandrel: false","Thước Đo Laser: false","Máy Đo OD KAYAK: false"]
+  Example Record 3: MSNV: 5059, Name: Nguyễn Văn Chất, Dept: Arrow QC Blank, Date: true, Status: Đủ điều kiện
+    Training values: ["Máy Tìm  Điểm Cứng  (SPINE FINDER): true","Máy Kiểm  Tra Độ Bền  (PROOF LOAD): true","Cân Weight  Đơn (CG): true","Cân Weight  Tự Động  (CG): false","Máy Đo  Độ Cong  (ZONE): true","Máy  Soi Đầu  TIP - Apple: false","Máy Đo  OD (Z-Mike): true","Máy Đo  Ortho Flex: false","Bảng Đo  Ortho Flex: false","Máy Kiểm Tra  Giao Động  (FREQUENCY): false","Máy Kiểm Tra  Độ Gãy  (BENDING TEST): false","Máy Kiểm Tra  Độ Xoắn  (TORQUE): false","Máy  Auto Inspection  Golf Shaft: false","Máy Đo  Độ Cong  3 Điểm: false","Máy Cắt  Đầu Flex: false","Máy Đo  HST Flex: false","Máy Kiểm Tra  Độ Bền Sơn: false","Máy Kiểm Tra  Độ Bền Sơn  (RUBTEST): false","Máy Kiểm Tra  Độ Bền Sơn  (FALLING SAND): false","Máy Đo  Mandrel: false","Thước Đo Laser: false","Máy Đo OD KAYAK: false"]
+Valid Employee Records: 119
+Unique HIỆN TRẠNG values and counts: {"Đủ điều kiện":86,"Thiếu chứng nhận":33}
+========================================
+

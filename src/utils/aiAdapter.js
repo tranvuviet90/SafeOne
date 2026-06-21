@@ -1,5 +1,5 @@
 // src/utils/aiAdapter.js
-import { db } from '../firebase';
+import { db, auth } from '../firebase';
 import { doc, getDoc } from 'firebase/firestore';
 
 /**
@@ -35,11 +35,67 @@ export async function callAIService(prompt, history = [], fallbackUrl, additiona
         fullSystemInstruction += "\n\n" + additionalContext;
       }
       if (Array.isArray(trainedDocs) && trainedDocs.length > 0) {
-        fullSystemInstruction += "\n\n=== TÀI LIỆU HUẤN LUYỆN KHÁCH HÀNG / KNOWLEDGE BASE ===\n";
-        trainedDocs.forEach(d => {
-          fullSystemInstruction += `\n[Tài liệu: ${d.name}]\n${d.content}\n[Kết thúc tài liệu: ${d.name}]\n`;
+        // Stop words to exclude from keyword scoring to reduce noise from common words
+        const STOP_WORDS = new Set(["cho", "tôi", "của", "và", "là", "các", "trong", "tại", "có", "này", "để", "với", "những", "một", "về", "ra", "lên", "ta", "nào", "đó", "này"]);
+
+        // RAG client-side: chỉ chọn các tài liệu có từ khóa trùng khớp với câu hỏi để tiết kiệm tối đa token
+        const keywords = prompt.toLowerCase()
+          .replace(/[^a-zA-Z0-9áàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđĐ\s]/g, " ")
+          .split(/\s+/)
+          .filter(w => w.length >= 2 && !STOP_WORDS.has(w));
+
+        const scoredDocs = trainedDocs.map(d => {
+          const content = (d.content || "").toLowerCase();
+          const name = (d.name || "").toLowerCase();
+          
+          let score = 0;
+          let matchedTitleKeywords = 0;
+          let matchedContentKeywords = 0;
+
+          keywords.forEach(kw => {
+            let keywordMatchedInTitle = false;
+            let keywordMatchedInContent = false;
+
+            if (name.includes(kw)) {
+              keywordMatchedInTitle = true;
+              score += 15; // Title match
+            }
+            if (content.includes(kw)) {
+              keywordMatchedInContent = true;
+              score += 2; // Content include
+              
+              // Frequency score (capped)
+              const wordRegex = new RegExp(kw, "g");
+              const matches = content.match(wordRegex);
+              if (matches) {
+                score += Math.min(matches.length * 0.2, 5); // Capped to 5 points max per keyword frequency
+              }
+            }
+
+            if (keywordMatchedInTitle) matchedTitleKeywords++;
+            if (keywordMatchedInContent) matchedContentKeywords++;
+          });
+
+          // Boost score based on number of unique core keywords matched
+          const uniqueKeywordsMatched = Math.max(matchedTitleKeywords, matchedContentKeywords);
+          score += uniqueKeywordsMatched * 20; // 20 points per unique keyword matched
+
+          return { doc: d, score };
         });
-        fullSystemInstruction += "\nBạn hãy sử dụng các thông tin và tài liệu hướng dẫn trên để trả lời các câu hỏi của người dùng một cách chính xác nhất. Nếu thông tin không có trong tài liệu và cũng không có trong chỉ dẫn của bạn, hãy trả lời dựa trên kiến thức chung nhưng phải lịch sự và chuyên nghiệp.";
+
+        const relevantDocs = scoredDocs
+          .filter(item => item.score > 0)
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 2)
+          .map(item => item.doc);
+
+        if (relevantDocs.length > 0) {
+          fullSystemInstruction += "\n\n=== TÀI LIỆU HUẤN LUYỆN KHÁCH HÀNG / KNOWLEDGE BASE (RAG) ===\n";
+          relevantDocs.forEach(d => {
+            fullSystemInstruction += `\n[Tài liệu: ${d.name}]\n${d.content}\n[Kết thúc tài liệu: ${d.name}]\n`;
+          });
+          fullSystemInstruction += "\nBạn hãy sử dụng các thông tin và tài liệu hướng dẫn trên để trả lời các câu hỏi của người dùng một cách chính xác nhất. Nếu thông tin không có trong tài liệu và cũng không có trong chỉ dẫn của bạn, hãy trả lời dựa trên kiến thức chung nhưng phải lịch sự và chuyên nghiệp.";
+        }
       }
 
       // Nếu có đầy đủ API Key và Nhà cung cấp hợp lệ
@@ -143,12 +199,27 @@ export async function callAIService(prompt, history = [], fallbackUrl, additiona
       }
     }
   } catch (error) {
-    console.error("Lỗi trong Bộ chuyển đổi AI (Adapter):", error);
+    console.warn("Lỗi trong Bộ chuyển đổi AI (Adapter) - chuyển sang Cloud Function fallback:", error.message || error);
     // Nếu có lỗi khi gọi trực tiếp, tự động chuyển về fallback bên dưới
   }
 
-  // 2. Fallback: Nếu không có cấu hình, thiếu API Key, lỗi hoặc không khớp nhà cung cấp
-  console.log("Không có cấu hình API Key tùy chỉnh hoặc xảy ra lỗi. Đang sử dụng Fallback Cloud Function:", fallbackUrl);
+  let activeFallbackUrl = fallbackUrl;
+  if (auth.isMock || import.meta.env.VITE_USE_MOCK_FIREBASE === 'true') {
+    const API_BASE = import.meta.env.VITE_API_BASE || (() => {
+      if (typeof window !== "undefined" && window.location) {
+        if (window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
+          return window.location.origin;
+        }
+        if (window.location.port === "5000") {
+          return window.location.origin;
+        }
+      }
+      return "http://localhost:5000";
+    })();
+    activeFallbackUrl = `${API_BASE}/api/functions/askAI`;
+  }
+
+  console.log("Không có cấu hình API Key tùy chỉnh hoặc xảy ra lỗi. Đang sử dụng Fallback Cloud Function:", activeFallbackUrl);
   
   // Format lịch sử về dạng chuẩn của Cloud Function ban đầu
   const standardHistory = history.map(h => {
@@ -160,13 +231,126 @@ export async function callAIService(prompt, history = [], fallbackUrl, additiona
     };
   });
 
-  const response = await fetch(fallbackUrl, {
+  const currentUser = auth.currentUser;
+  let idToken = "";
+  if (currentUser) {
+    try {
+      idToken = await currentUser.getIdToken();
+    } catch (tokenErr) {
+      console.warn("Không lấy được Firebase ID token:", tokenErr);
+    }
+  }
+
+  const headers = { 'Content-Type': 'application/json' };
+  if (idToken) {
+    headers['Authorization'] = `Bearer ${idToken}`;
+  }
+
+  const response = await fetch(activeFallbackUrl, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: headers,
     body: JSON.stringify({
-      prompt: additionalContext ? `${additionalContext}\n\nUser Prompt: ${prompt}` : prompt,
+      prompt: prompt,
+      additionalContext: additionalContext,
       history: standardHistory
     }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Fallback Cloud Function returned ${response.status}`);
+  }
+
+  return await response.json();
+}
+
+/**
+ * Call Spell Check Service with optimized parameters (No history, no RAG context, temperature 0, constrained tokens)
+ * @param {string} text 
+ * @param {string} fallbackUrl (The askAI fallback URL, which will be converted to the checkSpelling URL)
+ * @returns {Promise<{response: string}>}
+ */
+export async function callSpellCheckService(text, fallbackUrl) {
+  if (!text || !text.trim()) {
+    return { response: "" };
+  }
+
+  try {
+    // 1. Kiểm tra cấu hình AI từ Firestore
+    const docRef = doc(db, "settings", "ai_config");
+    const snap = await getDoc(docRef);
+
+    if (snap.exists()) {
+      const config = snap.data();
+      const { provider, model, apiKey } = config;
+
+      // Nếu có API Key hợp lệ và là Google Gemini, thực hiện trực tiếp phía client (không nạp trainedDocs)
+      if (apiKey && apiKey.trim() !== "" && apiKey !== "MOCKED_SAVED_KEY") {
+        if (provider === 'google') {
+          let geminiModel = model || 'gemini-2.5-flash';
+          if (geminiModel === 'gemini-2.0-flash' || geminiModel === 'gemini-1.5-flash' || geminiModel === 'gemini-2.0-flash-lite') {
+            geminiModel = 'gemini-2.5-flash';
+          }
+
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${apiKey}`;
+          const maxOutputTokens = 200;
+
+          const systemInstruction = "Hãy sửa lỗi chính tả và ngữ pháp tiếng Việt cho văn bản sau (nếu có). Chỉ trả về văn bản kết quả đã sửa, không giải thích, không thêm bất kỳ văn bản nào khác. Nếu văn bản gốc không có lỗi, hãy trả về chính xác văn bản gốc.";
+
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ role: "user", parts: [{ text: text }] }],
+              systemInstruction: {
+                parts: [{ text: systemInstruction }]
+              },
+              generationConfig: {
+                temperature: 0,
+                maxOutputTokens: maxOutputTokens
+              }
+            })
+          });
+
+          if (response.ok) {
+            const resData = await response.json();
+            const responseText = resData?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            return { response: responseText.trim() };
+          } else {
+            const errBody = await response.text();
+            console.warn(`Direct Google Spellcheck returned ${response.status}: ${errBody}, falling back to Cloud Function.`);
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.warn("Lỗi trong Bộ chuyển đổi AI Spellcheck - chuyển sang Cloud Function fallback:", error.message || error);
+  }
+
+  // 2. Chuyển đổi thông minh askAI URL sang checkSpelling URL
+  let activeFallbackUrl = fallbackUrl;
+  if (auth.isMock || import.meta.env.VITE_USE_MOCK_FIREBASE === 'true') {
+    const API_BASE = import.meta.env.VITE_API_BASE || (() => {
+      if (typeof window !== "undefined" && window.location) {
+        if (window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
+          return window.location.origin;
+        }
+        if (window.location.port === "5000") {
+          return window.location.origin;
+        }
+      }
+      return "http://localhost:5000";
+    })();
+    activeFallbackUrl = `${API_BASE}/api/functions/checkSpelling`;
+  } else {
+    activeFallbackUrl = fallbackUrl
+      .replace("/askAI", "/checkSpelling")
+      .replace("askai-", "checkspelling-");
+  }
+
+  const response = await fetch(activeFallbackUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text })
   });
 
   if (!response.ok) {

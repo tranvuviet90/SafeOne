@@ -68,22 +68,55 @@ export default function MagicMenu({ user, activeTab, setActiveTab, ...props }) {
 
   const visible = useMemo(() => {
     const hasEhsAccess = userRolesList.some(r => ["admin", "ehs", "ehs committee", "manager"].includes(r));
+    const hasTrainerAccess = userRolesList.some(r => ["trainer"].includes(r));
+    const hasDeptRole = userRolesList.some(r => deptSet.has(r));
     const isCanteen = userRolesList.includes(CANTEEN);
-    if (isCanteen && !hasEhsAccess) return ALL_ITEMS.filter((i) => i.key === "menu.meal");
     
-    const base = ALL_ITEMS.filter(
-      (item) => !item.roles || item.roles.map(normalizeRole).some(r => userRolesList.includes(r))
-    );
-    
-    // Show/hide meal registration tab for EHS Committee proxy
-    if (userRolesList.includes(normalizeRole("ehs committee"))) {
-      const hasValidProxy = user?.mealDept && deptSet.has(normalizeRole(user.mealDept));
-      if (!hasValidProxy) {
-        return base.filter((i) => i.key !== "menu.meal");
-      }
+    // Default/guest user with no roles
+    if (userRolesList.length === 0) {
+      return ALL_ITEMS.filter(i => i.key === "menu.meal" || i.key === "menu.gemba" || i.key === "menu.tugemba");
     }
-    
-    return base;
+
+    return ALL_ITEMS.filter(item => {
+      // 1. Admin/EHS/Manager/EHS Committee can see everything they have role matching for
+      if (hasEhsAccess) {
+        // EHS Committee proxy check
+        if (item.key === "menu.meal" && userRolesList.includes(normalizeRole("ehs committee"))) {
+          const hasValidProxy = user?.mealDept && deptSet.has(normalizeRole(user.mealDept));
+          const hasDirectDept = userRolesList.some(r => deptSet.has(r));
+          if (!hasValidProxy && !hasDirectDept) return false;
+        }
+        // Check if item has specific roles restriction
+        if (item.roles) {
+          return item.roles.map(normalizeRole).some(r => userRolesList.includes(r));
+        }
+        return true;
+      }
+      
+      // 2. Union of allowed items for restricted/special roles
+      const allowedKeys = new Set();
+      if (isCanteen) {
+        allowedKeys.add("menu.meal");
+      }
+      if (hasDeptRole) {
+        allowedKeys.add("menu.meal");
+        allowedKeys.add("menu.gemba");
+        allowedKeys.add("menu.tugemba");
+      }
+      if (hasTrainerAccess) {
+        allowedKeys.add("menu.meal");
+        allowedKeys.add("menu.documents");
+      }
+      
+      // Fallback for custom roles or items with roles matching
+      if (item.roles) {
+        if (item.roles.map(normalizeRole).some(r => userRolesList.includes(r))) {
+          return true;
+        }
+      }
+      
+      return allowedKeys.has(item.key);
+    });
   }, [userRolesList, user]); // Phụ thuộc vào `user` đảm bảo re-render khi user data thay đổi.
 
   const navRef = useRef(null);
@@ -171,9 +204,20 @@ export default function MagicMenu({ user, activeTab, setActiveTab, ...props }) {
         {visible.map((item) => {
           const originalIndex = ALL_ITEMS.findIndex((o) => o.key === item.key);
           const isActive = activeTab === originalIndex;
-          const isDeptRole = userRolesList.some(r => deptSet.has(r));
           const hasEhsAccess = userRolesList.some(r => ["admin", "ehs", "ehs committee", "manager"].includes(r));
-          const isDisabled = isDeptRole && !hasEhsAccess && item.key !== "menu.meal";
+          const hasTrainerAccess = userRolesList.some(r => ["trainer"].includes(r));
+          
+          let isDisabled = false;
+          if (item.key === "menu.gemba" || item.key === "menu.tugemba") {
+            const isDeptRole = userRolesList.some(r => deptSet.has(r));
+            isDisabled = isDeptRole && !hasEhsAccess;
+          } else if (item.key === "menu.ehsCommittee") {
+            isDisabled = !hasEhsAccess;
+          } else if (item.key === "manager.title") {
+            isDisabled = !userRolesList.includes("admin");
+          } else if (item.key === "menu.documents") {
+            isDisabled = !hasEhsAccess && !hasTrainerAccess;
+          }
           const count = item.countProp ? props[item.countProp] || 0 : 0;
 
           return (

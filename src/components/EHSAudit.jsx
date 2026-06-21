@@ -1064,6 +1064,8 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
   const isCustomError = selectedGroup === "Lỗi Khác" || (selectedError && selectedError.endsWith(".other"));
   const userRolesList = user?.role ? (Array.isArray(user.role) ? user.role.map(r => String(r).toLowerCase()) : String(user.role).split(',').map(r => r.trim().toLowerCase())) : [];
   const isAdminOrEhs = userRolesList.some(r => r === 'admin' || r === 'ehs');
+  const isEhsCommittee = userRolesList.includes("ehs committee");
+  const isEhsCommitteeOnly = isEhsCommittee && !isAdminOrEhs;
   const userRole = isAdminOrEhs ? 'admin' : (userRolesList[0] || "");
 
   // === Tự sửa chính tả ===
@@ -1258,7 +1260,7 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
     let newErrorObject;
     const pointsMap = { Nhẹ: 2, Nặng: 4, "Nghiêm trọng": 6 };
     if (selectedGroup === "Lỗi Khác") {
-      newErrorObject = { group: selectedGroup, code: `custom-${Date.now()}`, desc: "Lỗi khác", point: pointsMap[otherErrorSeverity], timestamp: Timestamp.now(), imageUrls: urls, note: noteToUse, addedBy: user.name, isReminder, responsiblePerson };
+      newErrorObject = { group: selectedGroup, code: `custom-${Date.now()}`, desc: "Lỗi khác", point: pointsMap[otherErrorSeverity], timestamp: Timestamp.now(), imageUrls: urls, note: noteToUse, addedBy: user.name, addedByUid: user.uid, isReminder, responsiblePerson };
     } else {
       const errors = (errorGroups.find((g) => g.group === selectedGroup) || { items: [] }).items;
       const err = errors.find((e) => e.code === selectedError);
@@ -1266,7 +1268,7 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
       if (selectedError && selectedError.endsWith(".other")) {
         finalPoint = pointsMap[otherErrorSeverity];
       }
-      newErrorObject = { group: selectedGroup, ...err, point: finalPoint, timestamp: Timestamp.now(), imageUrls: urls, note: noteToUse, addedBy: user.name, isReminder, responsiblePerson };
+      newErrorObject = { group: selectedGroup, ...err, point: finalPoint, timestamp: Timestamp.now(), imageUrls: urls, note: noteToUse, addedBy: user.name, addedByUid: user.uid, isReminder, responsiblePerson };
     }
     const docRef = doc(db, "gemba_scores", dep.name);
     const docSnap = await getDoc(docRef);
@@ -1306,6 +1308,21 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
         const newAllScores = allScores.filter(score => score.timestamp !== errorToDelete.timestamp);
         const docRef = doc(db, "gemba_scores", dep.name);
         await setDoc(docRef, { scores: newAllScores }, { merge: true });
+
+        // Xóa toàn bộ comment liên quan trong audit_comments
+        const evId = `${dep.name}_${errorToDelete.code || 'custom'}_${safeTsToDate(errorToDelete.timestamp)?.getTime() || 'notime'}`;
+        try {
+          const qComments = query(collection(db, "audit_comments"), where("eventId", "==", evId));
+          const snapComments = await getDocs(qComments);
+          if (!snapComments.empty) {
+            const batchComments = writeBatch(db);
+            snapComments.forEach(d => batchComments.delete(d.ref));
+            await batchComments.commit();
+            console.log("Đã xóa toàn bộ bình luận liên quan cho evId:", evId);
+          }
+        } catch (err) {
+          console.error("Lỗi khi xóa bình luận liên quan:", err);
+        }
 
         // 2. Xóa ảnh khỏi Storage
         const images = errorToDelete.imageUrls || (errorToDelete.imageUrl ? [errorToDelete.imageUrl] : []);
@@ -1391,6 +1408,42 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
         } catch (err) {
           console.error("Lỗi khi xóa thông báo liên quan:", err);
         }
+    }
+  }
+
+  async function handleDeleteRequest(idx) {
+    const errorToDelete = scoreList[idx];
+    const originalIndex = allScores.findIndex(s => s.timestamp === errorToDelete.timestamp);
+    if (originalIndex === -1) return;
+    if (await askConfirm(`Bạn có chắc muốn gửi yêu cầu xóa lỗi "${errorToDelete.desc}" đến EHS duyệt không?`, "Yêu cầu xóa lỗi")) {
+      const newAllScores = [...allScores];
+      newAllScores[originalIndex] = {
+        ...newAllScores[originalIndex],
+        deleteRequested: true,
+        deleteRequestedBy: user.name,
+        deleteRequestedAt: new Date().toLocaleString("vi-VN")
+      };
+      const docRef = doc(db, "gemba_scores", dep.name);
+      await setDoc(docRef, { scores: newAllScores }, { merge: true });
+      alert("Đã gửi yêu cầu xóa lỗi. Vui lòng chờ EHS duyệt!");
+    }
+  }
+
+  async function handleCancelDeleteRequest(idx) {
+    const errorToDelete = scoreList[idx];
+    const originalIndex = allScores.findIndex(s => s.timestamp === errorToDelete.timestamp);
+    if (originalIndex === -1) return;
+    try {
+      const newAllScores = [...allScores];
+      delete newAllScores[originalIndex].deleteRequested;
+      delete newAllScores[originalIndex].deleteRequestedBy;
+      delete newAllScores[originalIndex].deleteRequestedAt;
+      const docRef = doc(db, "gemba_scores", dep.name);
+      await setDoc(docRef, { scores: newAllScores }, { merge: true });
+      alert("Đã từ chối yêu cầu xóa!");
+    } catch (err) {
+      console.error("Lỗi từ chối xóa:", err);
+      alert("Thao tác thất bại!");
     }
   }
   
@@ -1640,6 +1693,11 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
                              </div>
                            )}
                            {e.addedBy && <div style={{fontSize: 11, color: colors.textSecondary, fontStyle:'italic', marginTop: 2}}>{t("gemba.by")} {e.addedBy}</div>}
+                           {e.deleteRequested && (
+                             <div style={{ fontSize: '12px', color: '#c62828', fontWeight: 'bold', background: '#ffebee', padding: '4px 8px', borderRadius: 6, marginTop: 6, display: 'inline-block' }}>
+                               ⚠️ Chờ duyệt xóa (Yêu cầu bởi: {e.deleteRequestedBy})
+                             </div>
+                           )}
                         </div>
                         {images.length > 0 && (
                           <div style={{ marginTop: 8 }}>
@@ -1667,7 +1725,16 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
                             💬
                           </ActionButton>
                           <ActionButton onClick={() => setImprovementModal({ isOpen: true, error: e, index: i })} title={t("gemba.improve.action")} color={colors.white} bg={isImproved ? '#4caf50' : '#f44336'}><ImprovementIcon /></ActionButton>
-                          {(userRole === 'admin' || userRole === 'ehs') && (
+                          {isEhsCommitteeOnly && (e.addedByUid === user.uid || e.addedBy === user.name) && !e.deleteRequested && (
+                            <ActionButton onClick={() => handleDeleteRequest(i)} title="Yêu cầu xóa lỗi" color="#d32f2f" bg="transparent">x</ActionButton>
+                          )}
+                          {isAdminOrEhs && e.deleteRequested && (
+                            <>
+                              <ActionButton onClick={() => handleDelete(i)} title="Duyệt xóa" color="#fff" bg="#2e7d32">✅</ActionButton>
+                              <ActionButton onClick={() => handleCancelDeleteRequest(i)} title="Từ chối xóa" color="#fff" bg="#e65100">❌</ActionButton>
+                            </>
+                          )}
+                          {(userRole === 'admin' || userRole === 'ehs') && !e.deleteRequested && (
                             <ActionButton onClick={() => handleDelete(i)} title={t("gemba.delete.action")} color="#d32f2f" bg="transparent">x</ActionButton>
                           )}
                         </div>
@@ -1711,6 +1778,11 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
                             {t("gemba.by")} {e.addedBy}
                           </div>
                         )}
+                        {e.deleteRequested && (
+                          <div style={{ fontSize: '11px', color: '#c62828', fontWeight: 'bold', background: '#ffebee', padding: '2px 6px', borderRadius: 4, marginTop: 4, display: 'inline-block' }}>
+                            ⚠️ Chờ duyệt xóa (Yêu cầu bởi: {e.deleteRequestedBy})
+                          </div>
+                        )}
                       </td>
                       <td style={{ padding: "10px 8px", textAlign: "center" }}>
                         {images.length > 0 && (
@@ -1741,7 +1813,18 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
                               💬
                             </ActionButton>
                             <ActionButton onClick={() => setImprovementModal({ isOpen: true, error: e, index: i })} title="Cải thiện/Khắc phục" color={colors.white} bg={isImproved ? "#4caf50" : "#f44336"}> <ImprovementIcon /> </ActionButton>
-                            {(userRole === "admin" || userRole === "ehs") && ( <ActionButton onClick={() => handleDelete(i)} title="Xóa lỗi" color="#d32f2f" bg="transparent">x</ActionButton> )}
+                            {isEhsCommitteeOnly && (e.addedByUid === user.uid || e.addedBy === user.name) && !e.deleteRequested && (
+                              <ActionButton onClick={() => handleDeleteRequest(i)} title="Yêu cầu xóa lỗi" color="#d32f2f" bg="transparent">x</ActionButton>
+                            )}
+                            {isAdminOrEhs && e.deleteRequested && (
+                              <>
+                                <ActionButton onClick={() => handleDelete(i)} title="Duyệt xóa" color="#fff" bg="#2e7d32">✅</ActionButton>
+                                <ActionButton onClick={() => handleCancelDeleteRequest(i)} title="Từ chối xóa" color="#fff" bg="#e65100">❌</ActionButton>
+                              </>
+                            )}
+                            {(userRole === "admin" || userRole === "ehs") && !e.deleteRequested && (
+                              <ActionButton onClick={() => handleDelete(i)} title="Xóa lỗi" color="#d32f2f" bg="transparent">x</ActionButton>
+                            )}
                           </div>
                       </td>
                       </tr>
@@ -1788,12 +1871,13 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
         onClose={() => setCommentModal({ isOpen: false, eventId: "", error: null })} 
         eventId={commentModal.eventId} 
         user={user} 
+        error={commentModal.error}
       />
     </div>
   );
 }
 
-function CommentModal({ isOpen, onClose, eventId, user }) {
+function CommentModal({ isOpen, onClose, eventId, user, error }) {
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState("");
   const [loadingComments, setLoadingComments] = useState(false);
@@ -1840,6 +1924,20 @@ function CommentModal({ isOpen, onClose, eventId, user }) {
         text: txt,
         timestamp: serverTimestamp()
       });
+
+      // Gửi thông báo cho người tạo lỗi nếu người comment khác người tạo lỗi
+      const creatorUid = error?.addedByUid;
+      if (creatorUid && creatorUid !== user.uid) {
+        const errorDesc = error?.desc || "Lỗi vi phạm";
+        await addDoc(collection(db, "notifications"), {
+          type: "new_ehs_audit_comment",
+          message: `${user.name} đã bình luận về lỗi EHS Audit của bạn ("${errorDesc}")`,
+          targetUserId: creatorUid,
+          createdBy: user.uid,
+          readBy: [],
+          timestamp: serverTimestamp()
+        });
+      }
     } catch (err) {
       console.error("Lỗi gửi bình luận:", err);
       alert("Không thể gửi bình luận.");

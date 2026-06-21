@@ -1,8 +1,18 @@
 // src/firebase-mock.js
 import { io } from "socket.io-client";
 
-// Global local server base URL
-const API_BASE = "http://localhost:5000";
+// Global local server base URL (resolves dynamically for local dev, local prod, and VPS environments)
+const API_BASE = (() => {
+  if (typeof window !== "undefined" && window.location) {
+    if (window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
+      return window.location.origin;
+    }
+    if (window.location.port === "5000") {
+      return window.location.origin;
+    }
+  }
+  return "http://localhost:5000";
+})();
 
 // Global state variables
 let socket = null;
@@ -172,12 +182,17 @@ export async function signInWithEmailAndPassword(auth, email, password) {
   }
   const data = await res.json();
   localStorage.setItem("safeone_jwt_token", data.token);
-  auth.currentUser = data.user;
+  
+  const user = data.user;
+  if (user) {
+    user.getIdToken = async () => data.token;
+  }
+  auth.currentUser = user;
   
   // Notify listeners
-  auth.authStateListeners.forEach(cb => cb(data.user));
+  auth.authStateListeners.forEach(cb => cb(user));
   
-  return { user: data.user };
+  return { user };
 }
 
 export async function signOut(auth) {
@@ -199,6 +214,9 @@ export function onAuthStateChanged(auth, callback) {
         throw new Error("Expired");
       })
       .then(user => {
+        if (user) {
+          user.getIdToken = async () => localStorage.getItem("safeone_jwt_token") || "";
+        }
         auth.currentUser = user;
         callback(user);
       })
@@ -274,6 +292,9 @@ export async function getDoc(docRef) {
     return new MockDocumentSnapshot(docRef.id, false);
   }
   const data = await res.json();
+  if (data && data._exists === false) {
+    return new MockDocumentSnapshot(docRef.id, false);
+  }
   return new MockDocumentSnapshot(docRef.id, true, data);
 }
 
@@ -405,6 +426,10 @@ export function serverTimestamp() {
 
 export function arrayUnion(...elements) {
   return { type: "arrayUnion", elements };
+}
+
+export function deleteField() {
+  return { type: "deleteField" };
 }
 
 export function writeBatch(db) {

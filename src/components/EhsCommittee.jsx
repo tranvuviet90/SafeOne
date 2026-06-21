@@ -1,16 +1,19 @@
-import React, { Suspense, lazy, useEffect } from "react";
+import React, { Suspense, useEffect } from "react";
 import { useI18n } from "../i18n/I18nProvider";
 import { colors } from "../theme";
-import { FaWalkieTalkie, FaLock, FaCertificate } from "react-icons/fa6";
+import { FaWalkieTalkie, FaLock, FaCertificate, FaScissors } from "react-icons/fa6";
 import { IoCalendarClearOutline, IoCafeOutline, IoTrash } from "react-icons/io5";
 import { MdSmokingRooms } from "react-icons/md";
+import { lazyWithRetry } from "../utils/lazyWithRetry";
 
 // Lazy load các component con
-const Calamviec = lazy(() => import("./Calamviec"));
-const Bodam = lazy(() => import("./Bodam"));
-const GiamSatHutThuoc = lazy(() => import("./GiamSatHutThuoc"));
-const GiamSatGiaiLao = lazy(() => import("./GiamSatGiaiLao"));
-const GiamSatNhaRac = lazy(() => import("./GiamSatNhaRac"));
+const Calamviec = lazyWithRetry(() => import("./Calamviec"));
+const Bodam = lazyWithRetry(() => import("./Bodam"));
+const GiamSatHutThuoc = lazyWithRetry(() => import("./GiamSatHutThuoc"));
+const GiamSatGiaiLao = lazyWithRetry(() => import("./GiamSatGiaiLao"));
+const GiamSatNhaRac = lazyWithRetry(() => import("./GiamSatNhaRac"));
+const Locker = lazyWithRetry(() => import("./Locker"));
+const Knife = lazyWithRetry(() => import("./Knife"));
 
 // Placeholder cho các tính năng đang phát triển
 function DevelopmentPlaceholder() {
@@ -48,8 +51,8 @@ const SUB_TABS = [
   { id: "smoking", key: "menu.smoking", shortKey: "menu.short.smoking", Icon: MdSmokingRooms, component: GiamSatHutThuoc },
   { id: "break", key: "menu.break", shortKey: "menu.short.break", Icon: IoCafeOutline, component: GiamSatGiaiLao },
   { id: "trash", key: "menu.trash", shortKey: "menu.short.trash", Icon: IoTrash, component: GiamSatNhaRac },
-  { id: "locker", key: "menu.locker", shortKey: "menu.short.locker", Icon: FaLock, component: DevelopmentPlaceholder },
-  { id: "license", key: "menu.license", shortKey: "menu.short.license", Icon: FaCertificate, component: DevelopmentPlaceholder }
+  { id: "locker", key: "menu.locker", shortKey: "menu.short.locker", Icon: FaLock, component: Locker },
+  { id: "knife", key: "menu.knife", shortKey: "menu.short.knife", Icon: FaScissors, component: Knife }
 ];
 
 export default function EhsCommittee({ user, isMobile, activeSubTab, setActiveSubTab }) {

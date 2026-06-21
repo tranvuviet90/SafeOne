@@ -14,7 +14,7 @@ import "react-datepicker/dist/react-datepicker.css";
 import { colors } from "../theme";
 import { useI18n } from "../i18n/I18nProvider";
 import LightboxSwipeOnly, { useConfirm } from "./LightboxSwipeOnly";
-import { callAIService } from "../utils/aiAdapter";
+import { callAIService, callSpellCheckService } from "../utils/aiAdapter";
 
 /* ====================== BIỂU TƯỢNG (ICON) ====================== */
 function ImprovementIcon({ color = 'currentColor', size = 18 }) {
@@ -175,6 +175,8 @@ function ExportModal({ onClose, departments }) {
           beforeUrl: ev.imageUrl || "", 
           imageUrls: ev.imageUrls || [],
           afterUrl: ev.improvementImageUrl || "",
+          pic: ev.pic || "",
+          ehsVerified: ev.ehsVerified || false,
         });
       });
 
@@ -214,7 +216,7 @@ function ExportModal({ onClose, departments }) {
     let rowIndex = 7;
     for (let i = 0; i < rows.length; i++) {
       const r = rows[i];
-      const findings = r.note ? `${r.desc}\n\nGhi chú: ${r.note}` : r.desc;
+      const findings = r.note || r.desc;
       
       const borderThin = {
         left: { style: 'thin', color: { auto: true } },
@@ -227,28 +229,22 @@ function ExportModal({ onClose, departments }) {
         const cell = ws.getCell(rowIndex, c);
         cell.border = borderThin;
         cell.font = { name: 'Times New Roman', size: 11 };
-        if (c === 1 || c === 3 || c === 4 || c === 8 || c === 9 || c === 10) {
-          cell.alignment = { horizontal: 'center', vertical: 'middle' };
-        } else {
+        if (c === 2 || c === 7 || c === 13 || c === 14) {
           cell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+        } else {
+          cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
         }
       }
 
-      let progressStatus = "Chưa thực hiện";
+      // Calculate Progress Status and Comment dynamically
+      let progressStatus = "Chưa tiến hành";
       let ehsComment = "";
 
-      const hasImprovementInfo = r.responsiblePerson || r.dueDate || r.progressNotes || r.completionDate || r.afterUrl;
+      const hasImprovementInfo = r.pic || r.dueDate || r.progressNotes || r.afterUrl;
 
-      if (r.completionDate) {
+      if (r.ehsVerified) {
         progressStatus = "Đã hoàn thành";
-        const compDate = parseDateStr(r.completionDate);
-        const limitDate = r.dueDate ? parseDateStr(r.dueDate) : null;
-        if (compDate && limitDate && compDate > limitDate) {
-          ehsComment = `Hoàn thành trễ hạn (Hạn: ${r.dueDate.split('-').reverse().join('/')}, Hoàn thành: ${r.completionDate.split('-').reverse().join('/')})`;
-        } else {
-          ehsComment = "Hoàn thành đúng hạn";
-        }
-      } else if (hasImprovementInfo) {
+      } else {
         if (r.dueDate) {
           const limitDate = parseDateStr(r.dueDate);
           const today = new Date();
@@ -256,17 +252,14 @@ function ExportModal({ onClose, departments }) {
           if (limitDate) {
             limitDate.setHours(0, 0, 0, 0);
             if (today > limitDate) {
-              progressStatus = "Quá hạn";
-              const diffTime = Math.abs(today - limitDate);
-              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-              ehsComment = `Quá hạn từ ngày ${r.dueDate.split('-').reverse().join('/')} (Quá hạn ${diffDays} ngày)`;
-            } else {
+              progressStatus = "Trễ hạn hoàn thành";
+            } else if (hasImprovementInfo) {
               progressStatus = "Đang tiến hành";
             }
-          } else {
+          } else if (hasImprovementInfo) {
             progressStatus = "Đang tiến hành";
           }
-        } else {
+        } else if (hasImprovementInfo) {
           progressStatus = "Đang tiến hành";
         }
       }
@@ -277,17 +270,17 @@ function ExportModal({ onClose, departments }) {
       }
 
       ws.getCell(rowIndex, 1).value = i + 1; // No.
-      ws.getCell(rowIndex, 2).value = findings; // Findings
-      ws.getCell(rowIndex, 3).value = r.dateISO; // Audit date
+      ws.getCell(rowIndex, 2).value = findings; // Findings (Chỉ ghi chú)
+      ws.getCell(rowIndex, 3).value = r.ca ? `${r.dateISO}\nCa: ${r.ca}` : r.dateISO; // Audit date
       ws.getCell(rowIndex, 4).value = r.addedBy || ""; // Auditor
       ws.getCell(rowIndex, 5).value = r.department || ""; // Responsible Department
-      ws.getCell(rowIndex, 6).value = r.responsiblePerson || ""; // Information Recipient
-      ws.getCell(rowIndex, 7).value = r.progressNotes || ""; // Corrective Action
-      ws.getCell(rowIndex, 8).value = r.responsiblePerson || ""; // PIC
+      ws.getCell(rowIndex, 6).value = r.responsiblePerson || ""; // Information Recipient (Người nhận thông tin ban đầu)
+      ws.getCell(rowIndex, 7).value = r.progressNotes || ""; // Corrective Action (Biện pháp khắc phục)
+      ws.getCell(rowIndex, 8).value = r.pic || ""; // PIC (Người cải thiện)
       ws.getCell(rowIndex, 9).value = progressStatus; // Progress Status
       ws.getCell(rowIndex, 10).value = r.dueDate || ""; // Estimated Completion Date
-      ws.getCell(rowIndex, 13).value = ""; // EHS Assessment
-      ws.getCell(rowIndex, 14).value = ehsComment; // Comment
+      ws.getCell(rowIndex, 13).value = ""; // EHS Assessment (blank)
+      ws.getCell(rowIndex, 14).value = ehsComment; // Comment (blank)
 
       let imageAdded = false;
       const processImage = async (url, col) => {
@@ -298,7 +291,7 @@ function ExportModal({ onClose, departments }) {
           const img = new Image();
           await new Promise(resolve => { 
             img.onload = resolve; 
-            img.onerror = resolve; 
+            img.onerror = resolve; // Continue even if image is invalid
             img.src = b64; 
           });
           if (img.width && img.height) {
@@ -376,10 +369,10 @@ function ExportModal({ onClose, departments }) {
    CỬA SỔ (MODAL) CẢI THIỆN
    ========================= */
 function ImprovementModal({ modalData, onClose, onSave }) {
-  const [responsiblePerson, setResponsiblePerson] = useState(modalData.error?.responsiblePerson || "");
+  const [pic, setPic] = useState(modalData.error?.pic || "");
   const [dueDate, setDueDate] = useState(modalData.error?.dueDate || "");
   const [progressNotes, setProgressNotes] = useState(modalData.error?.progressNotes || "");
-  const [completionDate, setCompletionDate] = useState(modalData.error?.completionDate || "");
+  const [ehsVerified, setEhsVerified] = useState(modalData.error?.ehsVerified || false);
   const [improvementImageFile, setImprovementImageFile] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -416,7 +409,7 @@ function ImprovementModal({ modalData, onClose, onSave }) {
         return;
       }
     }
-    const improvementData = { responsiblePerson, dueDate, progressNotes, completionDate, improvementImageUrl: imageUrl };
+    const improvementData = { pic, dueDate, progressNotes, ehsVerified, improvementImageUrl: imageUrl };
     await onSave(modalData.logId, improvementData);
     setIsSaving(false);
     onClose();
@@ -431,7 +424,7 @@ function ImprovementModal({ modalData, onClose, onSave }) {
         <h3 style={{ marginTop: 0, color: colors.primary, borderBottom: `2px solid ${colors.primaryLight}`, paddingBottom: 10 }}>Cập nhật Cải thiện & Khắc phục</h3>
         <p><b>Lỗi:</b> {modalData.error.desc}</p>
         <div style={{ display: 'grid', gap: 12 }}>
-          <div> <label style={labelStyle}>Người nhận Thông tin</label> <input type="text" value={responsiblePerson} onChange={e => setResponsiblePerson(e.target.value)} style={inputStyle} /> </div>
+          <div> <label style={labelStyle}>P.I.C</label> <input type="text" value={pic} onChange={e => setPic(e.target.value)} style={inputStyle} placeholder="Người chịu trách nhiệm cải thiện" /> </div>
           <div>
             <label style={labelStyle}>Ngày dự kiến hoàn thành</label>
             <DatePicker
@@ -443,18 +436,7 @@ function ImprovementModal({ modalData, onClose, onSave }) {
               customInput={<input style={inputStyle} />}
             />
           </div>
-          <div> <label style={labelStyle}>Ghi chú tiến độ</label> <textarea value={progressNotes} onChange={e => setProgressNotes(e.target.value)} style={{...inputStyle, minHeight: 70}} /> </div>
-          <div>
-            <label style={labelStyle}>Ngày hoàn thành</label>
-            <DatePicker
-              selected={completionDate ? parseDateStr(completionDate) : null}
-              onChange={(date) => setCompletionDate(formatDateStr(date))}
-              dateFormat="dd/MM/yyyy"
-              placeholderText="dd/mm/yyyy"
-              className="date-picker-input"
-              customInput={<input style={inputStyle} />}
-            />
-          </div>
+          <div> <label style={labelStyle}>Biện pháp khắc phục</label> <textarea value={progressNotes} onChange={e => setProgressNotes(e.target.value)} style={{...inputStyle, minHeight: 70}} /> </div>
           <div>
             <label style={labelStyle}>Ảnh cải thiện</label>
             <input type="file" accept="image/*" onChange={handleImageChange} style={{...inputStyle, padding: 5}} />
@@ -471,10 +453,175 @@ function ImprovementModal({ modalData, onClose, onSave }) {
               </div>
             )}
           </div>
+          <div style={{ marginTop: 8 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none', ...labelStyle }}>
+              <input
+                type="checkbox"
+                checked={ehsVerified}
+                onChange={e => setEhsVerified(e.target.checked)}
+                style={{ width: 18, height: 18, accentColor: colors.primary, cursor: 'pointer' }}
+              />
+              <span>Xác nhận đã hoàn thành của EHS</span>
+            </label>
+          </div>
         </div>
         <div style={{ display: "flex", gap: 12, marginTop: 20, justifyContent: "flex-end" }}>
           <button onClick={onClose} disabled={isSaving} style={{ padding: "8px 16px", borderRadius: 6, border: `1px solid ${colors.border}`, background: colors.background, cursor: "pointer" }}>Hủy</button>
           <button onClick={handleSave} disabled={isSaving} style={{ padding: "8px 16px", borderRadius: 6, border: "none", background: colors.primary, color: colors.white, fontWeight: 700, cursor: "pointer" }}> {isSaving ? "Đang lưu..." : "Lưu thay đổi"} </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* =========================
+   CỬA SỔ (MODAL) ĐIỀU CHỈNH LỖI (ADMIN/EHS) - GEMBA
+   ========================= */
+function EditErrorModal({ modalData, onClose, onSave }) {
+  const [selectedGroup, setSelectedGroup] = useState(modalData.error?.group || "");
+  const [selectedError, setSelectedError] = useState(modalData.error?.code || "");
+  const [note, setNote] = useState(modalData.error?.note || "");
+  const [responsiblePerson, setResponsiblePerson] = useState(modalData.error?.responsiblePerson || "");
+  const [ca, setCa] = useState(modalData.error?.ca || "S1");
+  const [otherErrorSeverity, setOtherErrorSeverity] = useState("Nhẹ");
+  
+  // Date and Time parsing
+  const initialDate = modalData.error?.timestamp ? safeTsToDate(modalData.error.timestamp) : new Date();
+  const [editDate, setEditDate] = useState(initialDate);
+  const [editTime, setEditTime] = useState(
+    initialDate ? `${String(initialDate.getHours()).padStart(2, '0')}:${String(initialDate.getMinutes()).padStart(2, '0')}` : "08:00"
+  );
+
+  const [isSaving, setIsSaving] = useState(false);
+
+  const isCustomError = selectedGroup === "Lỗi Khác" || (selectedError && selectedError.endsWith(".other"));
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    // Combine Date and Time
+    const [hours, minutes] = editTime.split(':').map(Number);
+    const newDate = new Date(editDate);
+    newDate.setHours(hours, minutes, 0, 0);
+
+    const pointsMap = { Nhẹ: 2, Nặng: 4, "Nghiêm trọng": 6 };
+    let updatedData = {
+      group: selectedGroup,
+      note,
+      responsiblePerson,
+      ca,
+      timestamp: Timestamp.fromDate(newDate)
+    };
+
+    if (selectedGroup === "Lỗi Khác") {
+      updatedData.code = selectedError.startsWith("custom-") ? selectedError : `custom-${Date.now()}`;
+      updatedData.desc = "Lỗi khác";
+      updatedData.point = pointsMap[otherErrorSeverity];
+    } else {
+      const errors = (errorGroups.find((g) => g.group === selectedGroup) || { items: [] }).items;
+      const err = errors.find((e) => e.code === selectedError);
+      let finalPoint = err?.point || 0;
+      if (selectedError && selectedError.endsWith(".other")) {
+        finalPoint = pointsMap[otherErrorSeverity];
+      }
+      updatedData.code = selectedError;
+      updatedData.desc = err?.desc || modalData.error.desc;
+      updatedData.point = finalPoint;
+    }
+
+    await onSave(modalData.logId, updatedData);
+    setIsSaving(false);
+    onClose();
+  };
+
+  const inputStyle = { width: '100%', padding: 8, borderRadius: 6, border: `1px solid ${colors.border}`, marginTop: 5, boxSizing: 'border-box' };
+  const labelStyle = { fontWeight: 600, color: '#333', fontSize: 14 };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 1002 }}>
+      <div style={{ background: colors.surface, padding: 22, borderRadius: 12, width: '90%', maxWidth: 500, maxHeight: '90vh', overflowY: 'auto', boxShadow: "0 4px 15px rgba(0,0,0,.2)" }}>
+        <h3 style={{ marginTop: 0, color: colors.primary, borderBottom: `2px solid ${colors.primaryLight}`, paddingBottom: 10 }}>Điều chỉnh thông tin lỗi đã đăng</h3>
+        
+        <div style={{ display: 'grid', gap: 12, marginTop: 15 }}>
+          {/* Ngày giờ */}
+          <div style={{ display: 'flex', gap: 10 }}>
+            <div style={{ flex: 1 }}>
+              <label style={labelStyle}>Ngày phát hiện</label>
+              <DatePicker
+                selected={editDate}
+                onChange={(date) => setEditDate(date)}
+                dateFormat="dd/MM/yyyy"
+                className="date-picker-input"
+                customInput={<input style={inputStyle} />}
+              />
+            </div>
+            <div style={{ width: 120 }}>
+              <label style={labelStyle}>Giờ</label>
+              <input type="time" value={editTime} onChange={e => setEditTime(e.target.value)} style={inputStyle} />
+            </div>
+          </div>
+
+          {/* Người nhận thông tin & Ca */}
+          <div style={{ display: 'flex', gap: 10 }}>
+            <div style={{ flex: 1 }}>
+              <label style={labelStyle}>Người nhận Thông tin</label>
+              <input type="text" value={responsiblePerson} onChange={e => setResponsiblePerson(e.target.value)} style={inputStyle} />
+            </div>
+            <div style={{ width: 120 }}>
+              <label style={labelStyle}>Ca</label>
+              <select value={ca} onChange={e => setCa(e.target.value)} style={inputStyle}>
+                <option value="S1">S1</option>
+                <option value="S2">S2</option>
+                <option value="S3">S3</option>
+                <option value="S8">S8</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Phân loại/Nhóm lỗi */}
+          <div>
+            <label style={labelStyle}>Nhóm lỗi</label>
+            <select value={selectedGroup} onChange={(e) => { setSelectedGroup(e.target.value); setSelectedError(""); }} style={inputStyle}>
+              <option value="">-- Chọn nhóm --</option>
+              {errorGroups.map((g) => <option key={g.group} value={g.group}>{g.group}</option>)}
+            </select>
+          </div>
+
+          {selectedGroup && selectedGroup !== "Lỗi Khác" && (
+            <div>
+              <label style={labelStyle}>Chi tiết lỗi</label>
+              <select value={selectedError} onChange={(e) => setSelectedError(e.target.value)} style={inputStyle}>
+                <option value="">-- Chọn chi tiết --</option>
+                {(errorGroups.find(g => g.group === selectedGroup)?.items || []).map(e => <option key={e.code} value={e.code}>{e.code} - {e.desc}</option>)}
+              </select>
+            </div>
+          )}
+
+          {isCustomError && (
+            <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 10 }}>
+              <label style={labelStyle}>Mức độ nghiêm trọng</label>
+              <div style={{ display: 'flex', gap: 15, marginTop: 5 }}>
+                {["Nhẹ", "Nặng", "Nghiêm trọng"].map(level => (
+                  <label key={level} style={{ fontSize: 13, cursor: 'pointer' }}>
+                    <input type="radio" name="editSeverity" value={level} checked={otherErrorSeverity === level} onChange={e => setOtherErrorSeverity(e.target.value)} style={{ marginRight: 4 }} />
+                    {level}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Ghi chú */}
+          <div>
+            <label style={labelStyle}>Ghi chú</label>
+            <textarea value={note} onChange={e => setNote(e.target.value)} style={{ ...inputStyle, minHeight: 60 }} />
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: 12, marginTop: 20, justifyContent: "flex-end" }}>
+          <button onClick={onClose} disabled={isSaving} style={{ padding: "8px 16px", borderRadius: 6, border: `1px solid ${colors.border}`, background: colors.background, cursor: "pointer" }}>Hủy</button>
+          <button onClick={handleSave} disabled={isSaving} style={{ padding: "8px 16px", borderRadius: 6, border: "none", background: colors.primary, color: colors.white, fontWeight: 700, cursor: "pointer" }}>
+            {isSaving ? "Đang lưu..." : "Lưu thay đổi"}
+          </button>
         </div>
       </div>
     </div>
@@ -501,9 +648,11 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
   const [viewer, setViewer] = useState({ open: false, list: [], index: 0 });
   const [note, setNote] = useState("");
   const [responsiblePerson, setResponsiblePerson] = useState("");
+  const [ca, setCa] = useState("S1");
   const fileRef = useRef();
   const [thumbMap, setThumbMap] = useState({});
   const [improvementModal, setImprovementModal] = useState({ isOpen: false, error: null, logId: "" });
+  const [editModal, setEditModal] = useState({ isOpen: false, error: null, logId: "" });
   const [commentModal, setCommentModal] = useState({ isOpen: false, eventId: "", error: null });
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   
@@ -511,6 +660,8 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
   const isCustomError = selectedGroup === "Lỗi Khác" || (selectedError && selectedError.endsWith(".other"));
   const userRolesList = user?.role ? (Array.isArray(user.role) ? user.role.map(r => String(r).toLowerCase()) : String(user.role).split(',').map(r => r.trim().toLowerCase())) : [];
   const isAdminOrEhs = userRolesList.some(r => r === 'admin' || r === 'ehs');
+  const isEhsCommittee = userRolesList.includes("ehs committee");
+  const isEhsCommitteeOnly = isEhsCommittee && !isAdminOrEhs;
   const userRole = isAdminOrEhs ? 'admin' : (userRolesList[0] || "");
 
   // === Tự sửa chính tả ===
@@ -632,21 +783,16 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
     if (autoCorrect && note.trim()) {
       setIsCorrecting(true);
       try {
-        console.log("Đang gọi dịch vụ AI sửa ghi chú...", note.trim());
-        const data = await callAIService(
-          `Sửa lỗi chính tả, câu cú và dấu câu cho đoạn văn tiếng Việt sau. Chỉ trả về đoạn văn đã sửa, không giải thích, không thêm nội dung nào khác:\n${note.trim()}`,
-          [],
-          CLOUD_FUNCTION_URL
-        );
+        const data = await callSpellCheckService(note.trim(), CLOUD_FUNCTION_URL);
         console.log("Kết quả trả về từ AI Service:", data);
         const corrected = (data && data.response || "").trim();
-        if (corrected) {
+        if (corrected && corrected.toLowerCase() !== note.trim().toLowerCase()) {
           setCorrectedNote(corrected);
           setShowCorrectModal(true);
           setIsCorrecting(false);
           return;
         } else {
-          console.warn("AI Service trả về kết quả rỗng. Tiếp tục lưu bản gốc.");
+          console.warn("AI Service trả về kết quả trùng với bản gốc hoặc rỗng. Tiếp tục lưu bản gốc.");
         }
       } catch (e) {
         console.error("Lỗi khi gọi AI sửa chính tả:", e);
@@ -682,7 +828,6 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
         setIsUploading(false); 
         return;
       }
-
       // 2. Tạo logData
       let logData;
       if (isCustomError) {
@@ -695,6 +840,7 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
           imageUrls: urls, 
           note: noteToUse, 
           responsiblePerson: responsiblePerson.trim(),
+          ca: ca,
           userId: user.uid,
           addedBy: user.name 
         };
@@ -709,6 +855,7 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
           imageUrls: urls, 
           note: noteToUse, 
           responsiblePerson: responsiblePerson.trim(),
+          ca: ca,
           userId: user.uid,
           addedBy: user.name 
         };
@@ -750,7 +897,7 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
       if (fileRef.current) fileRef.current.value = "";
       setNote(""); 
       setResponsiblePerson("");
-      
+      setCa("S1");
     } catch (globalError) {
       console.error("Lỗi không xác định trong doSaveError:", globalError);
       alert(`Đã xảy ra lỗi không mong muốn: ${globalError.message || globalError}`);
@@ -769,6 +916,20 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
           console.error("Lỗi khi xóa khỏi tu_gemba_logs:", err);
           alert("Xóa vi phạm thất bại!");
           return;
+        }
+
+        // Xóa toàn bộ comment liên quan trong audit_comments
+        try {
+          const qComments = query(collection(db, "audit_comments"), where("eventId", "==", logId));
+          const snapComments = await getDocs(qComments);
+          if (!snapComments.empty) {
+            const batchComments = writeBatch(db);
+            snapComments.forEach(d => batchComments.delete(d.ref));
+            await batchComments.commit();
+            console.log("Đã xóa toàn bộ bình luận liên quan cho logId:", logId);
+          }
+        } catch (err) {
+          console.error("Lỗi khi xóa bình luận liên quan:", err);
         }
 
         const images = errorToDelete.imageUrls || (errorToDelete.imageUrl ? [errorToDelete.imageUrl] : []);
@@ -831,6 +992,41 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
         }
     }
   }
+
+  async function handleDeleteRequest(logId) {
+    const errorToDelete = allScores.find(s => s.id === logId);
+    if (!errorToDelete) return;
+    if (await askConfirm(`Bạn có chắc muốn gửi yêu cầu xóa lỗi "${errorToDelete.desc}" đến EHS duyệt không?`, "Yêu cầu xóa lỗi")) {
+      try {
+        const docRef = doc(db, "tu_gemba_logs", logId);
+        await updateDoc(docRef, {
+          deleteRequested: true,
+          deleteRequestedBy: user.name,
+          deleteRequestedAt: new Date().toLocaleString("vi-VN")
+        });
+        alert("Đã gửi yêu cầu xóa lỗi. Vui lòng chờ EHS duyệt!");
+      } catch (err) {
+        console.error("Lỗi gửi yêu cầu xóa:", err);
+        alert("Gửi yêu cầu xóa thất bại!");
+      }
+    }
+  }
+
+  async function handleCancelDeleteRequest(logId) {
+    try {
+      const docRef = doc(db, "tu_gemba_logs", logId);
+      const { deleteField } = await import("firebase/firestore");
+      await updateDoc(docRef, {
+        deleteRequested: deleteField(),
+        deleteRequestedBy: deleteField(),
+        deleteRequestedAt: deleteField()
+      });
+      alert("Đã từ chối yêu cầu xóa!");
+    } catch (err) {
+      console.error("Lỗi từ chối xóa:", err);
+      alert("Thao tác thất bại!");
+    }
+  }
   
   const handleSaveImprovement = async (logId, improvementData) => {
     const errorToUpdate = allScores.find(s => s.id === logId);
@@ -850,6 +1046,14 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
       dueDateHistory: newDueDateHistory
     });
   };
+
+  const handleSaveEditError = async (logId, updatedData) => {
+    const errorToUpdate = allScores.find(s => s.id === logId);
+    if (!errorToUpdate) return;
+
+    const docRef = doc(db, "tu_gemba_logs", logId);
+    await updateDoc(docRef, updatedData);
+  };
   
   const ActionButton = ({ onClick, title, children, color = "#555", bg = "#f0f0f0" }) => (
     <button onClick={onClick} title={title} style={{ border: `1px solid ${color === colors.white ? 'transparent' : color}`, background: bg, color: color, borderRadius: '50%', width: 28, height: 28, cursor: 'pointer', fontWeight: 800, fontSize: 16, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', margin: '0 2px', lineHeight: 1, padding: 0 }}>
@@ -867,6 +1071,7 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
       <div style={{ width: '100%', maxWidth: '1600px' }}>
         {showExportModal && <ExportModal onClose={() => setShowExportModal(false)} departments={departments} />}
         {improvementModal.isOpen && <ImprovementModal modalData={improvementModal} onClose={() => setImprovementModal({ isOpen: false, error: null, logId: "" })} onSave={handleSaveImprovement} />}
+        {editModal.isOpen && <EditErrorModal modalData={editModal} onClose={() => setEditModal({ isOpen: false, error: null, logId: "" })} onSave={handleSaveEditError} />}
 
         {/* Popup xác nhận sửa chính tả */}
         {showCorrectModal && (
@@ -942,12 +1147,13 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
             {isCustomError && (
                 <div style={{ border: `1.5px solid ${colors.primaryLight}`, borderRadius: 8, padding: 15, marginBottom: 15 }}>
                      <div style={{ fontSize: 15, color: colors.textPrimary, fontWeight: 700, marginBottom: 10 }}>{t("gemba.custom.detail")}</div>
-                    <div style={{ fontSize: 14, color: "#666" }}>
-                      Vui lòng nhập chi tiết lỗi phát hiện ở phần ghi chú bên dưới và tải lên ảnh bằng chứng.
-                    </div>
+                     <div style={{ fontSize: 14, color: "#666" }}>
+                       Vui lòng nhập chi tiết lỗi phát hiện ở phần ghi chú bên dưới và tải lên ảnh bằng chứng.
+                     </div>
                 </div>
             )}
-            <div style={{ marginBottom: 15 }}>
+            <div style={{ display: 'flex', gap: 12, marginBottom: 15 }}>
+              <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 15, color: colors.textPrimary, marginBottom: 5 }}>{t("gemba.recipient")}</div>
                 <input
                   type="text"
@@ -956,6 +1162,20 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
                   placeholder={t("gemba.recipient.placeholder")}
                   style={{ width: "100%", boxSizing: "border-box", padding: "8px 12px", borderRadius: 8, border: `1.5px solid ${colors.primaryLight}`, fontSize: 15 }}
                 />
+              </div>
+              <div style={{ width: 120 }}>
+                <div style={{ fontSize: 15, color: colors.textPrimary, marginBottom: 5 }}>Ca</div>
+                <select
+                  value={ca}
+                  onChange={(e) => setCa(e.target.value)}
+                  style={{ width: "100%", boxSizing: "border-box", padding: "8px 12px", borderRadius: 8, border: `1.5px solid ${colors.primaryLight}`, fontSize: 15 }}
+                >
+                  <option value="S1">S1</option>
+                  <option value="S2">S2</option>
+                  <option value="S3">S3</option>
+                  <option value="S8">S8</option>
+                </select>
+              </div>
             </div>
             <div style={{ marginBottom: 8 }}>
                 <div style={{ fontSize: 15, color: colors.textPrimary, marginBottom: 5 }}>{t("gemba.note.label")}</div>
@@ -994,21 +1214,34 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
                 <div style={{ display: 'grid', gap: 12 }}>
                   {scoreList.length > 0 ? scoreList.map((e, idx) => {
                     const images = e.imageUrls || (e.imageUrl ? [e.imageUrl] : []);
-                    const isImproved = e.completionDate && e.improvementImageUrl;
+                    const isImproved = e.ehsVerified === true;
                     return (
                       <div key={e.id || idx} style={{ border: '1.2px solid ' + colors.primaryLight, borderRadius: 12, padding: 12, background: colors.surface, boxShadow: `0 1.5px 10px ${colors.primary}11` }}>
                         <div style={{ display:'flex', justifyContent:'space-between', gap:8, flexWrap:'wrap' }}>
-                          <div style={{ fontSize: 12, color: colors.textSecondary }}>{safeTsToDate(e.timestamp)?.toLocaleString('vi-VN')}</div>
+                          <div style={{ fontSize: 12, color: colors.textSecondary }}>{safeTsToDate(e.timestamp)?.toLocaleString('vi-VN')}{e.ca ? ` | Ca: ${e.ca}` : ''}</div>
                           <div style={{ fontWeight: 700, color: colors.primary }}>{e.group}</div>
                         </div>
                         <div style={{ marginTop: 6, overflowWrap:'anywhere' }}>
                           <div>{e.group === 'Lỗi Khác' ? 'Lỗi khác' : e.desc}</div>
+                          {(() => {
+                            const noteText = e.note || (e.group === 'Lỗi Khác' && e.desc !== 'Lỗi khác' ? e.desc : null);
+                            return noteText ? (
+                              <div style={{ fontSize: '13px', color: colors.textSecondary, marginTop: 4, padding: '4px 8px', background: 'rgba(128,128,128,0.08)', borderRadius: 6, borderLeft: `3px solid ${colors.primary}` }}>
+                                Ghi chú: {noteText}
+                              </div>
+                            ) : null;
+                          })()}
                           {e.responsiblePerson && (
                             <div style={{ fontSize: '12px', color: '#b94a48', fontWeight: 600, marginTop: 4 }}>
                               Người nhận Thông tin: {e.responsiblePerson}
                             </div>
                           )}
                           {e.addedBy && <div style={{fontSize: 11, color: colors.textSecondary, fontStyle:'italic', marginTop: 2}}>{t("gemba.by")} {e.addedBy}</div>}
+                          {e.deleteRequested && (
+                            <div style={{ fontSize: '12px', color: '#c62828', fontWeight: 'bold', background: '#ffebee', padding: '4px 8px', borderRadius: 6, marginTop: 6, display: 'inline-block' }}>
+                              ⚠️ Chờ duyệt xóa (Yêu cầu bởi: {e.deleteRequestedBy})
+                            </div>
+                          )}
                         </div>
                         {images.length > 0 && (
                           <div style={{ marginTop: 8 }}>
@@ -1032,8 +1265,22 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
                             💬
                           </ActionButton>
                           <ActionButton onClick={() => setImprovementModal({ isOpen: true, error: e, logId: e.id })} title={t("gemba.improve.action")} color={colors.white} bg={isImproved ? '#4caf50' : '#f44336'}><ImprovementIcon /></ActionButton>
+                          {isEhsCommitteeOnly && e.userId === user.uid && !e.deleteRequested && (
+                            <ActionButton onClick={() => handleDeleteRequest(e.id)} title="Yêu cầu xóa lỗi" color="#d32f2f" bg="transparent">x</ActionButton>
+                          )}
+                          {isAdminOrEhs && e.deleteRequested && (
+                            <>
+                              <ActionButton onClick={() => handleDelete(e.id)} title="Duyệt xóa" color="#fff" bg="#2e7d32">✅</ActionButton>
+                              <ActionButton onClick={() => handleCancelDeleteRequest(e.id)} title="Từ chối xóa" color="#fff" bg="#e65100">❌</ActionButton>
+                            </>
+                          )}
                           {(userRole === 'admin' || userRole === 'ehs') && (
-                            <ActionButton onClick={() => handleDelete(e.id)} title={t("gemba.delete.action")} color="#d32f2f" bg="transparent">x</ActionButton>
+                            <>
+                              <ActionButton onClick={() => setEditModal({ isOpen: true, error: e, logId: e.id })} title="Sửa lỗi" color={colors.white} bg="#ff9800">✏️</ActionButton>
+                              {!e.deleteRequested && (
+                                <ActionButton onClick={() => handleDelete(e.id)} title={t("gemba.delete.action")} color="#d32f2f" bg="transparent">x</ActionButton>
+                              )}
+                            </>
                           )}
                         </div>
                       </div>
@@ -1056,11 +1303,14 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
                   </thead>
                   <tbody key={dep.name}>
                   {scoreList.length > 0 ? scoreList.map((e, idx) => {
-                     const isImproved = e.completionDate && e.improvementImageUrl;
+                     const isImproved = e.ehsVerified === true;
                      const images = e.imageUrls || (e.imageUrl ? [e.imageUrl] : []);
                      return (
                       <tr key={e.id || idx}>
-                      <td style={{ padding: "10px 14px", fontSize: 12 }}>{safeTsToDate(e.timestamp)?.toLocaleString("vi-VN")}</td>
+                      <td style={{ padding: "10px 14px", fontSize: 12 }}>
+                        <div>{safeTsToDate(e.timestamp)?.toLocaleString("vi-VN")}</div>
+                        {e.ca && <div style={{ fontWeight: 'bold', color: '#666', marginTop: 4 }}>Ca: {e.ca}</div>}
+                      </td>
                       <td style={{ padding: "10px 14px" }}>{e.group}</td>
                       <td style={{ padding: "10px 14px" }}>
                         <div>{e.group === 'Lỗi Khác' ? 'Lỗi khác' : e.desc}</div>
@@ -1072,6 +1322,11 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
                         {e.addedBy && (
                           <div style={{ fontSize: '11px', color: colors.textSecondary, fontStyle: 'italic', marginTop: 2 }}>
                             {t("gemba.by")} {e.addedBy}
+                          </div>
+                        )}
+                        {e.deleteRequested && (
+                          <div style={{ fontSize: '11px', color: '#c62828', fontWeight: 'bold', background: '#ffebee', padding: '2px 6px', borderRadius: 4, marginTop: 4, display: 'inline-block' }}>
+                            ⚠️ Chờ duyệt xóa (Yêu cầu bởi: {e.deleteRequestedBy})
                           </div>
                         )}
                       </td>
@@ -1101,7 +1356,23 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
                               💬
                             </ActionButton>
                             <ActionButton onClick={() => setImprovementModal({ isOpen: true, error: e, logId: e.id })} title="Cải thiện/Khắc phục" color={colors.white} bg={isImproved ? "#4caf50" : "#f44336"}> <ImprovementIcon /> </ActionButton>
-                            {(userRole === "admin" || userRole === "ehs") && ( <ActionButton onClick={() => handleDelete(e.id)} title="Xóa lỗi" color="#d32f2f" bg="transparent">x</ActionButton> )}
+                            {isEhsCommitteeOnly && e.userId === user.uid && !e.deleteRequested && (
+                              <ActionButton onClick={() => handleDeleteRequest(e.id)} title="Yêu cầu xóa lỗi" color="#d32f2f" bg="transparent">x</ActionButton>
+                            )}
+                            {isAdminOrEhs && e.deleteRequested && (
+                              <>
+                                <ActionButton onClick={() => handleDelete(e.id)} title="Duyệt xóa" color="#fff" bg="#2e7d32">✅</ActionButton>
+                                <ActionButton onClick={() => handleCancelDeleteRequest(e.id)} title="Từ chối xóa" color="#fff" bg="#e65100">❌</ActionButton>
+                              </>
+                            )}
+                            {(userRole === "admin" || userRole === "ehs") && (
+                              <>
+                                <ActionButton onClick={() => setEditModal({ isOpen: true, error: e, logId: e.id })} title="Sửa lỗi" color={colors.white} bg="#ff9800">✏️</ActionButton>
+                                {!e.deleteRequested && (
+                                  <ActionButton onClick={() => handleDelete(e.id)} title="Xóa lỗi" color="#d32f2f" bg="transparent">x</ActionButton>
+                                )}
+                              </>
+                            )}
                           </div>
                       </td>
                       </tr>
@@ -1115,7 +1386,11 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
               <div style={{ marginBottom: 20 }}>
                   <label htmlFor="dept-select" style={{ fontWeight: 700, color: colors.primary, display: 'block', marginBottom: 8 }}>Chọn bộ phận:</label>
                   <select id="dept-select" value={depIndex} onChange={(e) => handleSelectDepartment(parseInt(e.target.value, 10))} style={{ width: "100%", padding: "12px 15px", borderRadius: 8, border: `1.5px solid ${colors.primaryLight}`, fontSize: 16, background: colors.surface, fontWeight: 'bold', color: colors.textPrimary }}>
-                  {departments.map((d, i) => (<option key={d.name} value={i}>{d.name}</option>))}
+                  {departments.map((d, i) => (
+                    <option key={d.name} value={i}>
+                      {d.name}{newLogCounts && newLogCounts[d.name] > 0 ? ` (${newLogCounts[d.name]})` : ""}
+                    </option>
+                  ))}
                   </select>
               </div>
               ) : (
@@ -1145,6 +1420,7 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
         onClose={() => setCommentModal({ isOpen: false, eventId: "", error: null })} 
         eventId={commentModal.eventId} 
         user={user} 
+        error={commentModal.error}
       />
     </div>
   );
@@ -1153,7 +1429,7 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
 /* =========================
    Component Bình Luận Thảo Luận
    ========================= */
-function CommentModal({ isOpen, onClose, eventId, user }) {
+function CommentModal({ isOpen, onClose, eventId, user, error }) {
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState("");
   const [loadingComments, setLoadingComments] = useState(false);
@@ -1200,6 +1476,20 @@ function CommentModal({ isOpen, onClose, eventId, user }) {
         text: txt,
         timestamp: serverTimestamp()
       });
+
+      // Gửi thông báo cho người tạo lỗi nếu người comment khác người tạo lỗi
+      const creatorUid = error?.userId;
+      if (creatorUid && creatorUid !== user.uid) {
+        const errorDesc = error?.desc || "Lỗi vi phạm";
+        await addDoc(collection(db, "notifications"), {
+          type: "new_gemba_comment",
+          message: `${user.name} đã bình luận về lỗi Gemba của bạn ("${errorDesc}")`,
+          targetUserId: creatorUid,
+          createdBy: user.uid,
+          readBy: [],
+          timestamp: serverTimestamp()
+        });
+      }
     } catch (err) {
       console.error("Lỗi gửi bình luận:", err);
       alert("Không thể gửi bình luận.");

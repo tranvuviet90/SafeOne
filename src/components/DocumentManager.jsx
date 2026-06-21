@@ -15,10 +15,12 @@ import {
   IoFileTrayOutline,
   IoCreateOutline
 } from "react-icons/io5";
-import BookViewer3D from "./BookViewer3D";
 import { normalizeRole } from "../utils/string";
+import { useI18n } from "../i18n/I18nProvider";
+import License from "./License";
 
 export default function DocumentManager({ user, isMobile }) {
+  const { t } = useI18n();
   const { pushToast } = useToast();
   const { askConfirm } = useConfirm();
 
@@ -35,6 +37,7 @@ export default function DocumentManager({ user, isMobile }) {
   const [selectedFileEn, setSelectedFileEn] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [isAITrained, setIsAITrained] = useState(true);
 
   // Edit form state
   const [editingDoc, setEditingDoc] = useState(null);
@@ -44,8 +47,7 @@ export default function DocumentManager({ user, isMobile }) {
   const [editUploading, setEditUploading] = useState(false);
   const [editProgress, setEditProgress] = useState(0);
 
-  // PDF Viewer modal state
-  const [viewingDoc, setViewingDoc] = useState(null);
+
 
   // Roles verification
   const userRoles = user?.role ? (Array.isArray(user.role) ? user.role.map(normalizeRole) : String(user.role).split(',').map(normalizeRole)) : [];
@@ -59,6 +61,12 @@ export default function DocumentManager({ user, isMobile }) {
 
     // Do not attempt to query MSDS if user does not have permission
     if (activeSubTab === "msds" && !canViewMSDS) {
+      setDocuments([]);
+      setLoading(false);
+      return;
+    }
+
+    if (activeSubTab === "license") {
       setDocuments([]);
       setLoading(false);
       return;
@@ -199,6 +207,7 @@ export default function DocumentManager({ user, isMobile }) {
         type: activeSubTab,
         createdAt: serverTimestamp(),
         uploadedBy: user?.name || user?.email || "Admin",
+        isAITrained: isAITrained,
       };
 
       if (selectedFileVi) {
@@ -223,15 +232,33 @@ export default function DocumentManager({ user, isMobile }) {
         }
       }
 
-      await addDoc(collection(db, "documents"), docData);
+      const docRef = await addDoc(collection(db, "documents"), docData);
       setUploadProgress(100);
 
       pushToast("Tải lên tài liệu thành công!", "success");
+
+      // Extract markdown content asynchronously if isAITrained is true
+      if (docData.fileUrl && docData.isAITrained) {
+        pushToast("Đang trích xuất nội dung văn bản bằng AI...", "info");
+        (async () => {
+          try {
+            const { getFunctions, httpsCallable } = await import("firebase/functions");
+            const functions = getFunctions(undefined, "asia-southeast1");
+            const extractMarkdown = httpsCallable(functions, "extractMarkdown");
+            await extractMarkdown({ docId: docRef.id, fileUrl: docData.fileUrl });
+            pushToast("AI đã huấn luyện và trích xuất tài liệu thành công!", "success");
+          } catch (err) {
+            console.error("Lỗi khi trích xuất AI:", err);
+            pushToast("AI trích xuất tài liệu thất bại, vui lòng thử lại sau.", "error");
+          }
+        })();
+      }
       
       // Reset form
       setUploadTitle("");
       setSelectedFileVi(null);
       setSelectedFileEn(null);
+      setIsAITrained(true);
       setShowUploadForm(false);
       
       const fileInputVi = document.getElementById("pdf-file-input-vi");
@@ -338,6 +365,23 @@ export default function DocumentManager({ user, isMobile }) {
       setEditProgress(100);
 
       pushToast("Cập nhật tài liệu thành công!", "success");
+
+      // Extract markdown content asynchronously if fileUrl has been updated
+      if (updateData.fileUrl) {
+        pushToast("Đang cập nhật nội dung văn bản bằng AI...", "info");
+        (async () => {
+          try {
+            const { getFunctions, httpsCallable } = await import("firebase/functions");
+            const functions = getFunctions(undefined, "asia-southeast1");
+            const extractMarkdown = httpsCallable(functions, "extractMarkdown");
+            await extractMarkdown({ docId: editingDoc.id, fileUrl: updateData.fileUrl });
+            pushToast("AI đã cập nhật tài liệu thành công!", "success");
+          } catch (err) {
+            console.error("Lỗi khi trích xuất AI:", err);
+          }
+        })();
+      }
+
       setEditingDoc(null);
       setEditTitle("");
       setEditFileVi(null);
@@ -440,18 +484,21 @@ export default function DocumentManager({ user, isMobile }) {
       {/* Sub-tab Navigation */}
       <div style={{ 
         display: "flex", 
+        width: "100%",
+        boxSizing: "border-box",
         borderBottom: `2px solid ${colors.border}`, 
         marginBottom: 24, 
         overflowX: "auto",
         whiteSpace: "nowrap",
-        gap: 6,
+        gap: isMobile ? 3 : 6,
         paddingBottom: 2
       }} className="no-scrollbar">
         {[
           { key: "msds", label: "MSDS" },
           { key: "sop", label: "SOP" },
           { key: "quytrinh", label: "Quy trình" },
-          { key: "bieumau", label: "Biểu mẫu" }
+          { key: "bieumau", label: "Biểu mẫu" },
+          { key: "license", label: t("menu.license") || "Chứng nhận vận hành" }
         ].map((tab) => {
           const isActive = activeSubTab === tab.key;
           return (
@@ -463,16 +510,20 @@ export default function DocumentManager({ user, isMobile }) {
                 setShowUploadForm(false);
               }}
               style={{
-                padding: isMobile ? "10px 16px" : "12px 24px",
+                flex: isMobile ? 1 : "initial",
+                textAlign: "center",
+                padding: isMobile ? "10px 4px" : "12px 24px",
                 background: isActive ? colors.primary : "transparent",
                 color: isActive ? colors.white : colors.textSecondary,
                 border: "none",
                 borderRadius: "8px 8px 0 0",
-                fontSize: 15,
+                fontSize: isMobile ? 12 : 15,
                 fontWeight: 600,
                 cursor: "pointer",
                 transition: "all 0.2s ease",
-                outline: "none"
+                outline: "none",
+                whiteSpace: "normal",
+                wordBreak: "break-word"
               }}
               onMouseOver={(e) => {
                 if (!isActive) {
@@ -492,6 +543,11 @@ export default function DocumentManager({ user, isMobile }) {
           );
         })}
       </div>
+
+      {activeSubTab === "license" ? (
+        <License user={user} isMobile={isMobile} />
+      ) : (
+        <>
 
       {/* Toolbar Section */}
       <div style={{ 
@@ -704,7 +760,17 @@ export default function DocumentManager({ user, isMobile }) {
             )}
 
             {/* Submit buttons */}
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, marginTop: 4 }}>
+            <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 12, marginTop: 4 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, color: colors.textPrimary, cursor: "pointer", marginRight: "auto" }}>
+                <input
+                  type="checkbox"
+                  checked={isAITrained}
+                  onChange={(e) => setIsAITrained(e.target.checked)}
+                  disabled={uploading}
+                  style={{ width: 16, height: 16, cursor: "pointer" }}
+                />
+                Huấn luyện AI
+              </label>
               <button
                 type="button"
                 onClick={() => {
@@ -712,6 +778,7 @@ export default function DocumentManager({ user, isMobile }) {
                   setUploadTitle("");
                   setSelectedFileVi(null);
                   setSelectedFileEn(null);
+                  setIsAITrained(true);
                 }}
                 disabled={uploading}
                 style={{
@@ -760,7 +827,7 @@ export default function DocumentManager({ user, isMobile }) {
         </div>
       ) : (activeSubTab === "msds" && !canViewMSDS) ? (
         <div style={{
-          padding: 60,
+          padding: isMobile ? "32px 16px" : 60,
           textAlign: "center",
           border: `2px dashed ${colors.error}44`,
           borderRadius: 16,
@@ -781,7 +848,7 @@ export default function DocumentManager({ user, isMobile }) {
         </div>
       ) : currentDocs.length === 0 ? (
         <div style={{
-          padding: 60,
+          padding: isMobile ? "32px 16px" : 60,
           textAlign: "center",
           border: `2px dashed ${colors.border}`,
           borderRadius: 16,
@@ -839,7 +906,8 @@ export default function DocumentManager({ user, isMobile }) {
                 gap: 14,
                 boxShadow: "0 2px 6px rgba(0,0,0,0.02)",
                 transition: "all 0.2s ease-in-out",
-                cursor: "default"
+                cursor: "default",
+                minWidth: 0
               }}
               onMouseOver={(e) => {
                 e.currentTarget.style.boxShadow = "0 6px 16px rgba(70,110,115,0.08)";
@@ -873,7 +941,7 @@ export default function DocumentManager({ user, isMobile }) {
                 </div>
                 
                 {/* Text Metadata */}
-                <div style={{ minWidth: 0 }}>
+                <div style={{ minWidth: 0, flex: 1 }}>
                   <h4 style={{ 
                     margin: "0 0 6px 0", 
                     color: colors.textPrimary, 
@@ -889,15 +957,17 @@ export default function DocumentManager({ user, isMobile }) {
                     color: colors.textSecondary,
                     display: "flex",
                     flexDirection: "column",
-                    gap: 3
+                    gap: 3,
+                    minWidth: 0,
+                    width: "100%"
                   }}>
                     {(docItem.fileNameVi || docItem.fileUrlVi || docItem.fileName) && (
-                      <span style={{ textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap", display: "block" }}>
+                      <span style={{ textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap", display: "block", width: "100%" }}>
                         🇻🇳 Tiếng Việt: {docItem.fileNameVi || docItem.fileName}
                       </span>
                     )}
                     {(docItem.fileNameEn || docItem.fileUrlEn) && (
-                      <span style={{ textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap", display: "block" }}>
+                      <span style={{ textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap", display: "block", width: "100%" }}>
                         🇬🇧 English: {docItem.fileNameEn}
                       </span>
                     )}
@@ -918,8 +988,50 @@ export default function DocumentManager({ user, isMobile }) {
                 justifyContent: "flex-end", 
                 gap: 8,
                 borderTop: `1px solid ${colors.backgroundLight}`,
-                paddingTop: 12
+                paddingTop: 12,
+                flexWrap: "wrap"
               }}>
+                {/* AI Train button (Admin only, if missing markdownContent) */}
+                {isAdmin && docItem.isAITrained && !docItem.markdownContent && (
+                  <button
+                    onClick={async () => {
+                      pushToast("Đang trích xuất nội dung văn bản bằng AI...", "info");
+                      try {
+                        const { getFunctions, httpsCallable } = await import("firebase/functions");
+                        const functions = getFunctions(undefined, "asia-southeast1");
+                        const extractMarkdown = httpsCallable(functions, "extractMarkdown");
+                        await extractMarkdown({ docId: docItem.id, fileUrl: docItem.fileUrlVi || docItem.fileUrl || docItem.fileUrlEn });
+                        pushToast("AI đã trích xuất tài liệu thành công!", "success");
+                      } catch (err) {
+                        console.error("Lỗi khi trích xuất AI:", err);
+                        pushToast("AI trích xuất thất bại", "error");
+                      }
+                    }}
+                    title="Phân tích nội dung AI"
+                    style={{
+                      background: "none",
+                      border: `1.5px solid ${colors.primary}44`,
+                      borderRadius: 8,
+                      width: 36,
+                      height: 36,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: colors.primary,
+                      cursor: "pointer",
+                      transition: "all 0.2s ease"
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = colors.backgroundLight;
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = "none";
+                    }}
+                  >
+                    🤖
+                  </button>
+                )}
+
                 {/* Edit button (Admin only) */}
                 {isAdmin && (
                   <button
@@ -1021,7 +1133,14 @@ export default function DocumentManager({ user, isMobile }) {
 
                 {/* View button */}
                 <button
-                  onClick={() => setViewingDoc(docItem)}
+                  onClick={() => {
+                    const url = docItem.fileUrlVi || docItem.fileUrl || docItem.fileUrlEn;
+                    if (url) {
+                      window.open(url, "_blank");
+                    } else {
+                      pushToast("Tài liệu không có đường dẫn trực tiếp", "warning");
+                    }
+                  }}
                   style={{
                     background: colors.primary,
                     color: colors.white,
@@ -1048,16 +1167,7 @@ export default function DocumentManager({ user, isMobile }) {
         </div>
       )}
 
-      {/* PDF View Modal Overlay - Trình xem sách 3D */}
-      {viewingDoc && (
-        <BookViewer3D
-          fileUrl={viewingDoc.fileUrlVi || viewingDoc.fileUrl}
-          fileUrlEn={viewingDoc.fileUrlEn}
-          title={viewingDoc.title}
-          onClose={() => setViewingDoc(null)}
-          isMobile={isMobile}
-        />
-      )}
+
 
       {/* Edit Document Modal Overlay - Admin only */}
       {isAdmin && editingDoc && (
@@ -1230,6 +1340,8 @@ export default function DocumentManager({ user, isMobile }) {
             </form>
           </div>
         </div>
+      )}
+      </>
       )}
     </div>
   );

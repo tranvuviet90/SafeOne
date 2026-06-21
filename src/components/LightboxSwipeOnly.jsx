@@ -16,7 +16,11 @@ import React, {
 const ToastCtx = createContext({ pushToast: () => {} });
 
 export function useToast() {
-  return useContext(ToastCtx);
+  const ctx = useContext(ToastCtx);
+  return useMemo(() => ({
+    pushToast: ctx.pushToast,
+    show: (msg, type = "info", ttlMs = 4000) => ctx.pushToast(msg, type, ttlMs)
+  }), [ctx.pushToast]);
 }
 
 export function ToastProvider({ children }) {

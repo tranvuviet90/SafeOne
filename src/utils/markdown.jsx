@@ -9,8 +9,15 @@ import React from 'react';
 export function parseMarkdown(text) {
   if (!text) return "";
   
+  // Pre-process to merge and clean multi-line markdown links [text](url)
+  const cleanedText = text.replace(/\[([\s\S]*?)\]\s*\(([\s\S]*?)\)/g, (match, p1, p2) => {
+    const cleanText = p1.replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim();
+    const cleanUrl = p2.replace(/[\r\n\s]+/g, "");
+    return `[${cleanText}](${cleanUrl})`;
+  });
+  
   // Tách các đoạn code block trước
-  const parts = text.split(/(```[\s\S]*?```)/g);
+  const parts = cleanedText.split(/(```[\s\S]*?```)/g);
   
   return parts.map((part, index) => {
     if (part.startsWith("```") && part.endsWith("```")) {

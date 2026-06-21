@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useI18n } from '../i18n/I18nProvider';
 import { db, functions } from '../firebase';
-import { collection, query, where, getDocs, orderBy, doc, getDoc, setDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { useToast, useConfirm } from './LightboxSwipeOnly';
 import { colors } from '../theme';
@@ -56,6 +56,22 @@ export default function UserManager({ user, isMobile }) {
   const [trainedDocs, setTrainedDocs] = useState([]);
   const [viewingDoc, setViewingDoc] = useState(null);
   const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [aiDocuments, setAiDocuments] = useState([]);
+
+  const triggerExtractMarkdown = async (docItem) => {
+    pushToast("Đang trích xuất nội dung văn bản bằng AI...", "info");
+    try {
+      const { getFunctions, httpsCallable } = await import("firebase/functions");
+      const functionsInstance = getFunctions(undefined, "asia-southeast1");
+      const extractMarkdown = httpsCallable(functionsInstance, "extractMarkdown");
+      await extractMarkdown({ docId: docItem.id, fileUrl: docItem.fileUrlVi || docItem.fileUrl || docItem.fileUrlEn });
+      pushToast("AI đã trích xuất tài liệu thành công!", "success");
+      fetchAIConfig();
+    } catch (err) {
+      console.error("Lỗi khi trích xuất AI:", err);
+      pushToast("AI trích xuất thất bại", "error");
+    }
+  };
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -124,6 +140,14 @@ export default function UserManager({ user, isMobile }) {
         setApiKey('');
         setHasSavedKey(false);
       }
+
+      // Fetch active documents currently in use for RAG chatbot
+      const docsSnap = await getDocs(query(collection(db, 'documents')));
+      const docsList = [];
+      docsSnap.forEach(d => {
+        docsList.push({ id: d.id, ...d.data() });
+      });
+      setAiDocuments(docsList);
     } catch (err) {
       console.error("Error fetching AI config:", err);
       pushToast('Lỗi khi tải cấu hình AI.', 'error');
@@ -786,92 +810,127 @@ export default function UserManager({ user, isMobile }) {
 
           <hr style={{ border: 'none', borderTop: '1px solid #eee', margin: '24px 0' }} />
 
-          {/* Section: Upload Documents */}
+          {/* Section: Manage Chatbot Documents */}
           <div>
             <h4 style={{ margin: '0 0 8px 0', color: '#333', fontSize: 15, fontWeight: 700 }}>
-              2. Nạp tài liệu tri thức nội bộ (.txt, .md, .csv, .json)
+              2. Quản lý tài liệu huấn luyện AI hiện tại
             </h4>
             <p style={{ margin: '0 0 16px 0', fontSize: 13, color: '#555' }}>
-              Tải lên tài liệu quy định, quy trình vận hành hoặc cẩm nang hướng dẫn để Chatbot tự động phân tích và trả lời dựa trên dữ liệu thực tế này.
+              Bật/tắt trạng thái "Huấn luyện AI" cho các tài liệu (MSDS, SOP, Quy trình, Biểu mẫu) để Chatbot tự động nạp tri thức từ tài liệu đó. Để tải lên tài liệu mới, vui lòng vào tab <strong>Tài liệu</strong>.
             </p>
 
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 20 }}>
-              <label 
-                htmlFor="train-file-upload" 
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  padding: '10px 20px',
-                  background: uploadingDoc ? '#9ca3af' : '#10b981',
-                  color: 'white',
-                  borderRadius: 8,
-                  fontWeight: 'bold',
-                  cursor: uploadingDoc ? 'not-allowed' : 'pointer',
-                  fontSize: 14,
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
-                  transition: 'background 0.2s'
-                }}
-              >
-                {uploadingDoc ? '⏳ Đang đọc & nạp tài liệu...' : '📁 Tải tài liệu lên (.txt, .md, .csv, .json)'}
-              </label>
-              <input 
-                type="file" 
-                id="train-file-upload" 
-                accept=".txt,.md,.csv,.json" 
-                onChange={handleFileUpload} 
-                disabled={uploadingDoc}
-                style={{ display: 'none' }}
-              />
-              <span style={{ fontSize: 12, color: '#888' }}>(Tệp tin tối đa 500KB)</span>
-            </div>
-
             {/* List of Documents */}
-            <h5 style={{ margin: '0 0 10px 0', fontSize: 14, color: '#333', fontWeight: 600 }}>
-              Tài liệu đã được học ({trainedDocs.length})
-            </h5>
-
-            {trainedDocs.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '30px 20px', color: '#666', border: '2px dashed #ddd', borderRadius: 8, background: '#fdfdfd' }}>
-                Chưa có tài liệu huấn luyện nào. Hãy tải lên tài liệu tri thức đầu tiên để bắt đầu huấn luyện AI!
-              </div>
-            ) : (
-              <div style={{ overflowX: 'auto', border: '1px solid #ddd', borderRadius: 8, background: 'white' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                  <thead>
-                    <tr style={{ background: '#f5f5f5', borderBottom: '1px solid #ddd' }}>
-                      <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 'bold' }}>Tên tệp</th>
-                      <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 'bold', width: 100 }}>Dung lượng</th>
-                      <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 'bold', width: 180 }}>Ngày nạp</th>
-                      <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 'bold', width: 140 }}>Thao tác</th>
+            <div style={{ overflowX: 'auto', border: '1px solid #ddd', borderRadius: 8, background: 'white' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead>
+                  <tr style={{ background: '#f5f5f5', borderBottom: '1px solid #ddd' }}>
+                    <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 'bold' }}>Tên tài liệu</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 'bold', width: 120 }}>Phân loại</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 'bold', width: 120 }}>Huấn luyện AI</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 'bold', width: 140 }}>Nội dung Markdown</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 'bold', width: 140 }}>Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {aiDocuments.map((docItem) => (
+                    <tr key={docItem.id} style={{ borderBottom: '1px solid #eee' }}>
+                      <td style={{ padding: '10px 12px', color: '#333', fontWeight: 600, wordBreak: 'break-all' }}>
+                        📄 {docItem.title}
+                      </td>
+                      <td style={{ padding: '10px 12px', color: '#666', textTransform: 'uppercase' }}>
+                        {docItem.type}
+                      </td>
+                      <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                        <input
+                          type="checkbox"
+                          checked={docItem.isAITrained || false}
+                          onChange={async (e) => {
+                            const newStatus = e.target.checked;
+                            try {
+                              const docRef = doc(db, 'documents', docItem.id);
+                              await updateDoc(docRef, { isAITrained: newStatus });
+                              
+                              // Cập nhật state local
+                              setAiDocuments(prev => prev.map(d => d.id === docItem.id ? { ...d, isAITrained: newStatus } : d));
+                              pushToast(`Đã ${newStatus ? 'bật' : 'tắt'} huấn luyện AI cho tài liệu`, 'success');
+                              
+                              // Tự động kích hoạt trích xuất Markdown nếu bật huấn luyện AI và chưa có markdownContent
+                              if (newStatus && !docItem.markdownContent) {
+                                triggerExtractMarkdown(docItem);
+                              }
+                            } catch (err) {
+                              console.error(err);
+                              pushToast('Lỗi khi cập nhật trạng thái huấn luyện', 'error');
+                            }
+                          }}
+                          style={{ width: 18, height: 18, cursor: 'pointer', accentColor: colors.primary }}
+                        />
+                      </td>
+                      <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                        {docItem.markdownContent ? (
+                          <span style={{ color: '#2e7d32', fontWeight: 600, fontSize: 12, background: '#e8f5e9', padding: '2px 8px', borderRadius: 12 }}>
+                            ✓ Đã trích xuất
+                          </span>
+                        ) : (
+                          <span style={{ color: '#c62828', fontWeight: 600, fontSize: 12, background: '#ffebee', padding: '2px 8px', borderRadius: 12 }}>
+                            ✗ Chưa có
+                          </span>
+                        )}
+                      </td>
+                      <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                        <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
+                          <button
+                            onClick={() => {
+                              if (docItem.markdownContent) {
+                                setViewingDoc({
+                                  name: docItem.title,
+                                  size: docItem.markdownContent.length,
+                                  content: docItem.markdownContent
+                                });
+                              } else {
+                                pushToast("Tài liệu chưa được trích xuất nội dung văn bản", "warning");
+                              }
+                            }}
+                            disabled={!docItem.markdownContent}
+                            style={{
+                              padding: '4px 10px',
+                              background: docItem.markdownContent ? '#3b82f6' : '#ccc',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: 4,
+                              cursor: docItem.markdownContent ? 'pointer' : 'not-allowed',
+                              fontSize: 12,
+                              fontWeight: 600
+                            }}
+                          >
+                            👁️ Xem MD
+                          </button>
+                          
+                          {docItem.isAITrained && !docItem.markdownContent && (
+                            <button
+                              onClick={() => triggerExtractMarkdown(docItem)}
+                              style={{
+                                padding: '4px 10px',
+                                background: colors.primary,
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: 4,
+                                cursor: 'pointer',
+                                fontSize: 12,
+                                fontWeight: 600
+                              }}
+                              title="Trích xuất nội dung AI"
+                            >
+                              🤖 AI
+                            </button>
+                          )}
+                        </div>
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {trainedDocs.map((doc, idx) => (
-                      <tr key={idx} style={{ borderBottom: '1px solid #eee' }}>
-                        <td style={{ padding: '10px 12px', color: '#333', fontWeight: 600, wordBreak: 'break-all' }}>📄 {doc.name}</td>
-                        <td style={{ padding: '10px 12px', color: '#666' }}>{formatFileSize(doc.size)}</td>
-                        <td style={{ padding: '10px 12px', color: '#666' }}>{doc.uploadedAt}</td>
-                        <td style={{ padding: '10px 12px', textAlign: 'center' }}>
-                          <button 
-                            onClick={() => setViewingDoc(doc)}
-                            style={{ padding: '4px 10px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', marginRight: 6, fontSize: 12, fontWeight: 600 }}
-                          >
-                            👁️ Xem
-                          </button>
-                          <button 
-                            onClick={() => handleDeleteDoc(idx)}
-                            style={{ padding: '4px 10px', background: '#ef4444', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
-                          >
-                            🗑️ Xóa
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}

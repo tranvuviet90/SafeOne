@@ -2147,6 +2147,10 @@ export default function BaoCom({ user, isMobile }) {
   // Tab bộ phận hiện tại khi user có nhiều bộ phận hoặc là Admin/EHS xem tất cả các bộ phận
   const [activeDeptTab, setActiveDeptTab] = useState(0);
   const [adminTab, setAdminTab] = useState('summary'); // 'summary' (Tổng hợp & Gửi Nhà Ăn) hoặc 'depts' (Báo cơm từng Bộ phận dưới dạng mini tabs)
+  
+  const rawRolesForState = user?.role ? (Array.isArray(user.role) ? user.role : [String(user.role)]).flatMap(r => String(r).split(',')).map(r => r.trim()).filter(Boolean) : [];
+  const isCanteenForState = rawRolesForState.includes('Nhà Ăn');
+  const [nonAdminMainTab, setNonAdminMainTab] = useState(isCanteenForState ? 'canteen' : 'dept');
 
   const selectedDateKey = dateKey(selectedDate);
   const prevStatusRef = useRef({});
@@ -2273,6 +2277,88 @@ export default function BaoCom({ user, isMobile }) {
             <DepartmentView
               key={effectiveDeptRoles[activeDeptTab] || effectiveDeptRoles[0]}
               user={{ ...user, role: effectiveDeptRoles[activeDeptTab] || effectiveDeptRoles[0] }}
+              reportData={reportData}
+              selectedDateKey={selectedDateKey}
+              selectedDate={selectedDate}
+            />
+          </div>
+        )}
+      </div>
+    );
+  } else if (isCanteen && effectiveDeptRoles.length > 0) {
+    // User có cả vai trò Nhà ăn và đại diện Bộ phận báo cơm (multi-role)
+    const currentDept = effectiveDeptRoles[activeDeptTab] || effectiveDeptRoles[0];
+    const deptUser = { ...user, role: currentDept };
+    content = (
+      <div>
+        {/* Main Tab Switcher cho vai trò Canteen vs Bộ phận */}
+        <div style={{ display: 'flex', gap: 10, marginBottom: 20, borderBottom: '1px solid #ddd', paddingBottom: 10 }}>
+          <button
+            onClick={() => setNonAdminMainTab('canteen')}
+            style={{
+              padding: '8px 16px',
+              border: 'none',
+              borderRadius: 20,
+              background: nonAdminMainTab === 'canteen' ? colors.primary : '#f5f5f5',
+              color: nonAdminMainTab === 'canteen' ? '#fff' : '#333',
+              fontWeight: 600,
+              cursor: 'pointer'
+            }}
+          >
+            🍴 Giao diện Nhà Ăn
+          </button>
+          <button
+            onClick={() => setNonAdminMainTab('dept')}
+            style={{
+              padding: '8px 16px',
+              border: 'none',
+              borderRadius: 20,
+              background: nonAdminMainTab === 'dept' ? colors.primary : '#f5f5f5',
+              color: nonAdminMainTab === 'dept' ? '#fff' : '#333',
+              fontWeight: 600,
+              cursor: 'pointer'
+            }}
+          >
+            🏢 Báo cơm Bộ phận ({deptRoles.join(', ')})
+          </button>
+        </div>
+
+        {nonAdminMainTab === 'canteen' ? (
+          <CanteenView
+            user={user}
+            reportData={reportData}
+            selectedDateKey={selectedDateKey}
+            isMobile={isMobile}
+          />
+        ) : (
+          <div>
+            {/* Nếu có từ 2 bộ phận trở lên, hiển thị tab nhỏ chọn bộ phận */}
+            {effectiveDeptRoles.length > 1 && (
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
+                {effectiveDeptRoles.map((dept, idx) => (
+                  <button
+                    key={dept}
+                    onClick={() => setActiveDeptTab(idx)}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: 16,
+                      border: activeDeptTab === idx ? 'none' : '1px solid #ddd',
+                      background: activeDeptTab === idx ? colors.primary : '#f5f5f5',
+                      color: activeDeptTab === idx ? '#fff' : colors.textPrimary,
+                      fontWeight: activeDeptTab === idx ? 700 : 400,
+                      cursor: 'pointer',
+                      fontSize: 13,
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    {dept}
+                  </button>
+                ))}
+              </div>
+            )}
+            <DepartmentView
+              key={currentDept}
+              user={deptUser}
               reportData={reportData}
               selectedDateKey={selectedDateKey}
               selectedDate={selectedDate}

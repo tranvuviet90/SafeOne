@@ -13,13 +13,25 @@ function broadcastChange(path, data) {
   }
 }
 
+// Initialize generic Firestore mock table
+pool.query(`
+  CREATE TABLE IF NOT EXISTS firestore_mock (
+    collection VARCHAR(128) NOT NULL,
+    id VARCHAR(128) NOT NULL,
+    data JSON NOT NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (collection, id)
+  ) ENGINE=InnoDB;
+`).catch(err => {
+  console.error("Lỗi khởi tạo bảng firestore_mock:", err);
+});
+
 // Map collection name to MySQL table name and key field
 const TABLE_MAPPING = {
   users: { table: "users", key: "uid" },
   notifications: { table: "notifications", key: "id" },
   role_requests: { table: "role_requests", key: "id" },
   chat_messages: { table: "chat_messages", key: "id" },
-  weekly_shifts: { table: "weekly_shifts", key: "week_id" },
   msds_chemicals: { table: "msds_chemicals", key: "chemical_code" },
   gemba: { table: "gemba_reports", key: "id", filter: { type: "gemba" } },
   tu_gemba: { table: "gemba_reports", key: "id", filter: { type: "tu_gemba" } },
@@ -65,7 +77,27 @@ function formatRow(table, row) {
 export async function getCollection(req, res) {
   const { collection } = req.params;
   const cfg = TABLE_MAPPING[collection];
-  if (!cfg) return res.status(404).json({ error: "Không tìm thấy dữ liệu" });
+  
+  if (!cfg) {
+    try {
+      const [rows] = await pool.query(
+        "SELECT * FROM firestore_mock WHERE collection = ?",
+        [collection]
+      );
+      const result = rows.map(r => {
+        try {
+          const parsed = typeof r.data === "string" ? JSON.parse(r.data) : r.data;
+          return { id: r.id, ...parsed };
+        } catch (e) {
+          return { id: r.id };
+        }
+      });
+      return res.status(200).json(result);
+    } catch (error) {
+      console.error(`Get generic collection ${collection} error:`, error);
+      return res.status(500).json({ error: "Lỗi cơ sở dữ liệu" });
+    }
+  }
 
   try {
     let queryStr = `SELECT * FROM ${cfg.table}`;
@@ -94,14 +126,32 @@ export async function getCollection(req, res) {
 export async function getDocument(req, res) {
   const { collection, id } = req.params;
   const cfg = TABLE_MAPPING[collection];
-  if (!cfg) return res.status(404).json({ error: "Không tìm thấy dữ liệu" });
+  
+  if (!cfg) {
+    try {
+      const [rows] = await pool.query(
+        "SELECT data FROM firestore_mock WHERE collection = ? AND id = ?",
+        [collection, id]
+      );
+      if (rows.length === 0) {
+        // Return 200 with exists: false to avoid noisy 404 logs in console
+        return res.status(200).json({ _exists: false });
+      }
+      const parsed = typeof rows[0].data === "string" ? JSON.parse(rows[0].data) : rows[0].data;
+      return res.status(200).json({ id, ...parsed });
+    } catch (error) {
+      console.error(`Get generic document ${collection}/${id} error:`, error);
+      return res.status(500).json({ error: "Lỗi cơ sở dữ liệu" });
+    }
+  }
 
   try {
     // Special mapping for meal_reports (composite key)
     if (cfg.table === "meal_reports") {
       const [rows] = await pool.query("SELECT * FROM meal_reports WHERE date_key = ?", [id]);
       if (rows.length === 0) {
-        return res.status(404).json({ error: "Không có dữ liệu báo cơm cho ngày này" });
+        // Return 200 with exists: false to avoid noisy 404 logs in console
+        return res.status(200).json({ _exists: false });
       }
 
       const payload = {};
@@ -128,7 +178,8 @@ export async function getDocument(req, res) {
     // Normal table lookups
     const [rows] = await pool.query(`SELECT * FROM ${cfg.table} WHERE ${cfg.key} = ?`, [id]);
     if (rows.length === 0) {
-      return res.status(404).json({ error: "Không tìm thấy dòng tương ứng" });
+      // Return 200 with exists: false to avoid noisy 404 logs in console
+      return res.status(200).json({ _exists: false });
     }
     res.status(200).json(formatRow(cfg.table, rows[0]));
   } catch (error) {
@@ -156,12 +207,90 @@ function processFieldUpdate(currentValue, updateValue) {
   return updateValue;
 }
 
+function updateNestedField(obj, path, updateValue) {
+  const parts = path.split('.');
+  let current = obj;
+  for (let i = 0; i < parts.length - 1; i++) {
+    const part = parts[i];
+    if (current[part] === undefined || current[part] === null || typeof current[part] !== 'object') {
+      current[part] = {};
+    }
+    current = current[part];
+  }
+  const lastPart = parts[parts.length - 1];
+  const currentValue = current[lastPart];
+  
+  if (updateValue && updateValue.type === 'deleteField') {
+    delete current[lastPart];
+  } else {
+    current[lastPart] = processFieldUpdate(currentValue, updateValue);
+  }
+}
+
 // POST or PATCH single document
 export async function updateDocument(req, res) {
   const { collection, id } = req.params;
   const isPatch = req.method === "PATCH";
   const cfg = TABLE_MAPPING[collection];
-  if (!cfg) return res.status(404).json({ error: "Không tìm thấy dữ liệu" });
+  
+  if (!cfg) {
+    try {
+      const payload = req.body;
+      const [existing] = await pool.query(
+        "SELECT data FROM firestore_mock WHERE collection = ? AND id = ?",
+        [collection, id]
+      );
+      const rowExists = existing.length > 0;
+      let currentData = {};
+      if (rowExists) {
+        try {
+          currentData = typeof existing[0].data === "string" ? JSON.parse(existing[0].data) : existing[0].data;
+        } catch (e) {
+          currentData = {};
+        }
+      }
+
+      for (const key of Object.keys(payload)) {
+        updateNestedField(currentData, key, payload[key]);
+      }
+
+      const serializedData = JSON.stringify(currentData);
+
+      if (rowExists) {
+        await pool.query(
+          "UPDATE firestore_mock SET data = ? WHERE collection = ? AND id = ?",
+          [serializedData, collection, id]
+        );
+      } else {
+        await pool.query(
+          "INSERT INTO firestore_mock (collection, id, data) VALUES (?, ?, ?)",
+          [collection, id, serializedData]
+        );
+      }
+
+      const formatted = { id, ...currentData };
+      broadcastChange(`${collection}/${id}`, formatted);
+
+      const [allRows] = await pool.query(
+        "SELECT id, data FROM firestore_mock WHERE collection = ?",
+        [collection]
+      );
+      const list = allRows.map(r => {
+        try {
+          const parsed = typeof r.data === "string" ? JSON.parse(r.data) : r.data;
+          return { id: r.id, ...parsed };
+        } catch (e) {
+          return { id: r.id };
+        }
+      });
+      broadcastChange(collection, list);
+
+      return res.status(200).json(formatted);
+    } catch (error) {
+      console.error(`Update generic document ${collection}/${id} error:`, error);
+      return res.status(500).json({ error: "Lỗi cơ sở dữ liệu" });
+    }
+  }
 
   try {
     const payload = req.body;
@@ -324,7 +453,46 @@ export async function updateDocument(req, res) {
 export async function addDocument(req, res) {
   const { collection } = req.params;
   const cfg = TABLE_MAPPING[collection];
-  if (!cfg) return res.status(404).json({ error: "Không tìm thấy dữ liệu" });
+  
+  if (!cfg) {
+    try {
+      const payload = req.body;
+      const id = "doc-" + Date.now() + Math.random().toString(36).substr(2, 9);
+      const currentData = {};
+
+      for (const key of Object.keys(payload)) {
+        updateNestedField(currentData, key, payload[key]);
+      }
+
+      const serializedData = JSON.stringify(currentData);
+      await pool.query(
+        "INSERT INTO firestore_mock (collection, id, data) VALUES (?, ?, ?)",
+        [collection, id, serializedData]
+      );
+
+      const formatted = { id, ...currentData };
+      broadcastChange(`${collection}/${id}`, formatted);
+
+      const [allRows] = await pool.query(
+        "SELECT id, data FROM firestore_mock WHERE collection = ?",
+        [collection]
+      );
+      const list = allRows.map(r => {
+        try {
+          const parsed = typeof r.data === "string" ? JSON.parse(r.data) : r.data;
+          return { id: r.id, ...parsed };
+        } catch (e) {
+          return { id: r.id };
+        }
+      });
+      broadcastChange(collection, list);
+
+      return res.status(200).json(formatted);
+    } catch (error) {
+      console.error(`Add generic document in ${collection} error:`, error);
+      return res.status(500).json({ error: "Lỗi cơ sở dữ liệu" });
+    }
+  }
 
   try {
     const payload = req.body;
@@ -379,7 +547,43 @@ export async function commitBatch(req, res) {
       const collection = parts[3];
       const id = parts[4];
       const cfg = TABLE_MAPPING[collection];
-      if (!cfg) throw new Error(`Batch path không hợp lệ: ${op.path}`);
+      if (!cfg) {
+        const body = op.body || {};
+        if (op.method === "POST" || op.method === "PATCH") {
+          const [existing] = await connection.query(
+            "SELECT data FROM firestore_mock WHERE collection = ? AND id = ?",
+            [collection, id]
+          );
+          const rowExists = existing.length > 0;
+          let currentData = {};
+          if (rowExists) {
+            try {
+              currentData = typeof existing[0].data === "string" ? JSON.parse(existing[0].data) : existing[0].data;
+            } catch (e) {}
+          }
+          for (const key of Object.keys(body)) {
+            updateNestedField(currentData, key, body[key]);
+          }
+          const serializedData = JSON.stringify(currentData);
+          if (rowExists) {
+            await connection.query(
+              "UPDATE firestore_mock SET data = ? WHERE collection = ? AND id = ?",
+              [serializedData, collection, id]
+            );
+          } else {
+            await connection.query(
+              "INSERT INTO firestore_mock (collection, id, data) VALUES (?, ?, ?)",
+              [collection, id, serializedData]
+            );
+          }
+        } else if (op.method === "DELETE") {
+          await connection.query(
+            "DELETE FROM firestore_mock WHERE collection = ? AND id = ?",
+            [collection, id]
+          );
+        }
+        continue;
+      }
 
       const body = op.body || {};
 
@@ -429,6 +633,20 @@ export async function commitBatch(req, res) {
       if (cfg) {
         const [allRows] = await pool.query(`SELECT * FROM ${cfg.table}`);
         broadcastChange(col, allRows.map(r => formatRow(cfg.table, r)));
+      } else {
+        const [allRows] = await pool.query(
+          "SELECT id, data FROM firestore_mock WHERE collection = ?",
+          [col]
+        );
+        const list = allRows.map(r => {
+          try {
+            const parsed = typeof r.data === "string" ? JSON.parse(r.data) : r.data;
+            return { id: r.id, ...parsed };
+          } catch (e) {
+            return { id: r.id };
+          }
+        });
+        broadcastChange(col, list);
       }
     }
 

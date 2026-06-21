@@ -9,14 +9,14 @@ import { getWeekNumber, formatRelativeTime } from "../utils/string";
 const NOTIFICATION_TYPES_CONFIG = [
   {
     type: "new_gemba_error",
-    label: "🚨 Báo cáo sự cố Gemba",
-    desc: "Nhận thông báo khi có sự cố Gemba mới phát sinh cần kiểm tra.",
+    label: "🚨 Báo cáo sự cố EHS Audit",
+    desc: "Nhận thông báo khi có sự cố EHS Audit mới phát sinh cần kiểm tra.",
     roles: ["admin", "ehs"]
   },
   {
     type: "new_tu_gemba_error",
-    label: "💡 Báo cáo Tự Gemba",
-    desc: "Nhận thông báo khi có báo cáo Tự Gemba mới được ghi nhận.",
+    label: "💡 Báo cáo sự cố Gemba",
+    desc: "Nhận thông báo khi có báo cáo sự cố Gemba mới được ghi nhận.",
     roles: ["admin", "ehs", ...DEPARTMENT_ROLES]
   },
   {
@@ -27,14 +27,14 @@ const NOTIFICATION_TYPES_CONFIG = [
   },
   {
     type: "shift_reminder",
-    label: "🗓️ Ca làm việc & Nhắc nhở ca",
+    label: "🗓️ Phân ca & Nhắc nhở ca",
     desc: "Nhận nhắc nhở đăng ký ca làm việc tuần mới và lịch phân ca.",
     roles: ["admin", "ehs", "ehs committee"]
   },
   {
     type: "role_request",
-    label: "👤 Yêu cầu thay đổi chức vụ",
-    desc: "Nhận thông báo khi thành viên gửi yêu cầu xin thay đổi chức vụ.",
+    label: "👤 Yêu cầu thay đổi vai trò",
+    desc: "Nhận thông báo khi thành viên gửi yêu cầu xin thay đổi vai trò.",
     roles: ["admin"]
   },
   {
@@ -42,6 +42,18 @@ const NOTIFICATION_TYPES_CONFIG = [
     label: "🍽️ Báo cơm & Suất ăn",
     desc: "Nhận thông báo khi có thay đổi, điều chỉnh cơm hoặc Nhà Ăn đã phát mì/sữa.",
     roles: ["admin", "ehs", "Nhà Ăn", ...DEPARTMENT_ROLES]
+  },
+  {
+    type: "locker_management",
+    label: "🗄️ Quản lý Tủ cá nhân",
+    desc: "Nhận thông báo khi có yêu cầu đăng ký, di dời hoặc báo hư hỏng tủ cá nhân.",
+    roles: ["admin", "ehs"]
+  },
+  {
+    type: "operation_cert_eval",
+    label: "📋 Đánh giá Chứng nhận vận hành",
+    desc: "Nhận thông báo yêu cầu đánh giá hoặc tái đánh giá chứng nhận vận hành thiết bị.",
+    roles: ["admin", "ehs"]
   }
 ];
 
@@ -49,6 +61,8 @@ const getNotificationIcon = (type) => {
   switch (type) {
     case "new_gemba_error": return "🚨";
     case "new_tu_gemba_error": return "💡";
+    case "new_gemba_comment":
+    case "new_ehs_audit_comment": return "💬";
     case "new_error": return "🚨"; // fallback
     case "bodam_assign": return "📻";
     case "shift_assign": return "🗓️";
@@ -57,6 +71,8 @@ const getNotificationIcon = (type) => {
     case "role_request": return "👤";
     case "role_response": return "🔑";
     case "meal_registration": return "🍽️";
+    case "locker_management": return "🗄️";
+    case "operation_cert_eval": return "📋";
     default: return "🔔";
   }
 };
@@ -65,6 +81,8 @@ const getTabForNotification = (type) => {
   switch (type) {
     case "new_gemba_error":    return { main: 0 };
     case "new_tu_gemba_error": return { main: 1 };
+    case "new_gemba_comment": return { main: 1 };
+    case "new_ehs_audit_comment": return { main: 0 };
     case "new_error":          return { main: 0 };
     case "bodam_assign":       return { main: 2, sub: "bodam" };
     case "shift_assign":       return { main: 2, sub: "calamviec" };
@@ -73,6 +91,8 @@ const getTabForNotification = (type) => {
     case "role_request":       return { main: 4 };
     case "role_response":      return { main: 0 };
     case "meal_registration":  return { main: 3 };
+    case "locker_management":  return { main: 2, sub: "locker" };
+    case "operation_cert_eval": return { main: 5, sub: "license" };
     default: return null;
   }
 };

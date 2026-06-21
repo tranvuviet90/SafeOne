@@ -100,51 +100,49 @@ function Chatbot({ user }) {
         return { hasAccess: true };
     };
 
-    const constructDocContext = () => {
+    const constructDocContext = (promptText) => {
         const userRoleName = user?.role || "Khách";
+        const queryLower = (promptText || "").toLowerCase();
+        
+        // Kiểm tra xem câu hỏi của người dùng có thực sự cần liệt kê danh mục tài liệu không
+        const isAskingForList = queryLower.includes("danh sách") || 
+                               queryLower.includes("liệt kê") || 
+                               queryLower.includes("có những tài liệu") ||
+                               queryLower.includes("tài liệu gì") ||
+                               queryLower.includes("danh mục");
+
+        if (!isAskingForList) {
+            // Không hỏi về danh mục tài liệu -> không gửi danh sách tài liệu EHS để tiết kiệm token
+            return `=== VAI TRÒ & QUYỀN TRUY CẬP CỦA NGƯỜI DÙNG ===
+Người dùng hiện tại: ${user?.name || "Khách"}
+Vai trò: ${userRoleName}
+
+NGUYÊN TẮC: Chỉ cung cấp liên kết tài liệu gốc khi tài liệu đó được truy xuất trong Context của hệ thống và trạng thái quyền hạn là được phép truy cập. Không tự ý bịa đặt liên kết.`;
+        }
+
+        // Thực sự hỏi danh mục tài liệu -> cung cấp danh sách tài liệu EHS dạng siêu thu gọn để tiết kiệm tối đa token
         let context = `=== VAI TRÒ & QUYỀN TRUY CẬP CỦA NGƯỜI DÙNG ===
 Người dùng hiện tại: ${user?.name || "Khách"}
 Vai trò: ${userRoleName}
 
 === DANH SÁCH TÀI LIỆU EHS TRONG HỆ THỐNG ===
-Dưới đây là danh sách các tài liệu EHS hiện có trong cơ sở dữ liệu nhà máy và trạng thái quyền hạn của người dùng đối với từng tài liệu. 
-BẠN PHẢI TUÂN THỦ TUYỆT ĐỐI QUYỀN HẠN NÀY KHI TRẢ LỜI NGƯỜI DÙNG:
+Bao gồm tên tài liệu, danh mục và trạng thái quyền truy cập của người dùng. Hãy trả lời dựa trên danh sách này:
 `;
 
         allDocs.forEach((docItem, i) => {
             const access = getDocAccess(docItem, user);
-            context += `\n[Tài liệu ${i + 1}]:\n`;
-            context += `- Tên tài liệu: ${docItem.title}\n`;
-            context += `- Danh mục: ${docItem.type.toUpperCase()}\n`;
-            
-            if (access.hasAccess) {
-                context += `- Trạng thái quyền truy cập: ĐƯỢC PHÉP TRUY CẬP\n`;
-                if (docItem.fileUrlVi || docItem.fileUrl) {
-                    context += `- Đường dẫn tải/xem Tiếng Việt (VN): ${docItem.fileUrlVi || docItem.fileUrl}\n`;
-                }
-                if (docItem.fileUrlEn) {
-                    context += `- Đường dẫn tải/xem Tiếng Anh (EN): ${docItem.fileUrlEn}\n`;
-                }
-            } else {
-                context += `- Trạng thái quyền truy cập: BỊ TỪ CHỐI TRUY CẬP\n`;
-                context += `- Lý do từ chối: ${access.reason}\n`;
-            }
+            context += `\n[Tài liệu ${i + 1}]: ${docItem.title} (${docItem.type.toUpperCase()}) - ${access.hasAccess ? "ĐƯỢC TRUY CẬP" : "BỊ TỪ CHỐI"}`;
         });
 
-        context += `
-NGUYÊN TẮC QUAN TRỌNG KHI CUNG CẤP TÀI LIỆU:
-1. Chỉ cung cấp đường dẫn tải/xem (link) của tài liệu nếu trạng thái quyền truy cập là "ĐƯỢC PHÉP TRUY CẬP". Khi cung cấp, hãy tạo liên kết markdown đẹp mắt dạng: [Tên tài liệu](URL). Ví dụ: "Dưới đây là tài liệu bạn yêu cầu: [MSDS của hóa chất R3333](https://example.com/pdf)".
-2. Nếu người dùng yêu cầu tài liệu mà trạng thái quyền truy cập là "BỊ TỪ CHỐI TRUY CẬP", bạn KHÔNG ĐƯỢC CUNG CẤP bất kỳ link nào, và PHẢI thông báo rõ ràng cho người dùng lý do họ không truy cập được (dựa trên trường "Lý do từ chối" ở trên). Hãy khuyên họ liên hệ Admin/EHS nếu cần thiết.
-3. Nếu người dùng hỏi xin tài liệu không có trong danh sách trên, hãy trả lời rằng tài liệu này hiện chưa có trong cơ sở dữ liệu của hệ thống EHS, và khuyên họ liên hệ Admin hoặc bộ phận EHS để được hỗ trợ.
-4. Trình bày câu trả lời ngắn gọn, lịch sự, đúng trọng tâm.
-`;
+        context += `\n\nNếu người dùng hỏi xin link của tài liệu được phép truy cập, hãy cung cấp liên kết dạng [Tên tài liệu](URL) tương ứng với tài liệu đó từ Context hệ thống.`;
         return context;
     };
 
     const handleSendMessage = async () => {
         if (inputValue.trim() === '' || isLoading) return;
 
-        const newMessages = [...messages, { text: inputValue, type: 'user' }];
+        const currentInput = inputValue; // Sao lưu input hiện tại
+        const newMessages = [...messages, { text: currentInput, type: 'user' }];
         setMessages(newMessages);
         setInputValue('');
         setIsLoading(true);
@@ -155,9 +153,26 @@ NGUYÊN TẮC QUAN TRỌNG KHI CUNG CẤP TÀI LIỆU:
         }));
 
         try {
-            const additionalContext = constructDocContext();
-            const data = await callAIService(inputValue, history, CLOUD_FUNCTION_URL, additionalContext);
-            setMessages(prev => [...prev, { text: data.response, type: 'ai' }]);
+            const additionalContext = constructDocContext(currentInput);
+            const data = await callAIService(currentInput, history, CLOUD_FUNCTION_URL, additionalContext);
+            
+            // Lưu tin nhắn AI cùng thông tin file đính kèm
+            setMessages(prev => [...prev, { 
+                text: data.response, 
+                type: 'ai',
+                fileUrl: data.file_url,
+                docTitle: data.doc_title
+            }]);
+
+            // Tự động mở / tải tài liệu nếu người dùng yêu cầu (gửi, tải, mở, xem, download, get, send...)
+            if (data.file_url) {
+                const lowerInput = currentInput.toLowerCase();
+                const triggerWords = ["gửi", "tải", "tải về", "mở", "xem", "download", "get", "send", "show"];
+                const isRequestingFile = triggerWords.some(word => lowerInput.includes(word));
+                if (isRequestingFile) {
+                    window.open(data.file_url, "_blank");
+                }
+            }
         } catch (error) {
             console.error('Error:', error);
             setMessages(prev => [...prev, { text: t("chatbot.error"), type: 'ai' }]);
@@ -185,6 +200,24 @@ NGUYÊN TẮC QUAN TRỌNG KHI CUNG CẤP TÀI LIỆU:
                         {messages.map((msg, index) => (
                             <div key={index} className={`message ${msg.type}`}>
                                 {msg.type === 'ai' ? parseMarkdown(msg.text) : msg.text}
+                                
+                                {/* Render thẻ tải về tài liệu đính kèm cho câu trả lời của AI */}
+                                {msg.type === 'ai' && msg.fileUrl && (
+                                    <div className="chat-file-attachment">
+                                        <div className="file-info">
+                                            <span className="file-icon">📄</span>
+                                            <span className="file-name" title={msg.docTitle}>{msg.docTitle || "Tài liệu đính kèm"}</span>
+                                        </div>
+                                        <a 
+                                            href={msg.fileUrl} 
+                                            target="_blank" 
+                                            rel="noopener noreferrer" 
+                                            className="file-download-btn"
+                                        >
+                                            Tải về / Xem
+                                        </a>
+                                    </div>
+                                )}
                             </div>
                         ))}
                         {isLoading && <div className="message loading"><span></span><span></span><span></span></div>}

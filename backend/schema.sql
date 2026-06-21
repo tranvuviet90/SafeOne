@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS role_requests (
   uid VARCHAR(128) NOT NULL,
   name VARCHAR(100) NOT NULL,
   email VARCHAR(191) NOT NULL,
-  current_role VARCHAR(100) DEFAULT NULL,
+  `current_role` VARCHAR(100) DEFAULT NULL,
   requested_role VARCHAR(100) NOT NULL,
   status VARCHAR(20) DEFAULT 'pending', -- pending, approved, rejected
   timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP

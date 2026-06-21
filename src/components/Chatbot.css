@@ -95,3 +95,49 @@
   color: #111;
   font-weight: 700;
 }
+
+/* Card đính kèm tài liệu trong chatbot */
+.chat-file-attachment {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-top: 8px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+}
+.chat-file-attachment .file-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  margin-right: 12px;
+}
+.chat-file-attachment .file-icon {
+  font-size: 1.5em;
+  flex-shrink: 0;
+}
+.chat-file-attachment .file-name {
+  font-size: 0.9em;
+  font-weight: 500;
+  color: #333;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chat-file-attachment .file-download-btn {
+  background: #466E73;
+  color: white !important;
+  text-decoration: none !important;
+  font-size: 0.85em;
+  font-weight: bold;
+  padding: 6px 12px;
+  border-radius: 6px;
+  white-space: nowrap;
+  transition: background 0.2s ease-in-out;
+}
+.chat-file-attachment .file-download-btn:hover {
+  background: #365559;
+}

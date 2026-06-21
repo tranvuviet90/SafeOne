@@ -34,7 +34,7 @@ import {
 } from "./controllers/dbController.js";
 
 import { uploadMiddleware, uploadFile } from "./controllers/storageController.js";
-import { askAI } from "./controllers/functionsController.js";
+import { askAI, checkSpelling, extractMarkdown } from "./controllers/functionsController.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -89,6 +89,8 @@ app.post("/api/storage/upload", authenticateToken, uploadMiddleware, uploadFile)
 
 // 4. Cloud functions equivalents mapping
 app.post("/api/functions/askAI", askAI);
+app.post("/api/functions/checkSpelling", checkSpelling);
+app.post("/api/functions/extractMarkdown", extractMarkdown);
 app.post("/api/functions/listUsers", authenticateToken, requireAdmin, listUsers);
 app.post("/api/functions/adminUserAction", authenticateToken, requireAdmin, adminUserAction);
 app.post("/api/functions/submitRoleRequest", authenticateToken, submitRoleRequest);

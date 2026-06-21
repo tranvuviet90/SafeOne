@@ -51,7 +51,9 @@ export function authenticateToken(req, res, next) {
 
 // Middleware to verify admin role
 export function requireAdmin(req, res, next) {
-  const roles = (req.user?.role || "").split(",").map(r => r.trim().toLowerCase());
+  const rawRole = req.user?.role;
+  const roles = (Array.isArray(rawRole) ? rawRole : String(rawRole || "").split(","))
+    .map(r => r.trim().toLowerCase());
   if (!roles.includes("admin")) {
     return res.status(403).json({ error: "Quyền truy cập bị từ chối" });
   }

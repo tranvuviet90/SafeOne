@@ -1,27 +1,29 @@
 // Tệp đã sửa lỗi: App.jsx
 // Đã thêm logic để không fetch-count nếu là vai trò 'Bộ phận' hoặc 'Nhà Ăn'
-import React, { useState, useEffect, Suspense, lazy } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import ErrorBoundary from "./components/ErrorBoundary";
 import Login from "./components/Login";
 import UserSettings from "./components/UserSettings";
 import NotificationBell from "./components/NotificationBell";
+import { lazyWithRetry } from "./utils/lazyWithRetry";
 
-const DailyAudit = lazy(() => import("./components/DailyAudit"));
-const Gemba = lazy(() => import("./components/Gemba"));
-const EhsCommittee = lazy(() => import("./components/EhsCommittee"));
-const BaoCom = lazy(() => import("./components/BaoCom"));
-const UserManager = lazy(() => import("./components/UserManager"));
-const DocumentManager = lazy(() => import("./components/DocumentManager"));
+const EHSAudit = lazyWithRetry(() => import("./components/EHSAudit"));
+const Gemba = lazyWithRetry(() => import("./components/Gemba"));
+const EhsCommittee = lazyWithRetry(() => import("./components/EhsCommittee"));
+const BaoCom = lazyWithRetry(() => import("./components/BaoCom"));
+const UserManager = lazyWithRetry(() => import("./components/UserManager"));
+const DocumentManager = lazyWithRetry(() => import("./components/DocumentManager"));
 import logo from "./assets/logo.png";
 import { auth, db } from "./firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import { doc, getDoc, collection, query, where, Timestamp, getCountFromServer, setDoc } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, Timestamp, setDoc, onSnapshot } from "firebase/firestore";
 import "./App.css";
 
 import MagicMenu from "./components/MagicMenu";
 import Chatbot from "./components/Chatbot";
 import { colors } from "./theme";
 import { ToastProvider, ConfirmProvider, useToast } from "./components/LightboxSwipeOnly";
+import PublicLockerView from "./components/PublicLockerView";
 
 import { useI18n } from "./i18n/I18nProvider";
 import { DEPARTMENT_NAMES, DEPARTMENT_ROLES, SHIFT_START_HOURS } from "./constants/roles";
@@ -93,6 +95,19 @@ function ToastBridge() {
 }
 
 export default function App() {
+  const params = new URLSearchParams(window.location.search);
+  const lockerId = params.get("locker");
+
+  if (lockerId) {
+    return (
+      <ToastProvider>
+        <ConfirmProvider>
+          <PublicLockerView lockerId={lockerId} />
+        </ConfirmProvider>
+      </ToastProvider>
+    );
+  }
+
   const [tab, setTab] = useState(0);
   const [ehsActiveSubTab, setEhsActiveSubTab] = useState("calamviec");
 
@@ -143,9 +158,10 @@ export default function App() {
           
           // --- SỬA LỖI TẠI ĐÂY ---
           // CHANGED: Chỉ tự động chuyển đến tab Báo cơm (index 3) nếu người dùng
-          // chỉ có vai trò bộ phận hoặc nhà ăn (không có quyền EHS/Admin).
-          // Các tài khoản đa vai trò có quyền EHS/Admin sẽ giữ tab mặc định là 0.
-          const forceMealTab = (currentIsDept || currentIsCanteen) && !currentHasEhs;
+          // chỉ có vai trò bộ phận hoặc nhà ăn (không có quyền EHS/Admin hoặc Trainer).
+          // Các tài khoản đa vai trò có quyền EHS/Admin hoặc Trainer sẽ giữ tab mặc định là 0.
+          const currentHasTrainer = parsedRoles.some(r => normalizeRole(r) === 'trainer');
+          const forceMealTab = (currentIsDept || currentIsCanteen) && !currentHasEhs && !currentHasTrainer;
           setTab(forceMealTab ? 3 : 0);
           // --- KẾT THÚC SỬA LỖI ---
           
@@ -163,53 +179,110 @@ export default function App() {
   useEffect(() => {
     if (!user) return;
 
-    // =================================================================
-    // === BẮT ĐẦU SỬA LỖI 403 (Permission Denied) CHO VAI TRÒ BỘ PHẬN ===
-    // =================================================================
-    // Nếu là vai trò 'Bộ phận' hoặc 'Nhà ăn', họ không cần xem
-    // thông báo Gemba/TuGemba (vì menu bị ẩn).
-    // Bỏ qua việc fetch counts để tránh lỗi 403 và tối ưu.
     if (isRestrictedRole) {
       setGembaNotifCounts({});
       setTuGembaNotifCounts({});
       return;
     }
 
-    const fetchCountsForTab = async (collectionName, storageKey, setCountFunction) => {
-      // Ƭu tiên lấy từ Firestore (cross-device), fallback về localStorage
-      let lastSeenTimestamps = {};
-      try {
-        const prefRef = doc(db, "user_prefs", user.uid);
-        const prefSnap = await getDoc(prefRef);
-        if (prefSnap.exists() && prefSnap.data()[storageKey]) {
-          lastSeenTimestamps = prefSnap.data()[storageKey];
-        } else {
-          lastSeenTimestamps = JSON.parse(localStorage.getItem(storageKey) || "{}");
-        }
-      } catch {
-        lastSeenTimestamps = JSON.parse(localStorage.getItem(storageKey) || "{}");
+    let unsubEvents = null;
+    let unsubLogs = null;
+
+    // Lắng nghe tài liệu user_prefs của người dùng theo thời gian thực (Giống cách Facebook hoạt động)
+    const unsubPrefs = onSnapshot(doc(db, "user_prefs", user.uid), (prefSnap) => {
+      let lastSeenTimestampsEvents = {};
+      let lastSeenTimestampsLogs = {};
+
+      if (prefSnap.exists()) {
+        const prefData = prefSnap.data();
+        lastSeenTimestampsEvents = prefData["gembaLastSeenTimestamps"] || {};
+        lastSeenTimestampsLogs = prefData["tuGembaLastSeenTimestamps"] || {};
       }
-      const counts = {};
-      const promises = departments.map(async (dept) => {
-        const lastSeen = lastSeenTimestamps[dept.name] ? new Date(lastSeenTimestamps[dept.name]) : new Date(0);
-        const q = query(
-          collection(db, collectionName),
-          where("department", "==", dept.name),
-          where("timestamp", ">", Timestamp.fromDate(lastSeen))
-        );
-        const snapshot = await getCountFromServer(q);
-        counts[dept.name] = snapshot.data().count;
+
+      // Fallback về localStorage nếu trống
+      if (Object.keys(lastSeenTimestampsEvents).length === 0) {
+        lastSeenTimestampsEvents = JSON.parse(localStorage.getItem("gembaLastSeenTimestamps") || "{}");
+      }
+      if (Object.keys(lastSeenTimestampsLogs).length === 0) {
+        lastSeenTimestampsLogs = JSON.parse(localStorage.getItem("tuGembaLastSeenTimestamps") || "{}");
+      }
+
+      // Tìm thời gian xem cũ nhất làm mốc truy vấn
+      const getMinDate = (timestamps) => {
+        const dates = departments.map((d) => {
+          return timestamps[d.name] ? new Date(timestamps[d.name]) : new Date(0);
+        });
+        return new Date(Math.min(...dates.map(d => d.getTime())));
+      };
+
+      const minEventsSeen = getMinDate(lastSeenTimestampsEvents);
+      const minLogsSeen = getMinDate(lastSeenTimestampsLogs);
+
+      // Hủy đăng ký listener cũ trước khi tạo listener mới
+      if (unsubEvents) unsubEvents();
+      if (unsubLogs) unsubLogs();
+
+      // Lắng nghe gemba_events thời gian thực
+      const qEvents = query(
+        collection(db, "gemba_events"),
+        where("timestamp", ">", Timestamp.fromDate(minEventsSeen))
+      );
+      unsubEvents = onSnapshot(qEvents, (snapshot) => {
+        const counts = {};
+        departments.forEach((d) => { counts[d.name] = 0; });
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          const dept = data.department;
+          if (dept && counts[dept] !== undefined) {
+            const ts = data.timestamp ? (data.timestamp.toDate ? data.timestamp.toDate() : new Date(data.timestamp.seconds * 1000)) : null;
+            if (ts) {
+              const lastSeen = lastSeenTimestampsEvents[dept] ? new Date(lastSeenTimestampsEvents[dept]) : new Date(0);
+              if (ts > lastSeen) {
+                counts[dept] += 1;
+              }
+            }
+          }
+        });
+        setGembaNotifCounts(counts);
+      }, (error) => {
+        console.error("Lỗi lắng nghe thời gian thực gemba_events:", error);
       });
-      await Promise.all(promises);
-      setCountFunction(counts);
+
+      // Lắng nghe tu_gemba_logs thời gian thực
+      const qLogs = query(
+        collection(db, "tu_gemba_logs"),
+        where("timestamp", ">", Timestamp.fromDate(minLogsSeen))
+      );
+      unsubLogs = onSnapshot(qLogs, (snapshot) => {
+        const counts = {};
+        departments.forEach((d) => { counts[d.name] = 0; });
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          const dept = data.department;
+          if (dept && counts[dept] !== undefined) {
+            const ts = data.timestamp ? (data.timestamp.toDate ? data.timestamp.toDate() : new Date(data.timestamp.seconds * 1000)) : null;
+            if (ts) {
+              const lastSeen = lastSeenTimestampsLogs[dept] ? new Date(lastSeenTimestampsLogs[dept]) : new Date(0);
+              if (ts > lastSeen) {
+                counts[dept] += 1;
+              }
+            }
+          }
+        });
+        setTuGembaNotifCounts(counts);
+      }, (error) => {
+        console.error("Lỗi lắng nghe thời gian thực tu_gemba_logs:", error);
+      });
+
+    }, (error) => {
+      console.error("Lỗi lắng nghe user_prefs:", error);
+    });
+
+    return () => {
+      unsubPrefs();
+      if (unsubEvents) unsubEvents();
+      if (unsubLogs) unsubLogs();
     };
-    const fetchAll = () => {
-      fetchCountsForTab("gemba_events", "gembaLastSeenTimestamps", setGembaNotifCounts);
-      fetchCountsForTab("tu_gemba_logs", "tuGembaLastSeenTimestamps", setTuGembaNotifCounts);
-    };
-    fetchAll();
-    const id = setInterval(fetchAll, 5 * 60 * 1000);
-    return () => clearInterval(id);
   }, [user, isRestrictedRole]); // Cập nhật dependency
 
   // Automatic shift start and walkie-talkie reminders
@@ -412,7 +485,7 @@ export default function App() {
             }>
               {/* THÊM BỌC ĐIỀU KIỆN CHO TAB 0 VÀ 1 */}
               {!isRestrictedRole && (
-                <div style={tabStyle(0)}>{tab === 0 && <ErrorBoundary fallbackTitle="Lỗi tải Gemba Checklist"><DailyAudit user={user} isMobile={isMobile} newErrorCounts={gembaNotifCounts} setGembaNotifCounts={setGembaNotifCounts} /></ErrorBoundary>}</div>
+                <div style={tabStyle(0)}>{tab === 0 && <ErrorBoundary fallbackTitle="Lỗi tải Gemba Checklist"><EHSAudit user={user} isMobile={isMobile} newErrorCounts={gembaNotifCounts} setGembaNotifCounts={setGembaNotifCounts} /></ErrorBoundary>}</div>
               )}
               {!isRestrictedRole && (
                 <div style={tabStyle(1)}>{tab === 1 && <ErrorBoundary fallbackTitle="Lỗi tải Tự Gemba"><Gemba user={user} isMobile={isMobile} newLogCounts={tuGembaNotifCounts} setTuGembaNotifCounts={setTuGembaNotifCounts} /></ErrorBoundary>}</div>
