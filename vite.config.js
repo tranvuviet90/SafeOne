@@ -7,11 +7,11 @@ export default defineConfig(({ mode }) => {
   console.log("Building with LOCAL MySQL Database (Firebase completely disabled)...");
   
   const alias = {
-    'firebase/app': path.resolve(__dirname, './src/firebase-mock.js'),
-    'firebase/auth': path.resolve(__dirname, './src/firebase-mock.js'),
-    'firebase/firestore': path.resolve(__dirname, './src/firebase-mock.js'),
-    'firebase/storage': path.resolve(__dirname, './src/firebase-mock.js'),
-    'firebase/functions': path.resolve(__dirname, './src/firebase-mock.js')
+    'firebase/app': path.resolve(__dirname, './src/local-database-client.js'),
+    'firebase/auth': path.resolve(__dirname, './src/local-database-client.js'),
+    'firebase/firestore': path.resolve(__dirname, './src/local-database-client.js'),
+    'firebase/storage': path.resolve(__dirname, './src/local-database-client.js'),
+    'firebase/functions': path.resolve(__dirname, './src/local-database-client.js')
   };
 
   return {

@@ -137,7 +137,7 @@ export class Timestamp {
 // 1. firebase/app
 // -------------------------------------------------------------
 export function initializeApp(config) {
-  console.log("Mock Firebase App initialized with config", config);
+  // Config logging removed to prevent exposing sensitive environment keys
   return { name: "[MockApp]" };
 }
 
@@ -271,7 +271,7 @@ export function getFirestore(app) {
 }
 
 export function initializeFirestore(app, config) {
-  console.log("Mock Firestore initialized with config:", config);
+  // Config logging removed to prevent exposing sensitive environment keys
   return { name: "[MockFirestore]" };
 }
 
