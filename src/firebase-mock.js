@@ -79,10 +79,15 @@ async function authorizedFetch(url, options = {}) {
 
 // Mock Firestore Document & Query Snapshot Classes
 class MockDocumentSnapshot {
-  constructor(id, exists, docData = null) {
+  constructor(id, exists, docData = null, collectionName = "") {
     this.id = id;
     this.existsStatus = exists;
     this.docData = docData;
+    this.ref = {
+      id: id,
+      collection: collectionName,
+      type: "doc"
+    };
   }
   exists() {
     return this.existsStatus;
@@ -289,13 +294,13 @@ export function collection(db, collectionName) {
 export async function getDoc(docRef) {
   const res = await authorizedFetch(`${API_BASE}/api/db/${docRef.collection}/${docRef.id}`);
   if (!res.ok) {
-    return new MockDocumentSnapshot(docRef.id, false);
+    return new MockDocumentSnapshot(docRef.id, false, null, docRef.collection);
   }
   const data = await res.json();
   if (data && data._exists === false) {
-    return new MockDocumentSnapshot(docRef.id, false);
+    return new MockDocumentSnapshot(docRef.id, false, null, docRef.collection);
   }
-  return new MockDocumentSnapshot(docRef.id, true, data);
+  return new MockDocumentSnapshot(docRef.id, true, data, docRef.collection);
 }
 
 export async function getDocs(queryRef) {
@@ -305,7 +310,7 @@ export async function getDocs(queryRef) {
     return new MockQuerySnapshot();
   }
   const list = await res.json();
-  const docs = list.map(item => new MockDocumentSnapshot(item.id || item.uid, true, item));
+  const docs = list.map(item => new MockDocumentSnapshot(item.id || item.uid, true, item, collectionName));
   return new MockQuerySnapshot(docs);
 }
 
