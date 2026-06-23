@@ -115,3 +115,7 @@ CREATE TABLE IF NOT EXISTS msds_chemicals (
   quantity INT DEFAULT 0,
   last_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
+
+-- 11. Gieo hạt tài khoản Admin mặc định ban đầu
+INSERT IGNORE INTO users (uid, email, password_hash, name, role) 
+VALUES ('admin-uid-default', 'admin', 'admin', 'Default Admin', 'admin');
