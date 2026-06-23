@@ -156,6 +156,6 @@ const PORT = process.env.PORT || 5000;
 server.listen(PORT, async () => {
   console.log(`SafeOne local server successfully listening on port ${PORT}`);
   
-  // Autoseed is disabled as per requirement. Admin account will be created via UI first run.
-  console.log("ℹ️ Autoseed admin is disabled. First admin should be created using the UI.");
+  // Auto-seed default admin account
+  await seedDefaultAdmin();
 });

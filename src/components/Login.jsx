@@ -141,7 +141,7 @@ function Login({ setUser }) {
         {error && <p style={{ color:'red', marginBottom:'20px' }}>{error}</p>}
         <div style={{ marginBottom:'20px', textAlign:'left' }}>
           <label style={{ display:'block', marginBottom:'8px', color:'#333', fontWeight:'600' }}>{t('login.email')}</label>
-          <input type="email" value={email} onChange={e => setEmail(e.target.value)} style={{ width:'100%', padding:'12px 15px', borderRadius:'8px', border:'1px solid #ddd', fontSize:'16px', boxSizing:'border-box' }} />
+          <input type="text" value={email} onChange={e => setEmail(e.target.value)} style={{ width:'100%', padding:'12px 15px', borderRadius:'8px', border:'1px solid #ddd', fontSize:'16px', boxSizing:'border-box' }} />
         </div>
         <div style={{ marginBottom:'20px', textAlign:'left' }}>
           <label style={{ display:'block', marginBottom:'8px', color:'#333', fontWeight:'600' }}>{t('login.password')}</label>

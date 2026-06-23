@@ -8,26 +8,26 @@ const JWT_SECRET = process.env.JWT_SECRET || "safeone_super_secret_key_2026";
 // Auto-seed a default admin account and ensure it is loginable
 export async function seedDefaultAdmin() {
   try {
-    const [rows] = await pool.query("SELECT * FROM users WHERE email = ?", ["admin@safeone.com"]);
+    const [rows] = await pool.query("SELECT * FROM users WHERE email = ?", ["admin"]);
     const passwordHash = "admin";
     
     if (rows.length === 0) {
-      console.log("🔄 Tài khoản admin@safeone.com chưa tồn tại. Đang tiến hành tạo mới...");
-      const uid = "admin-uid-123456";
-      const name = "Super Admin";
-      const role = "admin,ehs";
+      console.log("🔄 Tài khoản mặc định 'admin' chưa tồn tại. Đang tiến hành tạo mới...");
+      const uid = "admin-uid-default";
+      const name = "Default Admin";
+      const role = "admin";
       await pool.query(
         "INSERT INTO users (uid, email, password_hash, name, role) VALUES (?, ?, ?, ?, ?)",
-        [uid, "admin@safeone.com", passwordHash, name, role]
+        [uid, "admin", passwordHash, name, role]
       );
-      console.log("✅ Tài khoản Admin mặc định đã được tạo thành công: admin@safeone.com / admin");
+      console.log("✅ Tài khoản Admin mặc định đã được tạo thành công: admin / admin");
     } else {
-      console.log("🔄 Tài khoản admin@safeone.com đã tồn tại. Đang đồng bộ và đặt lại mật khẩu về mặc định...");
+      console.log("🔄 Tài khoản mặc định 'admin' đã tồn tại. Đang đặt lại mật khẩu về mặc định...");
       await pool.query(
         "UPDATE users SET password_hash = ? WHERE email = ?",
-        [passwordHash, "admin@safeone.com"]
+        [passwordHash, "admin"]
       );
-      console.log("✅ Đã cập nhật mật khẩu mặc định thành công cho: admin@safeone.com / admin");
+      console.log("✅ Đã cập nhật mật khẩu mặc định thành công cho: admin / admin");
     }
   } catch (e) {
     console.error("❌ Lỗi khi tự động gieo hạt Admin:", e.message);
