@@ -4,20 +4,35 @@ import path from 'path'
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
-  console.log("Building with LOCAL MySQL Database (Firebase completely disabled)...");
-  
-  const alias = {
-    'firebase/app': path.resolve(__dirname, './src/local-database-client.js'),
-    'firebase/auth': path.resolve(__dirname, './src/local-database-client.js'),
-    'firebase/firestore': path.resolve(__dirname, './src/local-database-client.js'),
-    'firebase/storage': path.resolve(__dirname, './src/local-database-client.js'),
-    'firebase/functions': path.resolve(__dirname, './src/local-database-client.js')
-  };
+  console.log("Building SafeOne Fullstack Web App (Native Node.js & MySQL)...");
 
   return {
     plugins: [react()],
     resolve: {
-      alias
+      alias: {
+        '@': path.resolve(__dirname, './src')
+      }
+    },
+    server: {
+      proxy: {
+        '/api': {
+          target: 'http://localhost:5000',
+          changeOrigin: true
+        },
+        '/uploads': {
+          target: 'http://localhost:5000',
+          changeOrigin: true
+        },
+        '/socket.io': {
+          target: 'http://localhost:5000',
+          ws: true,
+          changeOrigin: true
+        }
+      }
+    },
+    build: {
+      outDir: path.resolve(__dirname, './backend/public'),
+      emptyOutDir: true
     }
   };
 });

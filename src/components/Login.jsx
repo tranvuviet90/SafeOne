@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { auth, db } from '../firebase';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import authService from '../services/authService';
+import apiClient from '../services/apiClient';
 import { useI18n } from '../i18n/I18nProvider';
 
 function Login({ setUser }) {
@@ -21,19 +20,20 @@ function Login({ setUser }) {
 
   useEffect(() => {
     const rememberedEmail = localStorage.getItem('rememberedEmail');
-    if (rememberedEmail) { setEmail(rememberedEmail); setRememberMe(true); }
+    if (rememberedEmail) {
+      setEmail(rememberedEmail);
+      setRememberMe(true);
+    }
 
-    // Check system initialization (only on local mockup env)
+    // Check system initialization
     const checkInit = async () => {
-      if (auth.isMock && typeof auth.checkSystemInit === 'function') {
-        try {
-          const res = await auth.checkSystemInit();
-          if (res && res.initialized === false) {
-            setShowInitForm(true);
-          }
-        } catch (e) {
-          console.warn("Check system init failed:", e);
+      try {
+        const res = await apiClient.get("/api/auth/check-init");
+        if (res.data && res.data.initialized === false) {
+          setShowInitForm(true);
         }
+      } catch (e) {
+        console.warn("Check system init failed:", e);
       }
     };
     checkInit();
@@ -41,24 +41,28 @@ function Login({ setUser }) {
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    setError(''); setLoading(true);
-    if (!email || !password) { setError(t('login.error.empty')); setLoading(false); return; }
+    setError('');
+    setLoading(true);
+    if (!email || !password) {
+      setError(t('login.error.empty'));
+      setLoading(false);
+      return;
+    }
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const firebaseUser = userCredential.user;
-      const userDocRef = doc(db, 'users', firebaseUser.uid);
-      const userDocSnap = await getDoc(userDocRef);
-      if (userDocSnap.exists()) {
-        const userData = userDocSnap.data();
-        const appUser = { uid: firebaseUser.uid, email: firebaseUser.email, name: userData.name, role: userData.role };
-        if (rememberMe) { localStorage.setItem('rememberedEmail', email); } else { localStorage.removeItem('rememberedEmail'); }
-        setUser(appUser);
-      } else { throw new Error("User not found."); }
+      const data = await authService.login(email, password, rememberMe);
+      const appUser = data.user;
+      if (rememberMe) {
+        localStorage.setItem('rememberedEmail', email);
+      } else {
+        localStorage.removeItem('rememberedEmail');
+      }
+      setUser(appUser);
     } catch (err) {
-      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-        setError(t('login.error.invalid'));
-      } else { setError(t('login.error.generic')); console.error("Lỗi đăng nhập:", err); }
-    } finally { setLoading(false); }
+      const errorMsg = err.response?.data?.error || err.message || t('login.error.generic');
+      setError(errorMsg);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleInitAdmin = async (e) => {
@@ -79,17 +83,18 @@ function Login({ setUser }) {
     }
 
     try {
-      if (auth.isMock && typeof auth.initAdmin === 'function') {
-        await auth.initAdmin(initEmail.trim(), initPassword, initName.trim());
-        alert("Khởi tạo tài khoản Admin đầu tiên thành công! Bạn có thể đăng nhập ngay bây giờ.");
-        setShowInitForm(false);
-        setEmail(initEmail.trim());
-        setPassword('');
-      } else {
-        throw new Error("Môi trường này không hỗ trợ đăng ký admin động.");
-      }
+      await apiClient.post("/api/auth/init-admin", {
+        email: initEmail.trim(),
+        password: initPassword,
+        name: initName.trim()
+      });
+      alert("Khởi tạo tài khoản Admin đầu tiên thành công! Bạn có thể đăng nhập ngay bây giờ.");
+      setShowInitForm(false);
+      setEmail(initEmail.trim());
+      setPassword('');
     } catch (err) {
-      setError(err.message || "Đăng ký admin thất bại");
+      const errorMsg = err.response?.data?.error || err.message || "Đăng ký admin thất bại";
+      setError(errorMsg);
     } finally {
       setLoading(false);
     }

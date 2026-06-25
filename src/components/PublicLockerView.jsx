@@ -1,8 +1,33 @@
 import React, { useState, useEffect } from "react";
-import { db } from "../firebase";
-import { doc, getDoc, setDoc, arrayUnion, query, where, getDocs, collection, writeBatch, onSnapshot, updateDoc, deleteField, addDoc, serverTimestamp } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { storage } from "../firebase";
+import originalDbService from "../services/dbService";
+import apiClient from "../services/apiClient";
+import realtimeService from "../services/realtimeService";
+
+let globalRefreshCallback = null;
+const dbService = {
+  getDoc: (col, id) => originalDbService.getDoc(col, id),
+  getDocs: (col) => originalDbService.getDocs(col),
+  createDoc: async (col, data) => {
+    const res = await originalDbService.createDoc(col, data);
+    if (globalRefreshCallback) globalRefreshCallback();
+    return res;
+  },
+  updateDoc: async (col, id, data) => {
+    const res = await originalDbService.updateDoc(col, id, data);
+    if (globalRefreshCallback) globalRefreshCallback();
+    return res;
+  },
+  deleteDoc: async (col, id) => {
+    const res = await originalDbService.deleteDoc(col, id);
+    if (globalRefreshCallback) globalRefreshCallback();
+    return res;
+  },
+  commitBatch: async (ops) => {
+    const res = await originalDbService.commitBatch(ops);
+    if (globalRefreshCallback) globalRefreshCallback();
+    return res;
+  }
+};
 import imageCompression from "browser-image-compression";
 import { colors } from "../theme";
 import { useToast } from "./LightboxSwipeOnly";
@@ -195,23 +220,39 @@ export default function PublicLockerView({ lockerId: initialLockerId }) {
     }
   }, [msnv]);
 
+  const fetchLockers = async () => {
+    try {
+      const snap = await dbService.getDocs("lockers");
+      const data = {};
+      snap.forEach(d => {
+        data[d.id || d.uid] = d;
+      });
+      setAllLockersData(data);
+    } catch (err) {
+      console.error("Lỗi lấy danh sách lockers:", err);
+    }
+  };
+
+  useEffect(() => {
+    globalRefreshCallback = fetchLockers;
+    return () => {
+      globalRefreshCallback = null;
+    };
+  }, []);
+
   // Lắng nghe trạng thái toàn bộ tủ đồ để vẽ sơ đồ chọn tủ trống
   useEffect(() => {
     if (!showVacantMap) return;
     setLoadingMap(true);
-    const q = collection(db, "lockers");
-    const unsub = onSnapshot(q, (snap) => {
-      const data = {};
-      snap.forEach(d => {
-        data[d.id] = d.data();
-      });
-      setAllLockersData(data);
-      setLoadingMap(false);
-    }, (err) => {
-      console.error("Lỗi onSnapshot lockers:", err);
-      setLoadingMap(false);
-    });
-    return () => unsub();
+    fetchLockers().finally(() => setLoadingMap(false));
+
+    const unsub = realtimeService.subscribeToPath("lockers", () => { fetchLockers(); });
+
+    const interval = setInterval(fetchLockers, 30000);
+    return () => {
+      unsub();
+      clearInterval(interval);
+    };
   }, [showVacantMap]);
 
   const getSortedBlocks = (group, groupIndex) => {
@@ -231,10 +272,9 @@ export default function PublicLockerView({ lockerId: initialLockerId }) {
   async function fetchLockerData(showSpinner = true) {
     if (showSpinner) setLoading(true);
     try {
-      const docRef = doc(db, "lockers", currentLockerId);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        setLockerData(docSnap.data());
+      const data = await dbService.getDoc("lockers", currentLockerId);
+      if (data && data._exists !== false) {
+        setLockerData(data);
       } else {
         setLockerData({ id: currentLockerId, currentUser: null });
       }
@@ -248,9 +288,9 @@ export default function PublicLockerView({ lockerId: initialLockerId }) {
 
   async function fetchGlobalSettings() {
     try {
-      const snap = await getDoc(doc(db, "lockers", "settings"));
-      if (snap.exists()) {
-        setGlobalSettings(snap.data());
+      const data = await dbService.getDoc("lockers", "settings");
+      if (data && data._exists !== false) {
+        setGlobalSettings(data);
       }
     } catch (e) {
       console.warn("Lỗi tải cài đặt EHS:", e);
@@ -269,7 +309,6 @@ export default function PublicLockerView({ lockerId: initialLockerId }) {
       setDamageFile(file);
     }
   };
-
   const handleReportDamage = async (e) => {
     e.preventDefault();
     if (!damageDesc.trim()) return;
@@ -277,29 +316,33 @@ export default function PublicLockerView({ lockerId: initialLockerId }) {
     let downloadUrl = "";
     try {
       if (damageFile) {
-        const imagePath = `locker_damage_images/${Date.now()}_${damageFile.name}`;
-        const imageRef = ref(storage, imagePath);
-        await uploadBytes(imageRef, damageFile);
-        downloadUrl = await getDownloadURL(imageRef);
+        const formData = new FormData();
+        formData.append("file", damageFile);
+        formData.append("path", `locker_damage_images/${Date.now()}_${damageFile.name}`);
+        const res = await apiClient.post("/api/storage/upload", formData, {
+          headers: {
+            "Content-Type": "multipart/form-data"
+          }
+        });
+        downloadUrl = res.data.url;
       }
 
-      const docRef = doc(db, "lockers", currentLockerId);
-      await setDoc(docRef, {
+      await dbService.updateDoc("lockers", currentLockerId, {
         damageReport: {
           description: damageDesc.trim(),
           imageUrl: downloadUrl,
           status: "reported",
           reportedAt: new Date().toISOString()
         }
-      }, { merge: true });
+      });
 
       try {
-        await addDoc(collection(db, "notifications"), {
+        await dbService.createDoc("notifications", {
           type: "locker_management",
           message: `Tủ cá nhân ${currentLockerId} được báo hư hỏng: "${damageDesc.trim()}"`,
           targetRoles: ["admin", "ehs"],
           createdBy: "system",
-          timestamp: serverTimestamp()
+          timestamp: { type: "serverTimestamp" }
         });
       } catch (notifErr) {
         console.error("Lỗi gửi thông báo báo hỏng:", notifErr);
@@ -322,17 +365,14 @@ export default function PublicLockerView({ lockerId: initialLockerId }) {
     if (!employeeId) return;
     try {
       const normalizedMsnv = employeeId.trim().toUpperCase();
-      const q = query(
-        collection(db, "lockers"),
-        where("currentUser.msnv", "==", normalizedMsnv)
-      );
-      const snap = await getDocs(q);
+      const list = await dbService.getDocs("lockers");
       const assigned = [];
-      snap.forEach(d => {
-        if (d.id !== currentLockerId && d.id !== "settings") {
-          const u = d.data().currentUser;
-          if (u && (u.status === "approved" || u.status === "pending")) {
-            assigned.push(d.id);
+      list.forEach(d => {
+        const id = d.id || d.uid;
+        if (id !== currentLockerId && id !== "settings") {
+          const u = d.currentUser;
+          if (u && u.msnv === normalizedMsnv && (u.status === "approved" || u.status === "pending")) {
+            assigned.push(id);
           }
         }
       });
@@ -357,7 +397,6 @@ export default function PublicLockerView({ lockerId: initialLockerId }) {
 
     setIsSubmitting(true);
     try {
-      const docRef = doc(db, "lockers", currentLockerId);
       const nowStr = new Date().toISOString();
       const newRegistration = {
         name: name.trim(),
@@ -365,26 +404,29 @@ export default function PublicLockerView({ lockerId: initialLockerId }) {
         msnv: msnv.trim().toUpperCase(),
         phone: phone.trim(),
         assignedAt: nowStr,
-        status: "pending" // Gửi đăng ký công cộng mặc định ở trạng thái chờ duyệt
+        status: "pending"
       };
 
-      await setDoc(docRef, {
+      await dbService.updateDoc("lockers", currentLockerId, {
         id: currentLockerId,
         currentUser: newRegistration,
-        history: arrayUnion({
-          ...newRegistration,
-          action: "registered_pending",
-          timestamp: nowStr
-        })
-      }, { merge: true });
+        history: {
+          type: "arrayUnion",
+          elements: [{
+            ...newRegistration,
+            action: "registered_pending",
+            timestamp: nowStr
+          }]
+        }
+      });
 
       try {
-        await addDoc(collection(db, "notifications"), {
+        await dbService.createDoc("notifications", {
           type: "locker_management",
           message: `Yêu cầu đăng ký tủ cá nhân ${currentLockerId} từ nhân viên ${name.trim()} (${msnv.trim().toUpperCase()}) đang chờ duyệt.`,
           targetRoles: ["admin", "ehs"],
           createdBy: "system",
-          timestamp: serverTimestamp()
+          timestamp: { type: "serverTimestamp" }
         });
       } catch (notifErr) {
         console.error("Lỗi gửi thông báo đăng ký:", notifErr);
@@ -411,31 +453,36 @@ export default function PublicLockerView({ lockerId: initialLockerId }) {
     try {
       const nowStr = new Date().toISOString();
       const normalizedMsnv = msnv.trim().toUpperCase();
-      const batch = writeBatch(db);
+      const operations = [];
 
-      // 1. Giải phóng các tủ cũ và ghi lịch sử di dời
       for (const oldId of otherLockers) {
-        const oldRef = doc(db, "lockers", oldId);
-        const oldSnap = await getDoc(oldRef);
-        if (oldSnap.exists()) {
-          const oldData = oldSnap.data();
+        let oldData = null;
+        try {
+          oldData = await dbService.getDoc("lockers", oldId);
+        } catch (e) {}
+        if (oldData && oldData._exists !== false) {
           const oldUser = oldData.currentUser;
           if (oldUser) {
-            batch.set(oldRef, {
-              currentUser: null,
-              history: arrayUnion({
-                ...oldUser,
-                action: "transferred_out",
-                timestamp: nowStr,
-                detail: `Di dời sang tủ ${currentLockerId}`
-              })
-            }, { merge: true });
+            operations.push({
+              method: "PATCH",
+              path: `/api/db/lockers/${oldId}`,
+              body: {
+                currentUser: null,
+                history: {
+                  type: "arrayUnion",
+                  elements: [{
+                    ...oldUser,
+                    action: "transferred_out",
+                    timestamp: nowStr,
+                    detail: `Di dời sang tủ ${currentLockerId}`
+                  }]
+                }
+              }
+            });
           }
         }
       }
 
-      // 2. Đăng ký tủ mới (Chờ duyệt)
-      const docRef = doc(db, "lockers", currentLockerId);
       const newRegistration = {
         name: name.trim(),
         department,
@@ -445,26 +492,33 @@ export default function PublicLockerView({ lockerId: initialLockerId }) {
         status: "pending"
       };
 
-      batch.set(docRef, {
-        id: currentLockerId,
-        currentUser: newRegistration,
-        history: arrayUnion({
-          ...newRegistration,
-          action: "registered_pending_transfer",
-          timestamp: nowStr,
-          detail: `Di dời từ tủ ${otherLockers.join(", ")}`
-        })
-      }, { merge: true });
+      operations.push({
+        method: "PATCH",
+        path: `/api/db/lockers/${currentLockerId}`,
+        body: {
+          id: currentLockerId,
+          currentUser: newRegistration,
+          history: {
+            type: "arrayUnion",
+            elements: [{
+              ...newRegistration,
+              action: "registered_pending_transfer",
+              timestamp: nowStr,
+              detail: `Di dời từ tủ ${otherLockers.join(", ")}`
+            }]
+          }
+        }
+      });
 
-      await batch.commit();
+      await dbService.commitBatch(operations);
 
       try {
-        await addDoc(collection(db, "notifications"), {
+        await dbService.createDoc("notifications", {
           type: "locker_management",
           message: `Yêu cầu di dời từ tủ ${otherLockers.join(", ")} sang tủ cá nhân ${currentLockerId} của nhân viên ${name.trim()} (${normalizedMsnv}) đang chờ duyệt.`,
           targetRoles: ["admin", "ehs"],
           createdBy: "system",
-          timestamp: serverTimestamp()
+          timestamp: { type: "serverTimestamp" }
         });
       } catch (notifErr) {
         console.error("Lỗi gửi thông báo di dời:", notifErr);

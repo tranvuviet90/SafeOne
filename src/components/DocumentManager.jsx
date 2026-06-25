@@ -1,7 +1,61 @@
 import React, { useState, useEffect } from "react";
-import { db, storage } from "../firebase";
-import { collection, addDoc, deleteDoc, doc, onSnapshot, serverTimestamp, query, where, updateDoc } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
+import originalDbService from "../services/dbService";
+import apiClient from "../services/apiClient";
+import realtimeService from "../services/realtimeService";
+
+let globalRefreshCallback = null;
+const dbService = {
+  getDoc: (col, id) => originalDbService.getDoc(col, id),
+  getDocs: (col) => originalDbService.getDocs(col),
+  createDoc: async (col, data) => {
+    const res = await originalDbService.createDoc(col, data);
+    if (globalRefreshCallback) globalRefreshCallback();
+    return res;
+  },
+  updateDoc: async (col, id, data) => {
+    const res = await originalDbService.updateDoc(col, id, data);
+    if (globalRefreshCallback) globalRefreshCallback();
+    return res;
+  },
+  deleteDoc: async (col, id) => {
+    const res = await originalDbService.deleteDoc(col, id);
+    if (globalRefreshCallback) globalRefreshCallback();
+    return res;
+  },
+  commitBatch: async (ops) => {
+    const res = await originalDbService.commitBatch(ops);
+    if (globalRefreshCallback) globalRefreshCallback();
+    return res;
+  }
+};
+
+// REST API adapter (legacy doc/writeBatch shims)
+const doc = (db, col, id) => ({ collection: col, id });
+const collection = (db, col) => ({ collection: col });
+const getDoc = async (docRef) => {
+  try {
+    const data = await dbService.getDoc(docRef.collection, docRef.id);
+    return {
+      exists() { return data && data._exists !== false; },
+      data() { return data; }
+    };
+  } catch (err) {
+    return {
+      exists() { return false; },
+      data() { return null; }
+    };
+  }
+};
+const addDoc = async (collectionRef, data) => {
+  return await dbService.createDoc(collectionRef.collection, data);
+};
+const updateDoc = async (docRef, data) => {
+  return await dbService.updateDoc(docRef.collection, docRef.id, data);
+};
+const deleteDoc = async (docRef) => {
+  return await dbService.deleteDoc(docRef.collection, docRef.id);
+};
+const serverTimestamp = () => new Date().toISOString();
 import { useToast, useConfirm } from "./LightboxSwipeOnly";
 import { colors } from "../theme";
 import { 
@@ -55,7 +109,7 @@ export default function DocumentManager({ user, isMobile }) {
   const canView = userRoles.some(r => ["admin", "ehs", "ehs committee", "trainer", "manager"].includes(r));
   const canViewMSDS = userRoles.some(r => ["admin", "ehs", "manager"].includes(r));
 
-  // Fetch documents real-time
+  // Fetch documents via Polling
   useEffect(() => {
     if (!canView) return;
 
@@ -72,27 +126,30 @@ export default function DocumentManager({ user, isMobile }) {
       return;
     }
 
-    setLoading(true);
-    // Query with type filter matching Firestore rules constraint
-    const q = query(collection(db, "documents"), where("type", "==", activeSubTab));
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const docsList = snapshot.docs.map((docSnap) => ({
-          id: docSnap.id,
-          ...docSnap.data(),
-        }));
-        setDocuments(docsList);
-        setLoading(false);
-      },
-      (error) => {
-        console.error("Lỗi khi tải tài liệu:", error);
+    const fetchDocs = async () => {
+      try {
+        const snap = await dbService.getDocs("documents");
+        const list = Array.isArray(snap) ? snap : [];
+        setDocuments(list.filter(d => d.type === activeSubTab));
+      } catch (err) {
+        console.error("Lỗi khi tải tài liệu:", err);
         pushToast("Không thể tải danh sách tài liệu", "error");
-        setLoading(false);
       }
-    );
+    };
 
-    return () => unsubscribe();
+    globalRefreshCallback = fetchDocs;
+
+    setLoading(true);
+    fetchDocs().finally(() => setLoading(false));
+
+    const unsub = realtimeService.subscribeToPath("documents", () => { fetchDocs(); });
+
+    const interval = setInterval(fetchDocs, 30000);
+    return () => {
+      globalRefreshCallback = null;
+      unsub();
+      clearInterval(interval);
+    };
   }, [canView, activeSubTab, canViewMSDS]);
 
   // Filter documents in memory
@@ -181,27 +238,31 @@ export default function DocumentManager({ user, isMobile }) {
       if (selectedFileVi) {
         setUploadProgress(20);
         const cleanFileNameVi = `${Date.now()}_vi_${selectedFileVi.name.replace(/\s+/g, "_")}`;
-        const pathVi = `documents/${activeSubTab}/${cleanFileNameVi}`;
-        const refVi = ref(storage, pathVi);
-        await uploadBytes(refVi, selectedFileVi, { contentType: "application/pdf" });
-        fileUrlVi = await getDownloadURL(refVi);
-        storagePathVi = pathVi;
+        const formData = new FormData();
+        formData.append("file", selectedFileVi, cleanFileNameVi);
+        const res = await apiClient.post("/api/storage/upload", formData, {
+          headers: { "Content-Type": "multipart/form-data" }
+        });
+        fileUrlVi = res.data.url;
+        storagePathVi = cleanFileNameVi;
       }
 
       // 2. Upload English PDF if selected
       if (selectedFileEn) {
         setUploadProgress(50);
         const cleanFileNameEn = `${Date.now()}_en_${selectedFileEn.name.replace(/\s+/g, "_")}`;
-        const pathEn = `documents/${activeSubTab}/${cleanFileNameEn}`;
-        const refEn = ref(storage, pathEn);
-        await uploadBytes(refEn, selectedFileEn, { contentType: "application/pdf" });
-        fileUrlEn = await getDownloadURL(refEn);
-        storagePathEn = pathEn;
+        const formData = new FormData();
+        formData.append("file", selectedFileEn, cleanFileNameEn);
+        const res = await apiClient.post("/api/storage/upload", formData, {
+          headers: { "Content-Type": "multipart/form-data" }
+        });
+        fileUrlEn = res.data.url;
+        storagePathEn = cleanFileNameEn;
       }
 
       setUploadProgress(80);
       
-      // Save metadata to Firestore
+      // Save metadata via REST API
       const docData = {
         title: uploadTitle.trim(),
         type: activeSubTab,
@@ -242,10 +303,7 @@ export default function DocumentManager({ user, isMobile }) {
         pushToast("Đang trích xuất nội dung văn bản bằng AI...", "info");
         (async () => {
           try {
-            const { getFunctions, httpsCallable } = await import("firebase/functions");
-            const functions = getFunctions(undefined, "asia-southeast1");
-            const extractMarkdown = httpsCallable(functions, "extractMarkdown");
-            await extractMarkdown({ docId: docRef.id, fileUrl: docData.fileUrl });
+            await apiClient.post("/api/functions/extractMarkdown", { docId: docRef.id, fileUrl: docData.fileUrl });
             pushToast("AI đã huấn luyện và trích xuất tài liệu thành công!", "success");
           } catch (err) {
             console.error("Lỗi khi trích xuất AI:", err);
@@ -305,25 +363,27 @@ export default function DocumentManager({ user, isMobile }) {
         const oldPathVi = editingDoc.storagePathVi || editingDoc.storagePath;
         if (oldPathVi) {
           try {
-            await deleteObject(ref(storage, oldPathVi));
+            const oldFilename = oldPathVi.substring(oldPathVi.lastIndexOf('/') + 1);
+            await apiClient.delete(`/api/storage/${oldFilename}`);
           } catch (err) {
-            if (err.code !== "storage/object-not-found") console.error("Error deleting old VI file:", err);
+            console.error("Error deleting old VI file:", err);
           }
         }
 
         // Upload new VI file
         const cleanFileNameVi = `${Date.now()}_vi_${editFileVi.name.replace(/\s+/g, "_")}`;
-        const pathVi = `documents/${editingDoc.type}/${cleanFileNameVi}`;
-        const refVi = ref(storage, pathVi);
-        await uploadBytes(refVi, editFileVi, { contentType: "application/pdf" });
-        const fileUrlVi = await getDownloadURL(refVi);
+        const formData = new FormData();
+        formData.append("file", editFileVi, cleanFileNameVi);
+        const res = await apiClient.post("/api/storage/upload", formData, {
+          headers: { "Content-Type": "multipart/form-data" }
+        });
 
-        updateData.fileUrl = fileUrlVi;
-        updateData.storagePath = pathVi;
+        updateData.fileUrl = res.data.url;
+        updateData.storagePath = cleanFileNameVi;
         updateData.fileName = editFileVi.name;
         
-        updateData.fileUrlVi = fileUrlVi;
-        updateData.storagePathVi = pathVi;
+        updateData.fileUrlVi = res.data.url;
+        updateData.storagePathVi = cleanFileNameVi;
         updateData.fileNameVi = editFileVi.name;
       }
 
@@ -335,27 +395,29 @@ export default function DocumentManager({ user, isMobile }) {
         const oldPathEn = editingDoc.storagePathEn;
         if (oldPathEn) {
           try {
-            await deleteObject(ref(storage, oldPathEn));
+            const oldFilename = oldPathEn.substring(oldPathEn.lastIndexOf('/') + 1);
+            await apiClient.delete(`/api/storage/${oldFilename}`);
           } catch (err) {
-            if (err.code !== "storage/object-not-found") console.error("Error deleting old EN file:", err);
+            console.error("Error deleting old EN file:", err);
           }
         }
 
         // Upload new EN file
         const cleanFileNameEn = `${Date.now()}_en_${editFileEn.name.replace(/\s+/g, "_")}`;
-        const pathEn = `documents/${editingDoc.type}/${cleanFileNameEn}`;
-        const refEn = ref(storage, pathEn);
-        await uploadBytes(refEn, editFileEn, { contentType: "application/pdf" });
-        const fileUrlEn = await getDownloadURL(refEn);
+        const formData = new FormData();
+        formData.append("file", editFileEn, cleanFileNameEn);
+        const res = await apiClient.post("/api/storage/upload", formData, {
+          headers: { "Content-Type": "multipart/form-data" }
+        });
 
-        updateData.fileUrlEn = fileUrlEn;
-        updateData.storagePathEn = pathEn;
+        updateData.fileUrlEn = res.data.url;
+        updateData.storagePathEn = cleanFileNameEn;
         updateData.fileNameEn = editFileEn.name;
 
         // If document had no VI file, make EN the default fileUrl too
         if (!editingDoc.fileUrlVi && !editingDoc.fileUrl && !editFileVi) {
-          updateData.fileUrl = fileUrlEn;
-          updateData.storagePath = pathEn;
+          updateData.fileUrl = res.data.url;
+          updateData.storagePath = cleanFileNameEn;
           updateData.fileName = editFileEn.name;
         }
       }
@@ -371,10 +433,7 @@ export default function DocumentManager({ user, isMobile }) {
         pushToast("Đang cập nhật nội dung văn bản bằng AI...", "info");
         (async () => {
           try {
-            const { getFunctions, httpsCallable } = await import("firebase/functions");
-            const functions = getFunctions(undefined, "asia-southeast1");
-            const extractMarkdown = httpsCallable(functions, "extractMarkdown");
-            await extractMarkdown({ docId: editingDoc.id, fileUrl: updateData.fileUrl });
+            await apiClient.post("/api/functions/extractMarkdown", { docId: editingDoc.id, fileUrl: updateData.fileUrl });
             pushToast("AI đã cập nhật tài liệu thành công!", "success");
           } catch (err) {
             console.error("Lỗi khi trích xuất AI:", err);
@@ -419,11 +478,10 @@ export default function DocumentManager({ user, isMobile }) {
       const pathVi = docData.storagePathVi || docData.storagePath;
       if (pathVi) {
         try {
-          await deleteObject(ref(storage, pathVi));
+          const fn = pathVi.substring(pathVi.lastIndexOf('/') + 1);
+          await apiClient.delete(`/api/storage/${fn}`);
         } catch (storageError) {
-          if (storageError.code !== "storage/object-not-found") {
-            console.error("Lỗi khi xóa file tiếng Việt trong storage:", storageError);
-          }
+          console.error("Lỗi khi xóa file tiếng Việt:", storageError);
         }
       }
 
@@ -431,16 +489,15 @@ export default function DocumentManager({ user, isMobile }) {
       const pathEn = docData.storagePathEn;
       if (pathEn) {
         try {
-          await deleteObject(ref(storage, pathEn));
+          const fn = pathEn.substring(pathEn.lastIndexOf('/') + 1);
+          await apiClient.delete(`/api/storage/${fn}`);
         } catch (storageError) {
-          if (storageError.code !== "storage/object-not-found") {
-            console.error("Lỗi khi xóa file tiếng Anh trong storage:", storageError);
-          }
+          console.error("Lỗi khi xóa file tiếng Anh:", storageError);
         }
       }
 
-      // 3. Delete document from Firestore
-      await deleteDoc(doc(db, "documents", docData.id));
+      // 3. Delete document via REST API
+      await deleteDoc(doc(null, "documents", docData.id));
       pushToast("Đã xóa tài liệu thành công!", "success");
     } catch (error) {
       console.error("Lỗi khi xóa tài liệu:", error);
@@ -451,7 +508,7 @@ export default function DocumentManager({ user, isMobile }) {
   // Format timestamp to user friendly string
   const formatTime = (ts) => {
     if (!ts) return "";
-    const date = ts.toDate ? ts.toDate() : new Date(ts.seconds * 1000);
+    const date = ts.toDate ? ts.toDate() : (typeof ts === 'string' ? new Date(ts) : new Date(ts.seconds * 1000));
     return date.toLocaleString("vi-VN", {
       year: "numeric",
       month: "2-digit",
@@ -997,10 +1054,7 @@ export default function DocumentManager({ user, isMobile }) {
                     onClick={async () => {
                       pushToast("Đang trích xuất nội dung văn bản bằng AI...", "info");
                       try {
-                        const { getFunctions, httpsCallable } = await import("firebase/functions");
-                        const functions = getFunctions(undefined, "asia-southeast1");
-                        const extractMarkdown = httpsCallable(functions, "extractMarkdown");
-                        await extractMarkdown({ docId: docItem.id, fileUrl: docItem.fileUrlVi || docItem.fileUrl || docItem.fileUrlEn });
+                        await apiClient.post("/api/functions/extractMarkdown", { docId: docItem.id, fileUrl: docItem.fileUrlVi || docItem.fileUrl || docItem.fileUrlEn });
                         pushToast("AI đã trích xuất tài liệu thành công!", "success");
                       } catch (err) {
                         console.error("Lỗi khi trích xuất AI:", err);

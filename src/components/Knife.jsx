@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { db } from "../firebase";
-import { collection, onSnapshot, doc, setDoc, deleteDoc, writeBatch, addDoc, getDocs } from "firebase/firestore";
+import dbService from "../services/dbService";
 import { colors } from "../theme";
 import { useConfirm, useToast } from "./LightboxSwipeOnly";
 import { useI18n } from "../i18n/I18nProvider";
@@ -10,6 +9,7 @@ import {
 } from "react-icons/fa";
 import { FaScissors } from "react-icons/fa6";
 import * as XLSX from "xlsx";
+import realtimeService from "../services/realtimeService";
 
 const DEPARTMENTS = [
   { code: "G_Cutting", name: "Golf Cutting" },
@@ -95,15 +95,10 @@ export default function Knife({ user, isMobile }) {
   const userRolesList = user?.role ? (Array.isArray(user.role) ? user.role.map(r => String(r).toLowerCase()) : String(user.role).split(',').map(r => r.trim().toLowerCase())) : [];
   const isEhsOrAdmin = userRolesList.some(r => r === 'admin' || r === 'ehs');
 
-  // Load Real-time Data
-  useEffect(() => {
-    setLoading(true);
-    const unsubKnives = onSnapshot(collection(db, "knives"), (snap) => {
-      const list = [];
-      snap.forEach(d => {
-        list.push({ id: d.id, ...d.data() });
-      });
-      // Sort by STT if present, otherwise by department
+  const fetchKnives = async () => {
+    try {
+      const snap = await dbService.getDocs("knives");
+      const list = Array.isArray(snap) ? snap : [];
       list.sort((a, b) => {
         if (a.department !== b.department) {
           return a.department.localeCompare(b.department);
@@ -111,28 +106,39 @@ export default function Knife({ user, isMobile }) {
         return (a.stt || 0) - (b.stt || 0);
       });
       setKnives(list);
-      setLoading(false);
-    }, (err) => {
+    } catch (err) {
       console.error(err);
       toast.show("Không thể tải danh sách dao.", "error");
-      setLoading(false);
-    });
+    }
+  };
 
-    const unsubRegs = onSnapshot(collection(db, "knife_registrations"), (snap) => {
-      const list = [];
-      snap.forEach(d => {
-        list.push({ id: d.id, ...d.data() });
-      });
+  const fetchRegs = async () => {
+    try {
+      const snap = await dbService.getDocs("knife_registrations");
+      const list = Array.isArray(snap) ? snap : [];
       list.sort((a, b) => (b.timestamp || "").localeCompare(a.timestamp || ""));
       setRegistrations(list);
-    }, (err) => {
+    } catch (err) {
       console.error(err);
       toast.show("Không thể tải danh sách đăng ký sử dụng.", "error");
-    });
+    }
+  };
 
+  // Load Data qua Polling (real-time)
+  useEffect(() => {
+    setLoading(true);
+    Promise.all([fetchKnives(), fetchRegs()]).finally(() => setLoading(false));
+
+    const unsubKnives = realtimeService.subscribeToPath("knives", () => { fetchKnives(); });
+    const unsubRegs = realtimeService.subscribeToPath("knife_registrations", () => { fetchRegs(); });
+
+    const intervalKnives = setInterval(fetchKnives, 30000);
+    const intervalRegs = setInterval(fetchRegs, 30000);
     return () => {
       unsubKnives();
       unsubRegs();
+      clearInterval(intervalKnives);
+      clearInterval(intervalRegs);
     };
   }, []);
 
@@ -289,7 +295,8 @@ export default function Knife({ user, isMobile }) {
     }
     try {
       const id = editingKnife ? editingKnife.id : `knife_${Date.now()}`;
-      await setDoc(doc(db, "knives", id), knifeForm, { merge: true });
+      await dbService.updateDoc("knives", id, knifeForm);
+      await fetchKnives();
       toast.show("Đã lưu thông tin dao thành công!", "success");
       setShowKnifeModal(false);
     } catch (err) {
@@ -301,7 +308,8 @@ export default function Knife({ user, isMobile }) {
   const handleDeleteKnife = async (id, name) => {
     if (await confirm.askConfirm(`Bạn có chắc muốn xóa dao tại vị trí "${name}" không?`, "Xác nhận xóa dao")) {
       try {
-        await deleteDoc(doc(db, "knives", id));
+        await dbService.deleteDoc("knives", id);
+        await fetchKnives();
         toast.show("Đã xóa dao thành công.", "success");
       } catch (err) {
         console.error(err);
@@ -323,7 +331,8 @@ export default function Knife({ user, isMobile }) {
         ...regForm,
         timestamp: editingReg ? editingReg.timestamp : new Date().toISOString()
       };
-      await setDoc(doc(db, "knife_registrations", id), payload, { merge: true });
+      await dbService.updateDoc("knife_registrations", id, payload);
+      await fetchRegs();
       toast.show("Đăng ký thành công!", "success");
       setShowRegModal(false);
     } catch (err) {
@@ -335,7 +344,8 @@ export default function Knife({ user, isMobile }) {
   const handleDeleteReg = async (id, name) => {
     if (await confirm.askConfirm(`Bạn có chắc muốn xóa bản đăng ký của nhân viên "${name}" không?`, "Xác nhận xóa đăng ký")) {
       try {
-        await deleteDoc(doc(db, "knife_registrations", id));
+        await dbService.deleteDoc("knife_registrations", id);
+        await fetchRegs();
         toast.show("Đã xóa bản đăng ký thành công.", "success");
       } catch (err) {
         console.error(err);
@@ -354,7 +364,6 @@ export default function Knife({ user, isMobile }) {
       try {
         const data = new Uint8Array(evt.target.result);
         const workbook = XLSX.read(data, { type: "array" });
-        const batch = writeBatch(db);
 
         // Parse Sheet 1: Danh Sách Dao
         const knivesSheet = workbook.Sheets['Danh Sách Dao'];
@@ -396,17 +405,21 @@ export default function Knife({ user, isMobile }) {
           }
 
           // Clear old
-          const existKnives = await getDocs(collection(db, "knives"));
-          const clearBatch = writeBatch(db);
-          existKnives.forEach(d => clearBatch.delete(d.ref));
-          await clearBatch.commit();
+          const existKnives = await dbService.getDocs("knives");
+          const opClear = (existKnives || []).map(d => ({
+            path: `/api/db/knives/${d.id}`,
+            method: "DELETE"
+          }));
+          await dbService.commitBatch(opClear);
 
           // Set new
-          parsedKnives.forEach((k, idx) => {
-            const ref = doc(db, "knives", `knife_${idx + 1}`);
-            batch.set(ref, k);
-            knivesCount++;
-          });
+          const opNew = parsedKnives.map((k, idx) => ({
+            path: `/api/db/knives/knife_${idx + 1}`,
+            method: "POST",
+            body: k
+          }));
+          await dbService.commitBatch(opNew);
+          knivesCount = parsedKnives.length;
         }
 
         // Parse Sheet 3: Nội dung đánh giá
@@ -458,21 +471,26 @@ export default function Knife({ user, isMobile }) {
           }
 
           // Clear old
-          const existRegs = await getDocs(collection(db, "knife_registrations"));
-          const clearBatch = writeBatch(db);
-          existRegs.forEach(d => clearBatch.delete(d.ref));
-          await clearBatch.commit();
+          const existRegs = await dbService.getDocs("knife_registrations");
+          const opClearRegs = (existRegs || []).map(d => ({
+            path: `/api/db/knife_registrations/${d.id}`,
+            method: "DELETE"
+          }));
+          await dbService.commitBatch(opClearRegs);
 
           // Set new
-          parsedRegs.forEach((rg, idx) => {
-            const ref = doc(db, "knife_registrations", `reg_${idx + 1}`);
-            batch.set(ref, rg);
-            regsCount++;
-          });
+          const opNewRegs = parsedRegs.map((rg, idx) => ({
+            path: `/api/db/knife_registrations/reg_${idx + 1}`,
+            method: "POST",
+            body: rg
+          }));
+          await dbService.commitBatch(opNewRegs);
+          regsCount = parsedRegs.length;
         }
 
-        await batch.commit();
         toast.show(`Đã nhập thành công ${knivesCount} dao và ${regsCount} đăng ký đánh giá!`, "success");
+        await fetchKnives();
+        await fetchRegs();
         if (e.target) e.target.value = "";
       } catch (err) {
         console.error(err);

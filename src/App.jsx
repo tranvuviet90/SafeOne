@@ -14,9 +14,8 @@ const BaoCom = lazyWithRetry(() => import("./components/BaoCom"));
 const UserManager = lazyWithRetry(() => import("./components/UserManager"));
 const DocumentManager = lazyWithRetry(() => import("./components/DocumentManager"));
 import logo from "./assets/logo.png";
-import { auth, db } from "./firebase";
-import { onAuthStateChanged, signOut } from "firebase/auth";
-import { doc, getDoc, collection, query, where, Timestamp, setDoc, onSnapshot } from "firebase/firestore";
+import authService from "./services/authService";
+import dbService from "./services/dbService";
 import "./App.css";
 
 import MagicMenu from "./components/MagicMenu";
@@ -141,39 +140,58 @@ export default function App() {
   // ---------------------------------------------------------------------------------
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        const ref = doc(db, "users", firebaseUser.uid);
-        const snap = await getDoc(ref);
-        if (snap.exists()) {
-          const data = snap.data();
-          const rawRole = data.role;
+    const fetchUser = async () => {
+      try {
+        const token = localStorage.getItem("safeone_jwt_token") || sessionStorage.getItem("safeone_jwt_token");
+        if (!token) {
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+
+        const data = await authService.getMe();
+        // /me returns the user wrapped as { user } (matching login); tolerate a flat shape too.
+        const userData = data?.user || data;
+        if (userData && userData.uid) {
+          const rawRole = userData.role;
           const parsedRoles = rawRole ? (Array.isArray(rawRole) ? rawRole : [String(rawRole)]).flatMap(r => String(r).split(',')).map(r => r.trim()).filter(Boolean) : [];
-          const userData = { uid: firebaseUser.uid, email: firebaseUser.email, ...data, role: parsedRoles };
-          setUser(userData);
+          setUser({ ...userData, role: parsedRoles });
 
           const currentIsDept = parsedRoles.some(r => deptRolesNormalized.has(normalizeRole(r)));
           const currentIsCanteen = parsedRoles.some(r => normalizeRole(r) === CANTEEN_NORMALIZED);
           const currentHasEhs = parsedRoles.some(r => ['admin', 'ehs', 'ehs committee', 'manager'].includes(normalizeRole(r)));
-          
-          // --- SỬA LỖI TẠI ĐÂY ---
-          // CHANGED: Chỉ tự động chuyển đến tab Báo cơm (index 3) nếu người dùng
-          // chỉ có vai trò bộ phận hoặc nhà ăn (không có quyền EHS/Admin hoặc Trainer).
-          // Các tài khoản đa vai trò có quyền EHS/Admin hoặc Trainer sẽ giữ tab mặc định là 0.
           const currentHasTrainer = parsedRoles.some(r => normalizeRole(r) === 'trainer');
           const forceMealTab = (currentIsDept || currentIsCanteen) && !currentHasEhs && !currentHasTrainer;
           setTab(forceMealTab ? 3 : 0);
-          // --- KẾT THÚC SỬA LỖI ---
-          
         } else {
           setUser(null);
         }
-      } else {
+      } catch (err) {
+        console.error("Lỗi lấy thông tin người dùng đăng nhập:", err);
+        // If the token was rejected (401 no-token / 403 invalid or stale signature),
+        // evict it so we don't get stuck logging out on every refresh. Network/500
+        // errors are left alone so a transient outage doesn't force a re-login.
+        const status = err.response?.status;
+        if (status === 401 || status === 403) {
+          localStorage.removeItem("safeone_jwt_token");
+          sessionStorage.removeItem("safeone_jwt_token");
+        }
         setUser(null);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
-    });
-    return () => unsubscribe();
+    };
+
+    fetchUser();
+
+    // Listen to custom authorization failure events (silent redirect)
+    const handleAuthFailed = () => {
+      setUser(null);
+    };
+    window.addEventListener("safeone-auth-failed", handleAuthFailed);
+    return () => {
+      window.removeEventListener("safeone-auth-failed", handleAuthFailed);
+    };
   }, []);
 
   useEffect(() => {
@@ -185,105 +203,86 @@ export default function App() {
       return;
     }
 
-    let unsubEvents = null;
-    let unsubLogs = null;
+    const checkNotifications = async () => {
+      try {
+        let lastSeenTimestampsEvents = {};
+        let lastSeenTimestampsLogs = {};
 
-    // Lắng nghe tài liệu user_prefs của người dùng theo thời gian thực (Giống cách Facebook hoạt động)
-    const unsubPrefs = onSnapshot(doc(db, "user_prefs", user.uid), (prefSnap) => {
-      let lastSeenTimestampsEvents = {};
-      let lastSeenTimestampsLogs = {};
+        // 1. Fetch user_prefs
+        const prefSnap = await dbService.getDoc("user_prefs", user.uid);
+        if (prefSnap && prefSnap._exists !== false) {
+          lastSeenTimestampsEvents = prefSnap["gembaLastSeenTimestamps"] || {};
+          lastSeenTimestampsLogs = prefSnap["tuGembaLastSeenTimestamps"] || {};
+        }
 
-      if (prefSnap.exists()) {
-        const prefData = prefSnap.data();
-        lastSeenTimestampsEvents = prefData["gembaLastSeenTimestamps"] || {};
-        lastSeenTimestampsLogs = prefData["tuGembaLastSeenTimestamps"] || {};
-      }
+        // Fallback to localStorage if empty
+        if (Object.keys(lastSeenTimestampsEvents).length === 0) {
+          lastSeenTimestampsEvents = JSON.parse(localStorage.getItem("gembaLastSeenTimestamps") || "{}");
+        }
+        if (Object.keys(lastSeenTimestampsLogs).length === 0) {
+          lastSeenTimestampsLogs = JSON.parse(localStorage.getItem("tuGembaLastSeenTimestamps") || "{}");
+        }
 
-      // Fallback về localStorage nếu trống
-      if (Object.keys(lastSeenTimestampsEvents).length === 0) {
-        lastSeenTimestampsEvents = JSON.parse(localStorage.getItem("gembaLastSeenTimestamps") || "{}");
-      }
-      if (Object.keys(lastSeenTimestampsLogs).length === 0) {
-        lastSeenTimestampsLogs = JSON.parse(localStorage.getItem("tuGembaLastSeenTimestamps") || "{}");
-      }
+        // Find oldest seen date as query threshold/filtering date
+        const getMinDate = (timestamps) => {
+          const dates = departments.map((d) => {
+            return timestamps[d.name] ? new Date(timestamps[d.name]) : new Date(0);
+          });
+          return new Date(Math.min(...dates.map(d => d.getTime())));
+        };
 
-      // Tìm thời gian xem cũ nhất làm mốc truy vấn
-      const getMinDate = (timestamps) => {
-        const dates = departments.map((d) => {
-          return timestamps[d.name] ? new Date(timestamps[d.name]) : new Date(0);
-        });
-        return new Date(Math.min(...dates.map(d => d.getTime())));
-      };
+        const minEventsSeen = getMinDate(lastSeenTimestampsEvents);
+        const minLogsSeen = getMinDate(lastSeenTimestampsLogs);
 
-      const minEventsSeen = getMinDate(lastSeenTimestampsEvents);
-      const minLogsSeen = getMinDate(lastSeenTimestampsLogs);
-
-      // Hủy đăng ký listener cũ trước khi tạo listener mới
-      if (unsubEvents) unsubEvents();
-      if (unsubLogs) unsubLogs();
-
-      // Lắng nghe gemba_events thời gian thực
-      const qEvents = query(
-        collection(db, "gemba_events"),
-        where("timestamp", ">", Timestamp.fromDate(minEventsSeen))
-      );
-      unsubEvents = onSnapshot(qEvents, (snapshot) => {
-        const counts = {};
-        departments.forEach((d) => { counts[d.name] = 0; });
-        snapshot.forEach((docSnap) => {
-          const data = docSnap.data();
-          const dept = data.department;
-          if (dept && counts[dept] !== undefined) {
-            const ts = data.timestamp ? (data.timestamp.toDate ? data.timestamp.toDate() : new Date(data.timestamp.seconds * 1000)) : null;
-            if (ts) {
-              const lastSeen = lastSeenTimestampsEvents[dept] ? new Date(lastSeenTimestampsEvents[dept]) : new Date(0);
-              if (ts > lastSeen) {
-                counts[dept] += 1;
+        // 2. Fetch gemba_events
+        const eventsList = await dbService.getDocs("gemba_events");
+        const countsEvents = {};
+        departments.forEach((d) => { countsEvents[d.name] = 0; });
+        if (Array.isArray(eventsList)) {
+          eventsList.forEach((item) => {
+            const dept = item.department;
+            if (dept && countsEvents[dept] !== undefined) {
+              const ts = item.timestamp ? new Date(item.timestamp) : null;
+              if (ts && ts > minEventsSeen) {
+                const lastSeen = lastSeenTimestampsEvents[dept] ? new Date(lastSeenTimestampsEvents[dept]) : new Date(0);
+                if (ts > lastSeen) {
+                  countsEvents[dept] += 1;
+                }
               }
             }
-          }
-        });
-        setGembaNotifCounts(counts);
-      }, (error) => {
-        console.error("Lỗi lắng nghe thời gian thực gemba_events:", error);
-      });
+          });
+        }
+        setGembaNotifCounts(countsEvents);
 
-      // Lắng nghe tu_gemba_logs thời gian thực
-      const qLogs = query(
-        collection(db, "tu_gemba_logs"),
-        where("timestamp", ">", Timestamp.fromDate(minLogsSeen))
-      );
-      unsubLogs = onSnapshot(qLogs, (snapshot) => {
-        const counts = {};
-        departments.forEach((d) => { counts[d.name] = 0; });
-        snapshot.forEach((docSnap) => {
-          const data = docSnap.data();
-          const dept = data.department;
-          if (dept && counts[dept] !== undefined) {
-            const ts = data.timestamp ? (data.timestamp.toDate ? data.timestamp.toDate() : new Date(data.timestamp.seconds * 1000)) : null;
-            if (ts) {
-              const lastSeen = lastSeenTimestampsLogs[dept] ? new Date(lastSeenTimestampsLogs[dept]) : new Date(0);
-              if (ts > lastSeen) {
-                counts[dept] += 1;
+        // 3. Fetch tu_gemba_logs
+        const logsList = await dbService.getDocs("tu_gemba_logs");
+        const countsLogs = {};
+        departments.forEach((d) => { countsLogs[d.name] = 0; });
+        if (Array.isArray(logsList)) {
+          logsList.forEach((item) => {
+            const dept = item.department;
+            if (dept && countsLogs[dept] !== undefined) {
+              const ts = item.timestamp ? new Date(item.timestamp) : null;
+              if (ts && ts > minLogsSeen) {
+                const lastSeen = lastSeenTimestampsLogs[dept] ? new Date(lastSeenTimestampsLogs[dept]) : new Date(0);
+                if (ts > lastSeen) {
+                  countsLogs[dept] += 1;
+                }
               }
             }
-          }
-        });
-        setTuGembaNotifCounts(counts);
-      }, (error) => {
-        console.error("Lỗi lắng nghe thời gian thực tu_gemba_logs:", error);
-      });
+          });
+        }
+        setTuGembaNotifCounts(countsLogs);
 
-    }, (error) => {
-      console.error("Lỗi lắng nghe user_prefs:", error);
-    });
-
-    return () => {
-      unsubPrefs();
-      if (unsubEvents) unsubEvents();
-      if (unsubLogs) unsubLogs();
+      } catch (err) {
+        console.error("Lỗi lấy thông tin thông báo (gemba/tu_gemba):", err);
+      }
     };
-  }, [user, isRestrictedRole]); // Cập nhật dependency
+
+    checkNotifications();
+    const intervalId = setInterval(checkNotifications, 30 * 1000);
+    return () => clearInterval(intervalId);
+  }, [user, isRestrictedRole]);
 
   // Automatic shift start and walkie-talkie reminders
   useEffect(() => {
@@ -298,12 +297,10 @@ export default function App() {
         const weekId = `${weekDates[0].getFullYear()}-${getWeekNumber(weekDates[0])}`;
 
         // 1. Fetch weekly shift assignments
-        const shiftDocRef = doc(db, "weekly_shifts", weekId);
-        const shiftSnap = await getDoc(shiftDocRef);
-        if (!shiftSnap.exists()) return;
+        const shiftSnap = await dbService.getDoc("weekly_shifts", weekId);
+        if (!shiftSnap || shiftSnap._exists === false) return;
 
-        const shiftData = shiftSnap.data();
-        const myShifts = shiftData[user.name];
+        const myShifts = shiftSnap[user.name];
         const todayShift = myShifts ? myShifts[todayDateId] : null;
 
         if (!todayShift || todayShift === "Off") return;
@@ -317,26 +314,34 @@ export default function App() {
         const nowMinutes = currentHour * 60 + currentMinute;
         const shiftStartMinutes = startHour * 60;
 
+        const notifs = await dbService.getDocs("notifications");
+        const todayStr = today.toDateString();
+
+        const hasShiftRemind = notifs.some(n => 
+          n.type === "shift_start_remind" && 
+          n.target_user_id === user.uid && 
+          new Date(n.timestamp).toDateString() === todayStr
+        );
+
         // A. Shift Start Reminder: within 1 hour after shift start
         if (nowMinutes >= shiftStartMinutes && nowMinutes < shiftStartMinutes + 60) {
-          const notifId = `shift-remind-${todayDateId}-${user.uid}-${todayShift}`;
-          await setDoc(doc(db, "notifications", notifId), {
-            type: "shift_start_remind",
-            message: `Ca trực ${todayShift} của bạn đã bắt đầu. Hãy nhớ thực hiện các nhiệm vụ EHS nhé!`,
-            targetUserId: user.uid,
-            createdBy: "system",
-            readBy: [],
-            relatedId: notifId,
-            timestamp: Timestamp.now()
-          });
+          if (!hasShiftRemind) {
+            await dbService.createDoc("notifications", {
+              type: "shift_start_remind",
+              message: `Ca trực ${todayShift} của bạn đã bắt đầu. Hãy nhớ thực hiện các nhiệm vụ EHS nhé!`,
+              target_user_id: user.uid,
+              createdBy: "system",
+              read_by: [],
+              timestamp: new Date().toISOString()
+            });
+          }
         }
 
         // B. Walkie-Talkie Reminder: within 15 mins to 1h15m after shift start
         if (nowMinutes >= shiftStartMinutes + 15 && nowMinutes < shiftStartMinutes + 75) {
-          const bodamDocRef = doc(db, "bodam", "status");
-          const bodamSnap = await getDoc(bodamDocRef);
-          if (bodamSnap.exists() && bodamSnap.data().status) {
-            const statusList = bodamSnap.data().status;
+          const bodamSnap = await dbService.getDoc("bodam", "status");
+          if (bodamSnap && bodamSnap._exists !== false && bodamSnap.status) {
+            const statusList = bodamSnap.status;
             let assignedBodamIdx = -1;
             let isCheckedIn = false;
 
@@ -350,17 +355,23 @@ export default function App() {
               }
             });
 
+            const hasBodamRemind = notifs.some(n => 
+              n.type === "bodam_unreturned_remind" && 
+              n.target_user_id === user.uid && 
+              new Date(n.timestamp).toDateString() === todayStr
+            );
+
             if (assignedBodamIdx !== -1 && !isCheckedIn) {
-              const notifId = `bodam-remind-${todayDateId}-${user.uid}-${todayShift}`;
-              await setDoc(doc(db, "notifications", notifId), {
-                type: "bodam_unreturned_remind",
-                message: `Bạn đã bắt đầu ca trực ${todayShift} nhưng chưa nhận/check-in Bộ đàm ${assignedBodamIdx + 1}. Hãy check-in ngay nhé!`,
-                targetUserId: user.uid,
-                createdBy: "system",
-                readBy: [],
-                relatedId: notifId,
-                timestamp: Timestamp.now()
-              });
+              if (!hasBodamRemind) {
+                await dbService.createDoc("notifications", {
+                  type: "bodam_unreturned_remind",
+                  message: `Bạn đã bắt đầu ca trực ${todayShift} nhưng chưa nhận/check-in Bộ đàm ${assignedBodamIdx + 1}. Hãy check-in ngay nhé!`,
+                  target_user_id: user.uid,
+                  createdBy: "system",
+                  read_by: [],
+                  timestamp: new Date().toISOString()
+                });
+              }
             }
           }
         }
@@ -377,7 +388,8 @@ export default function App() {
 
   const handleLogout = async () => {
     try {
-      await signOut(auth);
+      authService.logout();
+      setUser(null);
     } catch (e) {
       console.error("Lỗi đăng xuất:", e);
     }
@@ -485,7 +497,7 @@ export default function App() {
             }>
               {/* THÊM BỌC ĐIỀU KIỆN CHO TAB 0 VÀ 1 */}
               {!isRestrictedRole && (
-                <div style={tabStyle(0)}>{tab === 0 && <ErrorBoundary fallbackTitle="Lỗi tải Gemba Checklist"><EHSAudit user={user} isMobile={isMobile} newErrorCounts={gembaNotifCounts} setGembaNotifCounts={setGembaNotifCounts} /></ErrorBoundary>}</div>
+                <div style={tabStyle(0)}>{tab === 0 && <ErrorBoundary fallbackTitle="Lỗi tải EHS Audit"><EHSAudit user={user} isMobile={isMobile} newErrorCounts={gembaNotifCounts} setGembaNotifCounts={setGembaNotifCounts} /></ErrorBoundary>}</div>
               )}
               {!isRestrictedRole && (
                 <div style={tabStyle(1)}>{tab === 1 && <ErrorBoundary fallbackTitle="Lỗi tải Tự Gemba"><Gemba user={user} isMobile={isMobile} newLogCounts={tuGembaNotifCounts} setTuGembaNotifCounts={setTuGembaNotifCounts} /></ErrorBoundary>}</div>

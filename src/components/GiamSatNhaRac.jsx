@@ -1,32 +1,18 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { db, storage } from "../firebase";
-import { colors } from "../theme.js";
-import {
-  collection,
-  addDoc,
-  onSnapshot,
-  serverTimestamp,
-  query,
-  orderBy,
-  doc,
-  deleteDoc,
-  where,
-  getDocs,
-  Timestamp,
-  writeBatch,
-  updateDoc,
-} from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
+import dbService from "../services/dbService";
+import apiClient from "../services/apiClient";
 import imageCompression from "browser-image-compression";
+import { colors } from "../theme.js";
 import LightboxSwipeOnly, { useConfirm } from "./LightboxSwipeOnly";
 import { useI18n } from "../i18n/I18nProvider";
+import { getWeekNumber } from "../utils/string";
+import realtimeService from "../services/realtimeService";
 
 const orange = colors.primary;
 const orangeLight = colors.primaryLight;
 const dark = colors.textPrimary;
 
-const FIRESTORE_COLLECTION = "giamsatnharac";
-const STORAGE_FOLDER = "giamsatnharac_images";
+const COLLECTION_NAME = "giamsatnharac";
 
 // ====================== CÁC BIỂU TƯỢNG MỚI ======================
 function RedXIcon({ size = 14 }) {
@@ -75,7 +61,18 @@ function UndoIcon({ size = 20 }) {
     </svg>
   );
 }
-// ===============================================================
+
+const getFilenameFromUrl = (url) => {
+  if (!url) return "";
+  const parts = url.split("/");
+  return parts[parts.length - 1];
+};
+
+const formatTimestamp = (ts) => {
+  if (!ts) return "";
+  const date = ts.seconds ? new Date(ts.seconds * 1000) : new Date(ts);
+  return date.toLocaleString("vi-VN");
+};
 
 function GiamSatNhaRac({ user }) {
   const { t } = useI18n();
@@ -92,52 +89,64 @@ function GiamSatNhaRac({ user }) {
   const isAdminOrEhs = userRolesList.some(r => r === 'admin' || r === 'ehs');
   const userRole = isAdminOrEhs ? 'admin' : (userRolesList[0] || "");
 
+  const fetchChat = async () => {
+    try {
+      const list = await dbService.getDocs(COLLECTION_NAME);
+      if (Array.isArray(list)) {
+        const sorted = list.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        setChat(sorted);
+      }
+    } catch (err) {
+      console.error("Lỗi lấy lịch sử giám sát nhà rác:", err);
+    }
+  };
+
   useEffect(() => {
-    const q = query(
-      collection(db, FIRESTORE_COLLECTION),
-      orderBy("timestamp", "desc")
-    );
-    const unsub = onSnapshot(q, (snap) =>
-      setChat(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
-    );
-    return unsub;
+    fetchChat();
+
+    const unsub = realtimeService.subscribeToPath(COLLECTION_NAME, () => {
+      fetchChat();
+    });
+
+    const intervalId = setInterval(fetchChat, 30000);
+    return () => {
+      unsub();
+      clearInterval(intervalId);
+    };
   }, []);
 
-  // Dọn rác >7 ngày (logic cũ giữ nguyên)
+  // Dọn rác >7 ngày
   useEffect(() => {
     const cleanupOldData = async () => {
-      const sevenDaysAgo = Timestamp.fromMillis(
-        Date.now() - 7 * 24 * 60 * 60 * 1000
-      );
-      const oldDataQuery = query(
-        collection(db, FIRESTORE_COLLECTION),
-        where("timestamp", "<", sevenDaysAgo)
-      );
-
       try {
-        const snapshot = await getDocs(oldDataQuery);
-        if (snapshot.empty) return;
+        const list = await dbService.getDocs(COLLECTION_NAME);
+        if (!Array.isArray(list)) return;
 
-        const deleteImagePromises = [];
-        snapshot.forEach((docu) => {
-          const data = docu.data();
-          if (data.images?.length) {
-            data.images.forEach((url) => {
-              const imageRef = ref(storage, url);
-              const promise = deleteObject(imageRef).catch((error) => {
-                if (error.code !== "storage/object-not-found") {
-                  console.error("Lỗi khi xóa ảnh cũ từ Storage:", error);
-                }
-              });
-              deleteImagePromises.push(promise);
-            });
+        const sevenDaysAgoMs = Date.now() - 7 * 24 * 60 * 60 * 1000;
+        const oldItems = list.filter(item => item.timestamp && new Date(item.timestamp).getTime() < sevenDaysAgoMs);
+        if (oldItems.length === 0) return;
+
+        // Delete images
+        for (const item of oldItems) {
+          if (item.images && Array.isArray(item.images)) {
+            for (const url of item.images) {
+              try {
+                const filename = getFilenameFromUrl(url);
+                if (filename) await apiClient.delete(`/api/storage/${filename}`);
+              } catch (e) {
+                console.error("Lỗi xóa ảnh cũ:", e);
+              }
+            }
           }
-        });
-        await Promise.all(deleteImagePromises);
+        }
 
-        const batch = writeBatch(db);
-        snapshot.forEach((docu) => batch.delete(docu.ref));
-        await batch.commit();
+        // Batch delete old items
+        const operations = oldItems.map(item => ({
+          method: "DELETE",
+          path: `/api/db/${COLLECTION_NAME}/${item.id}`
+        }));
+        await dbService.commitBatch(operations);
+        fetchChat();
       } catch (error) {
         console.error("Lỗi khi dọn dẹp dữ liệu cũ:", error);
       }
@@ -180,12 +189,12 @@ function GiamSatNhaRac({ user }) {
       try {
         urls = await Promise.all(
           files.map(async (f) => {
-            const sr = ref(
-              storage,
-              `${STORAGE_FOLDER}/` + Date.now() + "_" + f.name
-            );
-            await uploadBytes(sr, f);
-            return await getDownloadURL(sr);
+            const formData = new FormData();
+            formData.append("file", f);
+            const res = await apiClient.post("/api/storage/upload", formData, {
+              headers: { "Content-Type": "multipart/form-data" }
+            });
+            return res.data.url;
           })
         );
       } catch (e) {
@@ -195,39 +204,46 @@ function GiamSatNhaRac({ user }) {
         return;
       }
     }
-    await addDoc(collection(db, FIRESTORE_COLLECTION), {
+    await dbService.createDoc(COLLECTION_NAME, {
       user: user.name,
       userId: user.uid,
       text,
       images: urls,
-      timestamp: serverTimestamp(),
+      timestamp: new Date().toISOString(),
     });
     setText("");
     setFiles([]);
     setFileNames([]);
     if (fileRef.current) fileRef.current.value = "";
     setIsUploading(false);
+    fetchChat();
   };
 
   const handleSoftDelete = async (postId) => {
     if (await askConfirm(t("common.confirmDelete"), "Xác nhận yêu cầu xóa")) {
-      const docRef = doc(db, FIRESTORE_COLLECTION, postId);
-      await updateDoc(docRef, { pendingDeletion: true });
+      await dbService.updateDoc(COLLECTION_NAME, postId, { pendingDeletion: true });
+      fetchChat();
     }
   };
   const handleCancelDelete = async (postId) => {
-    const docRef = doc(db, FIRESTORE_COLLECTION, postId);
-    await updateDoc(docRef, { pendingDeletion: false });
+    await dbService.updateDoc(COLLECTION_NAME, postId, { pendingDeletion: false });
+    fetchChat();
   };
   const handlePermanentDelete = async (message) => {
     if (!(await askConfirm(t("common.confirmPermanentDelete"), "Xác nhận xóa vĩnh viễn"))) return;
     try {
       if (message.images?.length) {
         for (const url of message.images) {
-          try { await deleteObject(ref(storage, url)); } catch (error) { if (error.code !== "storage/object-not-found") console.error("Lỗi xóa ảnh:", error); }
+          try {
+            const filename = getFilenameFromUrl(url);
+            if (filename) await apiClient.delete(`/api/storage/${filename}`);
+          } catch (error) {
+            if (error.response?.status !== 404) console.error("Lỗi xóa ảnh:", error);
+          }
         }
       }
-      await deleteDoc(doc(db, FIRESTORE_COLLECTION, message.id));
+      await dbService.deleteDoc(COLLECTION_NAME, message.id);
+      fetchChat();
     } catch (err) { console.error("Lỗi khi xóa vĩnh viễn:", err); alert(t("common.deleteFailed")); }
   };
 
@@ -328,7 +344,6 @@ function GiamSatNhaRac({ user }) {
         </div>
       </form>
 
-      {/* Vùng chứa tin nhắn, đã loại bỏ wrapper cuộn ngang */}
       <div
         style={{
           flexGrow: 1,
@@ -435,8 +450,7 @@ function GiamSatNhaRac({ user }) {
                 )}
 
                 <div style={{ fontSize: 11, color: "#666", marginTop: 5, textAlign: "right" }}>
-                  {msg.timestamp &&
-                    new Date(msg.timestamp.seconds * 1000).toLocaleString("vi-VN")}
+                  {formatTimestamp(msg.timestamp)}
                 </div>
               </div>
             </div>
@@ -444,7 +458,6 @@ function GiamSatNhaRac({ user }) {
         })}
         {clippedChat.length === 0 && chat.length === 0 && <div>{t("common.noData")}</div>}
       </div>
-
 
       {hasMore && (
         <div className="row" style={{ justifyContent: "center", display: "flex", marginTop: 8 }}>

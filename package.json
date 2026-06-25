@@ -8,12 +8,13 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "start": "node server.js",
+    "start": "node backend/server.js",
     "clean-db": "node backend/clean_db.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
     "@hello-pangea/dnd": "^18.0.1",
+    "axios": "^1.18.1",
     "browser-image-compression": "^2.0.2",
     "cors": "^2.8.5",
     "date-fns": "^4.1.0",
@@ -21,7 +22,6 @@
     "exceljs": "^4.4.0",
     "express": "^5.1.0",
     "file-saver": "^2.0.5",
-    "firebase": "^11.10.0",
     "react": "^19.1.0",
     "react-datepicker": "^8.7.0",
     "react-day-picker": "^9.9.0",

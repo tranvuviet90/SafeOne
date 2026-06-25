@@ -1,14 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { db, storage } from "../firebase";
-import {
-  collection, query, where, getDocs, onSnapshot, orderBy,
-  addDoc, serverTimestamp, doc, deleteDoc, updateDoc
-} from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
-import imageCompression from 'browser-image-compression';
+import { dbService } from "../services/dbService";
+import apiClient from "../services/apiClient";
 import { colors } from "../theme";
 import LightboxSwipeOnly, { useConfirm } from "./LightboxSwipeOnly";
 import { useI18n } from "../i18n/I18nProvider";
+import realtimeService from "../services/realtimeService";
 
 const orange = colors.primary;
 const orangeLight = colors.primaryLight;
@@ -59,30 +55,69 @@ function GiamSatHutThuoc({ user }) {
   const isAdminOrEhs = userRolesList.some(r => r === 'admin' || r === 'ehs');
   const userRole = isAdminOrEhs ? 'admin' : (userRolesList[0] || '');
 
+  // 1. Fetch EHS Committee members list
   useEffect(() => {
     const fetchCommitteeUsers = async () => {
       try {
-        const q = query(collection(db, "users"), where("role", "==", "ehs committee"));
-        const querySnapshot = await getDocs(q);
-        const usersData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        const uniqueUsers = usersData.filter((u, idx, self) => idx === self.findIndex((x) => x.name === u.name));
+        const usersData = await dbService.getDocs("users");
+        const uniqueUsers = usersData
+          .filter(u => {
+            const rawRole = u.role;
+            const roles = (Array.isArray(rawRole) ? rawRole : String(rawRole || "").split(","))
+              .map(r => r.trim().toLowerCase());
+            return roles.includes("ehs committee");
+          })
+          .filter((u, idx, self) => idx === self.findIndex((x) => x.name === u.name));
         setCommitteeUsers(uniqueUsers);
-      } catch (error) { console.error("Lỗi khi lấy danh sách EHS Committee:", error); }
+      } catch (error) {
+        console.error("Lỗi khi lấy danh sách EHS Committee:", error);
+      }
     };
     fetchCommitteeUsers();
   }, []);
 
+  // 2. Helper to fetch history
+  const fetchHistory = async () => {
+    try {
+      const logsData = await dbService.getDocs("hutthuoc_history");
+      const sortedLogs = logsData
+        .map(docu => {
+          const ts = docu.createdAt;
+          let timeStr = "";
+          if (ts) {
+            const dateVal = typeof ts === "string" ? new Date(ts) : (ts.seconds ? new Date(ts.seconds * 1000) : new Date(ts));
+            timeStr = dateVal.toLocaleString("vi-VN");
+          }
+          return {
+            id: docu.id,
+            ...docu,
+            time: timeStr
+          };
+        })
+        .sort((a, b) => {
+          const timeA = a.createdAt?.seconds ? a.createdAt.seconds * 1000 : (typeof a.createdAt === "string" ? new Date(a.createdAt).getTime() : 0);
+          const timeB = b.createdAt?.seconds ? b.createdAt.seconds * 1000 : (typeof b.createdAt === "string" ? new Date(b.createdAt).getTime() : 0);
+          return timeB - timeA;
+        });
+      setHistory(sortedLogs);
+    } catch (error) {
+      console.error("Lỗi khi lấy lịch sử kiểm tra:", error);
+    }
+  };
+
+  // 3. Setup Polling (Correction 1: Interval 30s) + immediate fetch on mount
   useEffect(() => {
-    const q = query(collection(db, "hutthuoc_history"), orderBy("createdAt", "desc"));
-    const unsub = onSnapshot(q, (querySnapshot) => {
-      const logsData = querySnapshot.docs.map(docu => ({
-        id: docu.id,
-        ...docu.data(),
-        time: docu.data().createdAt?.toDate().toLocaleString("vi-VN") || ""
-      }));
-      setHistory(logsData);
+    fetchHistory();
+
+    const unsub = realtimeService.subscribeToPath("hutthuoc_history", () => {
+      fetchHistory();
     });
-    return unsub;
+
+    const intervalId = setInterval(fetchHistory, 30000);
+    return () => {
+      unsub();
+      clearInterval(intervalId);
+    };
   }, []);
   
   useEffect(() => {
@@ -97,23 +132,15 @@ function GiamSatHutThuoc({ user }) {
     setSelected(arr => arr.includes(name) ? arr.filter(n => n !== name) : [...arr, name]);
   }
 
-  const handleImageChange = async (e) => {
+  const handleImageChange = (e) => {
     if (e.target.files && e.target.files.length > 0) {
       const selectedFiles = Array.from(e.target.files);
-      const compressionOptions = { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true };
-      try {
-        const processedFiles = await Promise.all(selectedFiles.map(file => {
-          if (file.size > compressionOptions.maxSizeMB * 1024 * 1024) return imageCompression(file, compressionOptions);
-          return file;
-        }));
-        setFiles(processedFiles);
-        setFileNames(processedFiles.map(f => f.name));
-      } catch (error) {
-        console.error("Lỗi khi nén ảnh:", error);
-        alert("Đã xảy ra lỗi trong quá trình xử lý ảnh.");
-        setFiles([]); setFileNames([]); if(fileRef.current) fileRef.current.value = "";
-      }
-    } else { setFiles([]); setFileNames([]); }
+      setFiles(selectedFiles);
+      setFileNames(selectedFiles.map(f => f.name));
+    } else {
+      setFiles([]);
+      setFileNames([]);
+    }
   };
 
   async function handleSave() {
@@ -121,13 +148,20 @@ function GiamSatHutThuoc({ user }) {
     let uploadedUrls = [];
     if (files.length > 0) {
       try {
-        const uploadPromises = files.map(file => {
-          const filename = Date.now() + "_" + file.name;
-          const storageRef = ref(storage, "hutthuoc_images/" + filename);
-          return uploadBytes(storageRef, file).then(() => getDownloadURL(storageRef));
+        const uploadPromises = files.map(async file => {
+          const formData = new FormData();
+          formData.append("file", file);
+          const res = await apiClient.post("/api/storage/upload", formData, {
+            headers: { "Content-Type": "multipart/form-data" }
+          });
+          return res.data.url;
         });
         uploadedUrls = await Promise.all(uploadPromises);
-      } catch (error) { console.error("Lỗi tải ảnh:", error); alert("Tải ảnh thất bại!"); return; }
+      } catch (error) {
+        console.error("Lỗi tải ảnh:", error);
+        alert("Tải ảnh thất bại!");
+        return;
+      }
     }
     const newEntry = {
       users: selected,
@@ -135,37 +169,48 @@ function GiamSatHutThuoc({ user }) {
       images: uploadedUrls,
       by: user.name,
       userId: user.uid,
-      createdAt: serverTimestamp()
+      createdAt: { type: "serverTimestamp" }
     };
-    await addDoc(collection(db, "hutthuoc_history"), newEntry);
-    setSelected([]); setNote(''); setFiles([]); setFileNames([]); if (fileRef.current) fileRef.current.value = "";
+    await dbService.createDoc("hutthuoc_history", newEntry);
+    fetchHistory();
+    setSelected([]);
+    setNote('');
+    setFiles([]);
+    setFileNames([]);
+    if (fileRef.current) fileRef.current.value = "";
   }
 
-  // Soft/Permanent delete (giữ nguyên)
   const handleSoftDelete = async (entryId) => {
     if (await askConfirm(t("common.confirmDelete"), "Xác nhận yêu cầu xóa")) {
-      const docRef = doc(db, "hutthuoc_history", entryId);
-      await updateDoc(docRef, { pendingDeletion: true });
+      await dbService.updateDoc("hutthuoc_history", entryId, { pendingDeletion: true });
+      fetchHistory();
     }
   };
+
   const handleCancelDelete = async (entryId) => {
-    const docRef = doc(db, "hutthuoc_history", entryId);
-    await updateDoc(docRef, { pendingDeletion: false });
+    await dbService.updateDoc("hutthuoc_history", entryId, { pendingDeletion: false });
+    fetchHistory();
   };
+
   const handlePermanentDelete = async (entryToDelete) => {
     if (!(await askConfirm(t("common.confirmPermanentDelete"), "Xác nhận xóa vĩnh viễn"))) return;
     try {
       if (entryToDelete.images?.length) {
         for (const url of entryToDelete.images) {
           try {
-            await deleteObject(ref(storage, url));
+            const filename = url.split("/").pop();
+            await apiClient.delete(`/api/storage/${filename}`);
           } catch (error) {
-            if (error.code !== 'storage/object-not-found') console.error("Lỗi xóa ảnh:", error);
+            console.error("Lỗi xóa ảnh:", error);
           }
         }
       }
-      await deleteDoc(doc(db, "hutthuoc_history", entryToDelete.id));
-    } catch (error) { console.error("Lỗi khi xóa vĩnh viễn:", error); alert("Xóa thất bại."); }
+      await dbService.deleteDoc("hutthuoc_history", entryToDelete.id);
+      fetchHistory();
+    } catch (error) {
+      console.error("Lỗi khi xóa vĩnh viễn:", error);
+      alert("Xóa thất bại.");
+    }
   };
 
   const filteredHistory = useMemo(() => {
@@ -212,10 +257,10 @@ function GiamSatHutThuoc({ user }) {
               {committeeUsers.map(u => (
                 <label key={u.id} style={{ display: 'flex', alignItems: 'center', padding: '10px 12px', cursor: 'pointer', borderBottom: '1px solid #f0f0f0' }}>
                   <input
-                    type="checkbox"
-                    checked={selected.includes(u.name)}
-                    onChange={() => handleSelectUser(u.name)}
-                    style={{ marginRight: 10, width: 16, height: 16, accentColor: orange }}
+                     type="checkbox"
+                     checked={selected.includes(u.name)}
+                     onChange={() => handleSelectUser(u.name)}
+                     style={{ marginRight: 10, width: 16, height: 16, accentColor: orange }}
                   />
                   {u.name}
                 </label>
@@ -289,7 +334,7 @@ function GiamSatHutThuoc({ user }) {
             style={{
               padding: '8px 16px',
               borderRadius: 6,
-              border: '1px solid #ccc',   // <-- ĐÃ SỬA Ở ĐÂY
+              border: '1px solid #ccc',
               background: '#f0f0f0',
               cursor: 'pointer',
               fontWeight: 600

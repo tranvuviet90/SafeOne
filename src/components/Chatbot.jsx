@@ -4,8 +4,7 @@ import './Chatbot.css';
 import chatIcon from '../assets/favicon.png'; // <-- 1. Import icon
 import { useI18n } from '../i18n/I18nProvider';
 import { callAIService } from '../utils/aiAdapter';
-import { db } from "../firebase";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
+import dbService from '../services/dbService';
 
 import { normalizeRole } from '../utils/string';
 import { parseMarkdown } from '../utils/markdown';
@@ -34,43 +33,30 @@ function Chatbot({ user }) {
         const canViewMSDS = userRoles.some(r => ["admin", "ehs", "manager"].includes(r));
         const canViewSOP = userRoles.some(r => ["admin", "ehs", "ehs committee", "trainer", "manager"].includes(r));
 
-        let unsubSOP = null;
-        let unsubMSDS = null;
+        const fetchDocs = async () => {
+            try {
+                const list = await dbService.getDocs("documents");
+                if (!Array.isArray(list)) return;
 
-        if (canViewSOP) {
-            const qSop = query(
-                collection(db, "documents"),
-                where("type", "in", ["sop", "quytrinh", "bieumau"])
-            );
-            unsubSOP = onSnapshot(qSop, (snapshot) => {
-                const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-                setSopDocs(list);
-            }, (error) => {
-                console.error("Lỗi tải SOP cho chatbot:", error);
-            });
-        } else {
-            setSopDocs([]);
-        }
+                if (canViewSOP) {
+                    const sops = list.filter(d => ["sop", "quytrinh", "bieumau"].includes(d.type));
+                    setSopDocs(sops);
+                } else {
+                    setSopDocs([]);
+                }
 
-        if (canViewMSDS) {
-            const qMsds = query(
-                collection(db, "documents"),
-                where("type", "==", "msds")
-            );
-            unsubMSDS = onSnapshot(qMsds, (snapshot) => {
-                const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-                setMsdsDocs(list);
-            }, (error) => {
-                console.error("Lỗi tải MSDS cho chatbot:", error);
-            });
-        } else {
-            setMsdsDocs([]);
-        }
-
-        return () => {
-            if (unsubSOP) unsubSOP();
-            if (unsubMSDS) unsubMSDS();
+                if (canViewMSDS) {
+                    const msds = list.filter(d => d.type === "msds");
+                    setMsdsDocs(msds);
+                } else {
+                    setMsdsDocs([]);
+                }
+            } catch (error) {
+                console.error("Lỗi tải tài liệu cho chatbot:", error);
+            }
         };
+
+        fetchDocs();
     }, [user]);
 
     // Tự động cuộn xuống khi có tin nhắn mới

@@ -1,13 +1,8 @@
 // File: Gemba.jsx (Tái cấu trúc giao diện và chức năng theo Daily Audit, lược bỏ tính điểm & nhắc nhở, lưu trữ qua tu_gemba_logs và Storage gemba_images)
 
 import React, { useState, useEffect, useRef } from "react";
-import { db, storage } from "../firebase";
-import {
-  doc, setDoc, onSnapshot, collection, addDoc, serverTimestamp,
-  query, where, getDocs, Timestamp, writeBatch, deleteDoc, getDoc,
-  updateDoc
-} from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
+import dbService from "../services/dbService";
+import apiClient from "../services/apiClient";
 import imageCompression from "browser-image-compression";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
@@ -15,6 +10,7 @@ import { colors } from "../theme";
 import { useI18n } from "../i18n/I18nProvider";
 import LightboxSwipeOnly, { useConfirm } from "./LightboxSwipeOnly";
 import { callAIService, callSpellCheckService } from "../utils/aiAdapter";
+import realtimeService from "../services/realtimeService";
 
 /* ====================== BIỂU TƯỢNG (ICON) ====================== */
 function ImprovementIcon({ color = 'currentColor', size = 18 }) {
@@ -48,6 +44,13 @@ const errorGroups = [
   { group: "Thái độ hợp tác", items: [ { code: "12.1", desc: "Không hợp tác xử lý an toàn" }, { code: "12.2", desc: "Thái độ đe dọa" }, { code: "12.3", desc: "Đánh người" }, { code: "12.4", desc: "QL không xử lý vi phạm của nhân viên" } ] },
   { group: "Lỗi Khác", items: [] },
 ];
+
+const serverTimestamp = () => new Date().toISOString();
+const Timestamp = {
+  fromDate(date) {
+    return date.toISOString();
+  }
+};
 
 /* =========================
    Hàm hỗ trợ ảnh và thời gian
@@ -93,10 +96,11 @@ async function makeThumbDataURL(url, maxW = 96, maxH = 96, quality = 0.55) {
 
 const safeTsToDate = (ts) => {
     if (!ts) return null;
-    if (ts instanceof Timestamp) return ts.toDate();
     if (ts.seconds) return new Date(ts.seconds * 1000);
     if (ts instanceof Date) return ts;
     if (typeof ts === 'string') {
+        const d = new Date(ts);
+        if (!isNaN(d.getTime())) return d;
         const parts = ts.match(/(\d+)/g);
         if (parts && parts.length === 6) {
             const [h, m, s, day, month, year] = parts.map(Number);
@@ -146,25 +150,22 @@ function ExportModal({ onClose, departments }) {
       const start = new Date(startDate); start.setHours(0, 0, 0, 0);
       const end = new Date(endDate); end.setHours(23, 59, 59, 999);
 
-      let qy = query(
-        collection(db, "tu_gemba_logs"),
-        where("timestamp", ">=", Timestamp.fromDate(start)),
-        where("timestamp", "<=", Timestamp.fromDate(end))
-      );
+      const allLogs = await dbService.getDocs("tu_gemba_logs");
+      const filteredLogs = allLogs.filter(ev => {
+        const ts = safeTsToDate(ev.timestamp);
+        if (!ts) return false;
+        const inDateRange = ts >= start && ts <= end;
+        const matchesDept = selectedDept === 'all' || ev.department === selectedDept;
+        return inDateRange && matchesDept;
+      });
 
-      if (selectedDept !== 'all') {
-        qy = query(qy, where("department", "==", selectedDept));
-      }
-
-      const eventsSnapshot = await getDocs(qy);
-      if (eventsSnapshot.empty) {
+      if (filteredLogs.length === 0) {
         alert("Không có dữ liệu trong khoảng ngày / bộ phận đã chọn.");
         setIsGenerating(false); return;
       }
       
       const rows = [];
-      eventsSnapshot.forEach((docSnap) => {
-        const ev = docSnap.data();
+      filteredLogs.forEach((ev) => {
         const ts = safeTsToDate(ev.timestamp);
         const dateISO = ts ? ts.toISOString().slice(0, 10) : "";
 
@@ -398,10 +399,15 @@ function ImprovementModal({ modalData, onClose, onSave }) {
     let imageUrl = modalData.error?.improvementImageUrl || null;
     if (improvementImageFile) {
       try {
-        // Tải lên thư mục gemba_improvement_images chung để tránh lỗi permission
-        const imageRef = ref(storage, `gemba_improvement_images/${Date.now()}_${improvementImageFile.name}`);
-        await uploadBytes(imageRef, improvementImageFile);
-        imageUrl = await getDownloadURL(imageRef);
+        const formData = new FormData();
+        formData.append("file", improvementImageFile);
+        formData.append("path", `gemba_improvement_images/${Date.now()}_${improvementImageFile.name}`);
+        const res = await apiClient.post("/api/storage/upload", formData, {
+          headers: {
+            "Content-Type": "multipart/form-data"
+          }
+        });
+        imageUrl = res.data.url;
       } catch (error) {
         console.error("Lỗi tải ảnh cải thiện: ", error);
         alert("Tải ảnh cải thiện thất bại!");
@@ -509,7 +515,7 @@ function EditErrorModal({ modalData, onClose, onSave }) {
       note,
       responsiblePerson,
       ca,
-      timestamp: Timestamp.fromDate(newDate)
+      timestamp: newDate.toISOString()
     };
 
     if (selectedGroup === "Lỗi Khác") {
@@ -602,7 +608,7 @@ function EditErrorModal({ modalData, onClose, onSave }) {
               <div style={{ display: 'flex', gap: 15, marginTop: 5 }}>
                 {["Nhẹ", "Nặng", "Nghiêm trọng"].map(level => (
                   <label key={level} style={{ fontSize: 13, cursor: 'pointer' }}>
-                    <input type="radio" name="editSeverity" value={level} checked={otherErrorSeverity === level} onChange={e => setOtherErrorSeverity(e.target.value)} style={{ marginRight: 4 }} />
+                     <input type="radio" name="editSeverity" value={level} checked={otherErrorSeverity === level} onChange={e => setOtherErrorSeverity(e.target.value)} style={{ marginRight: 4 }} />
                     {level}
                   </label>
                 ))}
@@ -684,24 +690,33 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
         return dateB - dateA;
     });
 
+  const fetchLogs = async () => {
+    if (!dep) return;
+    try {
+      const snap = await dbService.getDocs("tu_gemba_logs");
+      const logs = snap.filter(item => item.department === dep.name).map(item => ({ id: item.id || item.uid, ...item }));
+      setAllScores(logs);
+    } catch (error) {
+      console.warn("Lỗi fetch tu_gemba_logs:", error);
+      setAllScores([]);
+    }
+  };
+
   // Lắng nghe dữ liệu realtime trực tiếp từ tu_gemba_logs
   useEffect(() => {
     if (!dep) return;
     setLoading(true);
-    const q = query(collection(db, "tu_gemba_logs"), where("department", "==", dep.name));
-    const unsub = onSnapshot(q, (snap) => {
-      const logs = [];
-      snap.forEach(d => {
-        logs.push({ id: d.id, ...d.data() });
-      });
-      setAllScores(logs);
-      setLoading(false);
-    }, (error) => {
-      console.warn("Lỗi onSnapshot tu_gemba_logs:", error.code);
-      setAllScores([]);
-      setLoading(false);
+    fetchLogs().finally(() => setLoading(false));
+
+    const unsub = realtimeService.subscribeToPath("tu_gemba_logs", () => {
+      fetchLogs();
     });
-    return () => unsub();
+
+    const interval = setInterval(fetchLogs, 30000);
+    return () => {
+      unsub();
+      clearInterval(interval);
+    };
   }, [dep]);
 
   useEffect(() => {
@@ -737,9 +752,9 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
         timestamps[departmentName] = now;
         localStorage.setItem(storageKey, JSON.stringify(timestamps));
         if (user && user.uid) {
-          const prefRef = doc(db, "user_prefs", user.uid);
-          setDoc(prefRef, { [storageKey]: timestamps }, { merge: true }).catch(e => console.warn("Lưu prefs lỗi:", e));
+          dbService.updateDoc("user_prefs", user.uid, { [storageKey]: timestamps }).catch(e => console.warn("Lưu prefs lỗi:", e));
         }
+
         const updatedCounts = { ...newLogCounts, [departmentName]: 0 };
         setTuGembaNotifCounts(updatedCounts);
       } catch (e) { console.error("Lỗi khi cập nhật localStorage:", e); }
@@ -806,96 +821,83 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
 
   async function doSaveError(noteToUse) {
     setIsUploading(true);
-    let urls = [];
     try {
-      // 1. Tải ảnh lên Storage (Đổi thư mục từ tu_gemba_images sang gemba_images để tránh lỗi permission 403)
-      try {
-        console.log("Bắt đầu tải danh sách ảnh lên Firebase Storage...", imageFiles);
-        urls = await Promise.all(
-          imageFiles.map(async (file) => {
-            const imagePath = `gemba_images/${Date.now()}_${file.name}`;
-            console.log(`Đang tải ảnh: ${file.name} lên ref: ${imagePath}`);
-            const imageRef = ref(storage, imagePath);
-            await uploadBytes(imageRef, file);
-            const downloadUrl = await getDownloadURL(imageRef);
-            console.log(`Đã tải thành công ảnh: ${file.name} -> URL: ${downloadUrl}`);
-            return downloadUrl;
-          })
-        );
-      } catch (error) { 
-        console.error("Lỗi nghiêm trọng khi tải ảnh lên Storage: ", error); 
-        alert(`Tải ảnh thất bại: ${error.message || error}\nHãy kiểm tra xem Firebase Storage rules có chặn ghi hoặc cấu hình bucket bị sai không.`);
-        setIsUploading(false); 
-        return;
+      // 1. Upload ảnh lên local storage (sử dụng apiClient.post("/api/storage/upload"))
+      const urls = [];
+      for (const file of imageFiles) {
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("path", `gemba_images/${Date.now()}_${file.name}`);
+        const res = await apiClient.post("/api/storage/upload", formData, {
+          headers: { "Content-Type": "multipart/form-data" }
+        });
+        urls.push(res.data.url);
       }
-      // 2. Tạo logData
-      let logData;
-      if (isCustomError) {
-        logData = { 
+
+      // 2. Chuẩn bị logData
+      let logData = {};
+      const nowStr = new Date().toISOString();
+      if (selectedGroup === "Lỗi Khác") {
+        logData = {
           department: dep.name,
-          group: selectedGroup, 
-          code: `custom-${Date.now()}`, 
-          desc: "Lỗi khác", 
-          timestamp: serverTimestamp(), 
-          imageUrls: urls, 
-          note: noteToUse, 
+          group: selectedGroup,
+          code: `custom-${Date.now()}`,
+          desc: "Lỗi khác",
+          point: 2, // Mức mặc định
+          timestamp: nowStr,
+          imageUrls: urls,
+          note: noteToUse,
           responsiblePerson: responsiblePerson.trim(),
           ca: ca,
           userId: user.uid,
-          addedBy: user.name 
+          addedBy: user.name
         };
       } else {
         const errors = (errorGroups.find((g) => g.group === selectedGroup) || { items: [] }).items;
         const err = errors.find((e) => e.code === selectedError);
-        logData = { 
+        logData = {
           department: dep.name,
-          group: selectedGroup, 
-          ...err, 
-          timestamp: serverTimestamp(), 
-          imageUrls: urls, 
-          note: noteToUse, 
+          group: selectedGroup,
+          ...err,
+          timestamp: nowStr,
+          imageUrls: urls,
+          note: noteToUse,
           responsiblePerson: responsiblePerson.trim(),
           ca: ca,
           userId: user.uid,
-          addedBy: user.name 
+          addedBy: user.name
         };
       }
-      
-      // 3. Lưu vào Firestore tu_gemba_logs
-      try {
-        console.log("Bắt đầu lưu log vi phạm vào Firestore 'tu_gemba_logs'...", logData);
-        const docRef = await addDoc(collection(db, "tu_gemba_logs"), logData);
-        console.log("Đã lưu Firestore thành công! ID tài liệu mới: ", docRef.id);
-      } catch (error) {
-        console.error("Lỗi nghiêm trọng khi ghi vào Firestore tu_gemba_logs:", error);
-        alert(`Không thể lưu lỗi vào cơ sở dữ liệu (Firestore): ${error.message || error}\nVui lòng kiểm tra lại quyền hạn (Firestore Security Rules) hoặc cấu hình kết nối.`);
-        setIsUploading(false);
-        return;
-      }
+
+      // 3. Lưu vào tu_gemba_logs
+      console.log("Bắt đầu lưu log vi phạm vào tu_gemba_logs...", logData);
+      const docRef = await dbService.createDoc("tu_gemba_logs", logData);
+      console.log("Đã lưu thành công! ID tài liệu mới: ", docRef.id || docRef.uid);
+      await fetchLogs();
 
       // 4. Gửi thông báo
       const errorTimeSec = Math.floor(Date.now() / 1000);
       const notificationRelatedId = `tugemba-${dep.name}-${logData.code || 'nocode'}-${errorTimeSec}`;
       try {
-        await addDoc(collection(db, "notifications"), {
+        await dbService.createDoc("notifications", {
           type: "new_tu_gemba_error",
           message: `${user.name} đã thêm lỗi mới tại ${dep.name} (Gemba): ${logData.desc}`,
           targetRoles: ["ehs", "admin", "ehs committee"],
           createdBy: user.uid,
           readBy: [],
           relatedId: notificationRelatedId,
-          timestamp: serverTimestamp()
+          timestamp: nowStr
         });
       } catch (e) {
         console.error("Lỗi gửi thông báo:", e);
       }
 
       // 5. Reset Form và kết thúc
-      setSelectedError(""); 
+      setSelectedError("");
       setImageFiles([]);
       setImageFileNames([]);
       if (fileRef.current) fileRef.current.value = "";
-      setNote(""); 
+      setNote("");
       setResponsiblePerson("");
       setCa("S1");
     } catch (globalError) {
@@ -911,7 +913,7 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
     if (!errorToDelete) return;
     if (await askConfirm(`Bạn có chắc muốn XÓA VĨNH VIỄN lỗi "${errorToDelete.desc}" không?`, "Xác nhận xóa lỗi")) {
         try {
-          await deleteDoc(doc(db, "tu_gemba_logs", logId));
+          await dbService.deleteDoc("tu_gemba_logs", logId);
         } catch (err) {
           console.error("Lỗi khi xóa khỏi tu_gemba_logs:", err);
           alert("Xóa vi phạm thất bại!");
@@ -920,76 +922,74 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
 
         // Xóa toàn bộ comment liên quan trong audit_comments
         try {
-          const qComments = query(collection(db, "audit_comments"), where("eventId", "==", logId));
-          const snapComments = await getDocs(qComments);
-          if (!snapComments.empty) {
-            const batchComments = writeBatch(db);
-            snapComments.forEach(d => batchComments.delete(d.ref));
-            await batchComments.commit();
+          const allComments = await dbService.getDocs("audit_comments");
+          const relatedComments = allComments.filter(c => c.eventId === logId);
+          if (relatedComments.length > 0) {
+            const batchOps = relatedComments.map(c => ({
+              type: "delete",
+              collection: "audit_comments",
+              id: c.id || c.uid
+            }));
+            await dbService.commitBatch(batchOps);
             console.log("Đã xóa toàn bộ bình luận liên quan cho logId:", logId);
           }
         } catch (err) {
           console.error("Lỗi khi xóa bình luận liên quan:", err);
         }
 
+        // Xóa ảnh từ local storage
         const images = errorToDelete.imageUrls || (errorToDelete.imageUrl ? [errorToDelete.imageUrl] : []);
         for (const url of images) {
-          try { await deleteObject(ref(storage, url)); } catch (e) { console.error("Lỗi xóa ảnh gốc:", e); }
+          try {
+            const filename = url.substring(url.lastIndexOf('/') + 1);
+            await apiClient.delete(`/api/storage/${filename}`);
+          } catch (e) {
+            console.error("Lỗi xóa ảnh gốc:", e);
+          }
         }
         if (errorToDelete.improvementImageUrl) {
-          try { await deleteObject(ref(storage, errorToDelete.improvementImageUrl)); } catch(e) { console.error("Lỗi xóa ảnh cải thiện:", e); }
+          try {
+            const url = errorToDelete.improvementImageUrl;
+            const filename = url.substring(url.lastIndexOf('/') + 1);
+            await apiClient.delete(`/api/storage/${filename}`);
+          } catch(e) {
+            console.error("Lỗi xóa ảnh cải thiện:", e);
+          }
         }
 
+        // Xóa thông báo liên quan
         let errorSec = 0;
         if (errorToDelete.timestamp) {
-          if (typeof errorToDelete.timestamp.seconds === 'number') {
-            errorSec = errorToDelete.timestamp.seconds;
-          } else {
-            const dt = safeTsToDate(errorToDelete.timestamp);
-            if (dt) errorSec = Math.floor(dt.getTime() / 1000);
-          }
+          const dt = safeTsToDate(errorToDelete.timestamp);
+          if (dt) errorSec = Math.floor(dt.getTime() / 1000);
         }
         const deleteRelatedId = `tugemba-${dep.name}-${errorToDelete.code || 'nocode'}-${errorSec}`;
         try {
-          const qNotif = query(collection(db, "notifications"), where("relatedId", "==", deleteRelatedId));
-          const snapNotif = await getDocs(qNotif);
-          
-          if (!snapNotif.empty) {
-            const batchNotif = writeBatch(db);
-            snapNotif.forEach(d => batchNotif.delete(d.ref));
-            await batchNotif.commit();
-          } else {
-            const prefix = `tugemba-${dep.name}-${errorToDelete.code || 'nocode'}-`;
-            const qPrefix = query(
-              collection(db, "notifications"),
-              where("relatedId", ">=", prefix),
-              where("relatedId", "<", prefix + "\uf8ff")
-            );
-            const snapPrefix = await getDocs(qPrefix);
-            if (!snapPrefix.empty) {
-              const batchNotif = writeBatch(db);
-              let deletedCount = 0;
-              snapPrefix.forEach(d => {
-                const data = d.data();
-                const notifRelatedId = data.relatedId || "";
-                const parts = notifRelatedId.split("-");
-                const notifSec = Number(parts[parts.length - 1]);
-                if (!isNaN(notifSec) && Math.abs(notifSec - errorSec) < 60) {
-                  batchNotif.delete(d.ref);
-                  deletedCount++;
-                } else if (errorToDelete.code?.startsWith("custom-")) {
-                  batchNotif.delete(d.ref);
-                  deletedCount++;
-                }
-              });
-              if (deletedCount > 0) {
-                await batchNotif.commit();
-              }
+          const allNotifs = await dbService.getDocs("notifications");
+          const prefix = `tugemba-${dep.name}-${errorToDelete.code || 'nocode'}-`;
+          const relatedNotifs = allNotifs.filter(n => {
+            if (n.relatedId === deleteRelatedId) return true;
+            if (n.relatedId && n.relatedId.startsWith(prefix)) {
+              const parts = n.relatedId.split("-");
+              const notifSec = Number(parts[parts.length - 1]);
+              if (!isNaN(notifSec) && Math.abs(notifSec - errorSec) < 60) return true;
+              if (errorToDelete.code?.startsWith("custom-")) return true;
             }
+            return false;
+          });
+
+          if (relatedNotifs.length > 0) {
+            const batchOps = relatedNotifs.map(n => ({
+              type: "delete",
+              collection: "notifications",
+              id: n.id || n.uid
+            }));
+            await dbService.commitBatch(batchOps);
           }
         } catch (err) {
           console.error("Lỗi khi xóa thông báo liên quan:", err);
         }
+        await fetchLogs();
     }
   }
 
@@ -998,12 +998,12 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
     if (!errorToDelete) return;
     if (await askConfirm(`Bạn có chắc muốn gửi yêu cầu xóa lỗi "${errorToDelete.desc}" đến EHS duyệt không?`, "Yêu cầu xóa lỗi")) {
       try {
-        const docRef = doc(db, "tu_gemba_logs", logId);
-        await updateDoc(docRef, {
+        await dbService.updateDoc("tu_gemba_logs", logId, {
           deleteRequested: true,
           deleteRequestedBy: user.name,
           deleteRequestedAt: new Date().toLocaleString("vi-VN")
         });
+        await fetchLogs();
         alert("Đã gửi yêu cầu xóa lỗi. Vui lòng chờ EHS duyệt!");
       } catch (err) {
         console.error("Lỗi gửi yêu cầu xóa:", err);
@@ -1014,13 +1014,12 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
 
   async function handleCancelDeleteRequest(logId) {
     try {
-      const docRef = doc(db, "tu_gemba_logs", logId);
-      const { deleteField } = await import("firebase/firestore");
-      await updateDoc(docRef, {
-        deleteRequested: deleteField(),
-        deleteRequestedBy: deleteField(),
-        deleteRequestedAt: deleteField()
+      await dbService.updateDoc("tu_gemba_logs", logId, {
+        deleteRequested: null,
+        deleteRequestedBy: null,
+        deleteRequestedAt: null
       });
+      await fetchLogs();
       alert("Đã từ chối yêu cầu xóa!");
     } catch (err) {
       console.error("Lỗi từ chối xóa:", err);
@@ -1040,19 +1039,19 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
       newDueDateHistory.push(changeMsg);
     }
 
-    const docRef = doc(db, "tu_gemba_logs", logId);
-    await updateDoc(docRef, {
+    await dbService.updateDoc("tu_gemba_logs", logId, {
       ...improvementData,
       dueDateHistory: newDueDateHistory
     });
+    await fetchLogs();
   };
 
   const handleSaveEditError = async (logId, updatedData) => {
     const errorToUpdate = allScores.find(s => s.id === logId);
     if (!errorToUpdate) return;
 
-    const docRef = doc(db, "tu_gemba_logs", logId);
-    await updateDoc(docRef, updatedData);
+    await dbService.updateDoc("tu_gemba_logs", logId, updatedData);
+    await fetchLogs();
   };
   
   const ActionButton = ({ onClick, title, children, color = "#555", bg = "#f0f0f0" }) => (
@@ -1290,7 +1289,7 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
                   )}
                 </div>
               ) : (
-    <table style={{ marginTop: 10, width: "100%", borderCollapse: "separate", borderSpacing: 0, boxShadow: `0 1.5px 10px ${colors.primary}11`, border: `1.2px solid ${colors.primaryLight}`, background: colors.surface, borderRadius: 12, overflow: "hidden" }}>
+                <table style={{ marginTop: 10, width: "100%", borderCollapse: "separate", borderSpacing: 0, boxShadow: `0 1.5px 10px ${colors.primary}11`, border: `1.2px solid ${colors.primaryLight}`, background: colors.surface, borderRadius: 12, overflow: "hidden" }}>
                   <thead>
                     <tr style={{ background: colors.primaryLight }}>
                         <th style={{ padding: "10px 14px", color: colors.textPrimary }}>{t("gemba.table.time")}</th>
@@ -1435,61 +1434,63 @@ function CommentModal({ isOpen, onClose, eventId, user, error }) {
   const [loadingComments, setLoadingComments] = useState(false);
   const scrollRef = useRef();
 
+  const fetchComments = async () => {
+    try {
+      const list = await dbService.getDocs("audit_comments");
+      const filtered = list.filter(c => c.eventId === eventId);
+      filtered.sort((a, b) => {
+        const timeA = a.timestamp?.seconds ? a.timestamp.seconds * 1000 : (typeof a.timestamp === "string" ? new Date(a.timestamp).getTime() : 0);
+        const timeB = b.timestamp?.seconds ? b.timestamp.seconds * 1000 : (typeof b.timestamp === "string" ? new Date(b.timestamp).getTime() : 0);
+        return timeA - timeB;
+      });
+      setComments(filtered);
+    } catch (err) {
+      console.error("Lỗi khi lấy bình luận:", err);
+    }
+  };
+
   useEffect(() => {
     if (!isOpen || !eventId) return;
     setLoadingComments(true);
-    const q = query(
-      collection(db, "audit_comments"),
-      where("eventId", "==", eventId)
-    );
-    const unsub = onSnapshot(q, (snap) => {
-      const list = [];
-      snap.forEach(d => {
-        list.push({ id: d.id, ...d.data() });
-      });
-      list.sort((a, b) => {
-        const timeA = a.timestamp?.seconds ? a.timestamp.seconds * 1000 : a.timestamp || 0;
-        const timeB = b.timestamp?.seconds ? b.timestamp.seconds * 1000 : b.timestamp || 0;
-        return timeA - timeB;
-      });
-      setComments(list);
-      setLoadingComments(false);
-      
-      setTimeout(() => {
-        if (scrollRef.current) {
-          scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-        }
-      }, 50);
-    });
-    return unsub;
+    fetchComments().finally(() => setLoadingComments(false));
+    const interval = setInterval(fetchComments, 10000);
+    return () => clearInterval(interval);
   }, [isOpen, eventId]);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [comments]);
 
   const handleSend = async () => {
     if (!newComment.trim()) return;
     const txt = newComment.trim();
     setNewComment("");
     try {
-      await addDoc(collection(db, "audit_comments"), {
+      const nowStr = new Date().toISOString();
+      await dbService.createDoc("audit_comments", {
         eventId,
         userId: user.uid,
         userName: user.name,
         text: txt,
-        timestamp: serverTimestamp()
+        timestamp: nowStr
       });
 
       // Gửi thông báo cho người tạo lỗi nếu người comment khác người tạo lỗi
       const creatorUid = error?.userId;
       if (creatorUid && creatorUid !== user.uid) {
         const errorDesc = error?.desc || "Lỗi vi phạm";
-        await addDoc(collection(db, "notifications"), {
+        await dbService.createDoc("notifications", {
           type: "new_gemba_comment",
           message: `${user.name} đã bình luận về lỗi Gemba của bạn ("${errorDesc}")`,
           targetUserId: creatorUid,
           createdBy: user.uid,
           readBy: [],
-          timestamp: serverTimestamp()
+          timestamp: nowStr
         });
       }
+      await fetchComments();
     } catch (err) {
       console.error("Lỗi gửi bình luận:", err);
       alert("Không thể gửi bình luận.");
@@ -1564,28 +1565,39 @@ function CommentModal({ isOpen, onClose, eventId, user, error }) {
 async function runCleanup() {
     const oneYearAgo = new Date();
     oneYearAgo.setMonth(oneYearAgo.getMonth() - 12);
-    const oneYearAgoTimestamp = Timestamp.fromDate(oneYearAgo);
     try {
-        const oldLogsQuery = query(collection(db, "tu_gemba_logs"), where("timestamp", "<=", oneYearAgoTimestamp));
-        const oldLogsSnap = await getDocs(oldLogsQuery);
-        if (oldLogsSnap.empty) return;
-        let batch = writeBatch(db); let count = 0;
+        const oldLogs = await dbService.getDocs("tu_gemba_logs");
+        const toDelete = oldLogs.filter(log => {
+          const dt = safeTsToDate(log.timestamp);
+          return dt && dt <= oneYearAgo;
+        });
+        if (toDelete.length === 0) return;
+        
+        let batchOps = [];
         const imagesToDelete = [];
-        for (const document of oldLogsSnap.docs) {
-            const logData = document.data();
+        for (const logData of toDelete) {
             const allImages = [...(logData.imageUrls || []), ...(logData.imageUrl ? [logData.imageUrl] : []), ...(logData.improvementImageUrl ? [logData.improvementImageUrl] : [])];
             imagesToDelete.push(...allImages);
-            batch.delete(document.ref);
-            count++;
-            if (count >= 400) { await batch.commit(); batch = writeBatch(db); count = 0; }
+            batchOps.push({
+              type: "delete",
+              collection: "tu_gemba_logs",
+              id: logData.id || logData.uid
+            });
+            if (batchOps.length >= 400) {
+              await dbService.commitBatch(batchOps);
+              batchOps = [];
+            }
         }
-        if (count > 0) await batch.commit();
+        if (batchOps.length > 0) {
+          await dbService.commitBatch(batchOps);
+        }
+        
         for (const url of imagesToDelete) {
             try {
-                const imageRef = ref(storage, url);
-                await deleteObject(imageRef);
+                const filename = url.substring(url.lastIndexOf('/') + 1);
+                await apiClient.delete(`/api/storage/${filename}`);
             } catch (error) {
-                if (error.code !== 'storage/not-found') { console.error("Lỗi xóa ảnh cũ từ Storage:", error); }
+                console.error("Lỗi xóa ảnh cũ từ Storage:", error);
             }
         }
     } catch (error) { console.error("Lỗi trong quá trình cleanup Gemba:", error); }

@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from "react";
-import { db } from "../firebase";
-import { doc, setDoc, onSnapshot, collection, query, where, getDocs, addDoc, serverTimestamp, writeBatch, getDoc } from "firebase/firestore";
+import dbService from "../services/dbService";
 import { useI18n } from "../i18n/I18nProvider";
 import { useConfirm } from "./LightboxSwipeOnly";
+import realtimeService from "../services/realtimeService";
 
 const DEFAULT_COUNT = 15;
+const MIN_COUNT = 15;
 const orange = "#466E73";
 const orangeLight = "#A9D9D4";
 const dark = "#222";
@@ -51,43 +52,80 @@ function BoDam({ user, isMobile }) {
   const userRolesList = user?.role ? (Array.isArray(user.role) ? user.role.map(r => String(r).toLowerCase()) : String(user.role).split(',').map(r => r.trim().toLowerCase())) : [];
   const isAdmin = userRolesList.some(r => r === "admin" || r === "ehs");
 
-  // Lấy số lượng bộ đàm từ Firestore config
+  const fetchConfig = async () => {
+    try {
+      const snap = await dbService.getDoc("bodam", "config");
+      if (snap && snap._exists !== false && snap.count) {
+        setBodamCount(snap.count);
+      } else {
+        setBodamCount(DEFAULT_COUNT);
+      }
+    } catch (e) {
+      console.error("Lỗi lấy cấu hình bộ đàm:", e);
+    }
+  };
+
+  const fetchStatus = async () => {
+    try {
+      const docSnap = await dbService.getDoc("bodam", "status");
+      if (docSnap && docSnap._exists !== false && docSnap.status) {
+        setStatus(docSnap.status);
+      }
+    } catch (e) {
+      console.error("Lỗi lấy trạng thái bộ đàm:", e);
+    }
+  };
+
   useEffect(() => {
-    const configRef = doc(db, "bodam", "config");
-    const unsub = onSnapshot(configRef, (snap) => {
-      if (snap.exists() && snap.data().count) {
-        setBodamCount(snap.data().count);
+    fetchConfig();
+    fetchStatus();
+
+    const unsubConfig = realtimeService.subscribeToPath("bodam/config", (data) => {
+      if (data && data.count) {
+        setBodamCount(data.count);
       } else {
         setBodamCount(DEFAULT_COUNT);
       }
     });
-    return unsub;
-  }, []);
 
-  // Lấy trạng thái bộ đàm từ Firestore
-  useEffect(() => {
-    const docRef = doc(db, "bodam", "status");
-    const unsub = onSnapshot(docRef, (docSnap) => {
-      if (docSnap.exists() && docSnap.data().status) {
-        setStatus(docSnap.data().status);
+    const unsubStatus = realtimeService.subscribeToPath("bodam/status", (data) => {
+      if (data && data.status) {
+        setStatus(data.status);
       }
     });
-    return unsub;
+
+    // Fallback polling interval (30 seconds)
+    const intervalId = setInterval(() => {
+      fetchConfig();
+      fetchStatus();
+    }, 30000);
+
+    return () => {
+      unsubConfig();
+      unsubStatus();
+      clearInterval(intervalId);
+    };
   }, []);
 
   const [committeeUsers, setCommitteeUsers] = useState([]);
   useEffect(() => {
     const fetchUsers = async () => {
-      const q = query(collection(db, "users"), where("role", "==", "ehs committee"));
-      const snap = await getDocs(q);
-      const users = [];
-      snap.forEach(d => users.push({ uid: d.id, ...d.data() }));
-      setCommitteeUsers(users);
+      try {
+        const usersList = await dbService.getDocs("users");
+        if (Array.isArray(usersList)) {
+          const committee = usersList.filter(u => {
+            const roles = Array.isArray(u.role) ? u.role : String(u.role).split(",").map(r => r.trim());
+            return roles.map(r => r.toLowerCase()).includes("ehs committee");
+          });
+          setCommitteeUsers(committee);
+        }
+      } catch (err) {
+        console.error("Lỗi lấy danh sách committee:", err);
+      }
     };
     if (isAdmin) fetchUsers();
   }, [isAdmin]);
 
-  // Lấy item cho index, nếu chưa có thì trả về default
   function getItem(idx) {
     return status[idx] || { checked: false, name: "", unavailable: false };
   }
@@ -96,15 +134,20 @@ function BoDam({ user, isMobile }) {
     return `Bộ đàm ${idx + 1}`;
   }
 
-  // Thêm bộ đàm
   async function handleAddBodam() {
     const newCount = bodamCount + 1;
-    await setDoc(doc(db, "bodam", "config"), { count: newCount });
+    await dbService.updateDoc("bodam", "config", { count: newCount });
+    fetchConfig();
   }
 
-  // Bớt bộ đàm (chỉ xóa nếu bộ đàm cuối chưa được sử dụng)
   async function handleRemoveBodam() {
-    if (bodamCount <= 1) return;
+    if (bodamCount <= MIN_COUNT) {
+      await askConfirm(
+        `Không thể giảm xuống dưới ${MIN_COUNT} bộ đàm.`,
+        "Không thể xóa"
+      );
+      return;
+    }
     const lastIdx = bodamCount - 1;
     const lastItem = getItem(lastIdx);
     if (lastItem.checked || lastItem.assignedTo) {
@@ -116,12 +159,14 @@ function BoDam({ user, isMobile }) {
     }
     if (!(await askConfirm(`Bạn có chắc muốn xóa Bộ đàm ${lastIdx + 1} không?`, "Xác nhận xóa bộ đàm"))) return;
     const newCount = bodamCount - 1;
-    await setDoc(doc(db, "bodam", "config"), { count: newCount });
-    // Dọn trạng thái nếu có
+    await dbService.updateDoc("bodam", "config", { count: newCount });
+    fetchConfig();
+
     const newStatus = [...status];
     if (newStatus.length > newCount) {
       newStatus.splice(newCount);
-      await setDoc(doc(db, "bodam", "status"), { status: newStatus });
+      await dbService.updateDoc("bodam", "status", { status: newStatus });
+      fetchStatus();
     }
   }
 
@@ -133,16 +178,18 @@ function BoDam({ user, isMobile }) {
     
     currentShifts[shiftKey] = { uid: targetUserId, name: targetUserName };
     newStatus[idx] = { ...cur, assignedTo: currentShifts };
-    await setDoc(doc(db, "bodam", "status"), { status: newStatus });
+    await dbService.updateDoc("bodam", "status", { status: newStatus });
+    fetchStatus();
+
     try {
-      await addDoc(collection(db, "notifications"), {
+      await dbService.createDoc("notifications", {
         type: "bodam_assign",
         message: `Bạn được chỉ định sử dụng ${getBodamName(idx)} ở ca ${shiftKey}. Hãy vào tab Bộ đàm để chấp nhận.`,
-        targetUserId: targetUserId,
+        target_user_id: targetUserId,
         createdBy: user.uid,
-        readBy: [],
+        read_by: [],
         relatedId: `bodam-${idx}-${shiftKey}-${targetUserId}`,
-        timestamp: serverTimestamp()
+        timestamp: new Date().toISOString()
       });
     } catch (e) { console.error(e); }
   }
@@ -157,13 +204,20 @@ function BoDam({ user, isMobile }) {
     
     const hasAssignments = Object.values(currentShifts).some(u => u !== null);
     newStatus[idx] = { ...cur, assignedTo: hasAssignments ? currentShifts : null };
-    await setDoc(doc(db, "bodam", "status"), { status: newStatus });
+    await dbService.updateDoc("bodam", "status", { status: newStatus });
+    fetchStatus();
+
     try {
-      const q = query(collection(db, "notifications"), where("relatedId", "==", `bodam-${idx}-${shiftKey}-${targetUserId}`));
-      const snap = await getDocs(q);
-      const batch = writeBatch(db);
-      snap.forEach(d => batch.delete(d.ref));
-      await batch.commit();
+      const notifs = await dbService.getDocs("notifications");
+      const relatedId = `bodam-${idx}-${shiftKey}-${targetUserId}`;
+      const matchedNotifs = notifs.filter(n => n.relatedId === relatedId);
+      if (matchedNotifs.length > 0) {
+        const operations = matchedNotifs.map(n => ({
+          method: "DELETE",
+          path: `/api/db/notifications/${n.id}`
+        }));
+        await dbService.commitBatch(operations);
+      }
     } catch (err) { console.error("Lỗi xóa thông báo chỉ định:", err); }
   }
 
@@ -171,20 +225,24 @@ function BoDam({ user, isMobile }) {
     const newStatus = [...status];
     while (newStatus.length <= idx) newStatus.push({ checked: false, name: "", unavailable: false });
     newStatus[idx] = { ...newStatus[idx], checked: true, name: user.name };
-    await setDoc(doc(db, "bodam", "status"), { status: newStatus });
+    await dbService.updateDoc("bodam", "status", { status: newStatus });
+    fetchStatus();
+
     try {
-      const q = query(collection(db, "notifications"), 
-        where("targetUserId", "==", user.uid),
-        where("type", "==", "bodam_assign")
+      const notifs = await dbService.getDocs("notifications");
+      const matchedNotifs = notifs.filter(n => 
+        n.target_user_id === user.uid && 
+        n.type === "bodam_assign" && 
+        n.relatedId && 
+        n.relatedId.startsWith(`bodam-${idx}-`)
       );
-      const snap = await getDocs(q);
-      const batch = writeBatch(db);
-      snap.forEach(d => {
-        if (d.data().relatedId && d.data().relatedId.startsWith(`bodam-${idx}-`)) {
-          batch.delete(d.ref);
-        }
-      });
-      await batch.commit();
+      if (matchedNotifs.length > 0) {
+        const operations = matchedNotifs.map(n => ({
+          method: "DELETE",
+          path: `/api/db/notifications/${n.id}`
+        }));
+        await dbService.commitBatch(operations);
+      }
     } catch (err) { console.error("Lỗi tự dọn dẹp thông báo:", err); }
   }
 
@@ -195,7 +253,8 @@ function BoDam({ user, isMobile }) {
     while (newStatus.length <= idx) newStatus.push({ checked: false, name: "", unavailable: false });
     const cur = newStatus[idx];
     newStatus[idx] = cur.checked ? { ...cur, checked: false, name: "" } : { ...cur, checked: true, name: user.name };
-    await setDoc(doc(db, "bodam", "status"), { status: newStatus });
+    await dbService.updateDoc("bodam", "status", { status: newStatus });
+    fetchStatus();
   }
 
   async function handleToggleUnavailable(idx) {
@@ -203,7 +262,8 @@ function BoDam({ user, isMobile }) {
     while (newStatus.length <= idx) newStatus.push({ checked: false, name: "", unavailable: false });
     const cur = newStatus[idx];
     newStatus[idx] = { ...cur, unavailable: !cur.unavailable, checked: false, name: '' };
-    await setDoc(doc(db, "bodam", "status"), { status: newStatus });
+    await dbService.updateDoc("bodam", "status", { status: newStatus });
+    fetchStatus();
   }
 
   const indices = Array.from({ length: bodamCount }, (_, i) => i);
@@ -225,9 +285,9 @@ function BoDam({ user, isMobile }) {
             >+</button>
             <button
               onClick={handleRemoveBodam}
-              title="Bớt bộ đàm cuối"
-              style={{ background: bodamCount <= 1 ? '#ccc' : red, color: 'white', border: 'none', borderRadius: 7, width: 34, height: 34, fontSize: 22, cursor: bodamCount <= 1 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}
-              disabled={bodamCount <= 1}
+              title={bodamCount <= MIN_COUNT ? `Tối thiểu ${MIN_COUNT} bộ đàm` : "Bớt bộ đàm cuối"}
+              style={{ background: bodamCount <= MIN_COUNT ? '#ccc' : red, color: 'white', border: 'none', borderRadius: 7, width: 34, height: 34, fontSize: 22, cursor: bodamCount <= MIN_COUNT ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}
+              disabled={bodamCount <= MIN_COUNT}
             >−</button>
           </div>
         )}
@@ -310,13 +370,13 @@ function BoDam({ user, isMobile }) {
           })}
         </div>
       ) : (
-        <table style={{ borderCollapse: "separate", borderSpacing: 0, width: "100%", background: "#fff", borderRadius: 14, overflow: "hidden", boxShadow: "0 1.5px 9px #E88E2E11", border: `1.2px solid ${orangeLight}` }}>
+        <table style={{ borderCollapse: "separate", borderSpacing: 0, width: "100%", maxWidth: 820, background: "#fff", borderRadius: 14, overflow: "hidden", boxShadow: "0 1.5px 9px #E88E2E11", border: `1.2px solid ${orangeLight}` }}>
           <thead>
             <tr style={{ background: orangeLight }}>
-              <th style={{ padding: "12px 24px", fontSize: 17, color: dark, textAlign: "left" }}>{t("bodam.col.name")}</th>
-              <th style={{ padding: "12px 24px", fontSize: 17, color: dark, textAlign: "left" }}>{t("bodam.col.status")}</th>
+              <th style={{ padding: "10px 14px", fontSize: 15, color: dark, textAlign: "left", whiteSpace: "nowrap", width: 110 }}>{t("bodam.col.name")}</th>
+              <th style={{ padding: "10px 14px", fontSize: 15, color: dark, textAlign: "left" }}>{t("bodam.col.status")}</th>
               {isAdmin && (
-                <th style={{ padding: "12px 24px", fontSize: 17, color: dark, textAlign: "left" }}>{t("bodam.col.action")}</th>
+                <th style={{ padding: "10px 14px", fontSize: 15, color: dark, textAlign: "left" }}>{t("bodam.col.action")}</th>
               )}
             </tr>
           </thead>
@@ -329,8 +389,8 @@ function BoDam({ user, isMobile }) {
               const canCheck = !item.unavailable && (!hasAssignments || isUserAssigned);
               return (
                 <tr key={idx} style={{ background: idx % 2 ? "#F4FAF9" : "#fff", opacity: item.unavailable ? 0.5 : 1 }}>
-                  <td style={{ padding: "15px 22px", fontWeight: 600, color: dark }}>{getBodamName(idx)}</td>
-                  <td style={{ padding: "15px 22px" }}>
+                  <td style={{ padding: "12px 14px", fontWeight: 600, color: dark, whiteSpace: "nowrap" }}>{getBodamName(idx)}</td>
+                  <td style={{ padding: "12px 14px" }}>
                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                       <input type="checkbox" checked={item.checked || false} disabled={!canCheck} style={{ width: 20, height: 20, accentColor: orange, marginRight: 6, cursor: (!canCheck) ? 'not-allowed' : 'pointer', verticalAlign: 'middle' }} onChange={() => handleCheck(idx)} />
                       {item.unavailable ? (
@@ -352,22 +412,23 @@ function BoDam({ user, isMobile }) {
                     </div>
                   </td>
                   {isAdmin && (
-                    <td style={{ padding: "15px 22px" }}>
-                      <button onClick={() => handleToggleUnavailable(idx)} style={{ background: item.unavailable ? '#f0ad4e' : '#6c757d', color: 'white', border: 'none', padding: '6px 12px', borderRadius: 6, fontWeight: 600, cursor: 'pointer', marginRight: 8, verticalAlign: 'middle' }}>
+                    <td style={{ padding: "12px 14px" }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8 }}>
+                      <button onClick={() => handleToggleUnavailable(idx)} style={{ background: item.unavailable ? '#f0ad4e' : '#6c757d', color: 'white', border: 'none', padding: '6px 12px', borderRadius: 6, fontWeight: 600, cursor: 'pointer' }}>
                         {item.unavailable ? t("bodam.reopen") : t("bodam.markUnavailable")}
                       </button>
                       {!item.unavailable && (
-                        <div style={{ display: 'inline-flex', flexWrap: 'nowrap', gap: '6px', verticalAlign: 'middle', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center', maxWidth: 360 }}>
                           {SHIFTS.map(sh => {
                             const val = assignedShifts[sh];
                             return (
-                              <div key={sh} style={{ 
-                                display: 'inline-flex', 
-                                alignItems: 'center', 
-                                background: val ? '#E5F4F2' : '#f5f5f5', 
-                                padding: '2px 6px', 
-                                borderRadius: 6, 
-                                border: `1px solid ${val ? orange : orangeLight}`, 
+                              <div key={sh} style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                background: val ? '#E5F4F2' : '#f5f5f5',
+                                padding: '2px 6px',
+                                borderRadius: 6,
+                                border: `1px solid ${val ? orange : orangeLight}`,
                                 fontSize: 12,
                                 whiteSpace: 'nowrap'
                               }}>
@@ -401,6 +462,7 @@ function BoDam({ user, isMobile }) {
                           })}
                         </div>
                       )}
+                      </div>
                     </td>
                   )}
                 </tr>

@@ -1,12 +1,34 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { db } from '../firebase';
-import {
-  doc, onSnapshot, setDoc, updateDoc, getDoc,
-  serverTimestamp, arrayUnion, writeBatch,
-  collection, addDoc
-} from 'firebase/firestore';
+import originalDbService from '../services/dbService';
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+import realtimeService from "../services/realtimeService";
+
+let globalRefreshCallback = null;
+const dbService = {
+  getDoc: (col, id) => originalDbService.getDoc(col, id),
+  getDocs: (col) => originalDbService.getDocs(col),
+  createDoc: async (col, data) => {
+    const res = await originalDbService.createDoc(col, data);
+    if (globalRefreshCallback) globalRefreshCallback();
+    return res;
+  },
+  updateDoc: async (col, id, data) => {
+    const res = await originalDbService.updateDoc(col, id, data);
+    if (globalRefreshCallback) globalRefreshCallback();
+    return res;
+  },
+  deleteDoc: async (col, id) => {
+    const res = await originalDbService.deleteDoc(col, id);
+    if (globalRefreshCallback) globalRefreshCallback();
+    return res;
+  },
+  commitBatch: async (ops) => {
+    const res = await originalDbService.commitBatch(ops);
+    if (globalRefreshCallback) globalRefreshCallback();
+    return res;
+  }
+};
 import { colors } from '../theme';
 import { useToast, useConfirm } from './LightboxSwipeOnly';
 import { useI18n } from '../i18n/I18nProvider';
@@ -210,6 +232,18 @@ const NumberInput = React.memo(function NumberInput({ value, onChange, itemShift
 });
 
 /* --- DepartmentView: Giao diện bộ phận --- */
+// Helper to get updated history array
+const getUpdatedHistory = async (selectedDateKey, newItem) => {
+  try {
+    const latestDoc = await dbService.getDoc('meal_reports', selectedDateKey);
+    const currentHistory = latestDoc.history || [];
+    return [...currentHistory, newItem];
+  } catch (err) {
+    console.error("Lỗi lấy lịch sử:", err);
+    return [newItem];
+  }
+};
+
 function DepartmentView({ user, reportData, selectedDateKey, selectedDate }) {
   const { pushToast } = useToast();
   const { askConfirm } = useConfirm();
@@ -295,30 +329,30 @@ function DepartmentView({ user, reportData, selectedDateKey, selectedDate }) {
       "Bộ phận xác nhận đã nhận"
     ))) return;
 
-    const docRef = doc(db, 'meal_reports', selectedDateKey);
     try {
-      await updateDoc(docRef, {
+      const updatedHistory = await getUpdatedHistory(selectedDateKey, {
+        user: user.name,
+        role: userRole,
+        action: 'Bộ phận xác nhận nhận Tăng Ca',
+        shift,
+        details: `Xác nhận đã nhận đúng & đủ từ Nhà Ăn: ${ful.mi} mì, ${ful.sua} sữa.`,
+        timestampMs: Date.now()
+      });
+      await dbService.updateDoc('meal_reports', selectedDateKey, {
         [`${shift}.overtimeFulfilled.${userRole}.deptAck`]: user.name,
-        [`${shift}.overtimeFulfilled.${userRole}.deptAckAt`]: serverTimestamp(),
-        history: arrayUnion({
-          user: user.name,
-          role: userRole,
-          action: 'Bộ phận xác nhận nhận Tăng Ca',
-          shift,
-          details: `Xác nhận đã nhận đúng & đủ từ Nhà Ăn: ${ful.mi} mì, ${ful.sua} sữa.`,
-          timestampMs: Date.now()
-        }),
-        lastHistoryAt: serverTimestamp()
+        [`${shift}.overtimeFulfilled.${userRole}.deptAckAt`]: new Date().toISOString(),
+        history: updatedHistory,
+        lastHistoryAt: new Date().toISOString()
       });
       pushToast('Đã xác nhận nhận đủ số lượng mì/sữa.', 'success');
       
-      await addDoc(collection(db, "notifications"), {
+      await dbService.createDoc("notifications", {
         type: "meal_registration",
         message: `Bộ phận ${userRole} đã xác nhận nhận ĐỦ ${ful.mi} mì và ${ful.sua} sữa tăng ca cho ${SHIFT_NAMES[shift]}.`,
         targetRoles: ["admin", "ehs", "Nhà Ăn"],
         readBy: [],
         createdBy: user.uid || "",
-        timestamp: serverTimestamp()
+        timestamp: new Date().toISOString()
       });
     } catch (e) {
       console.error(e);
@@ -336,7 +370,6 @@ function DepartmentView({ user, reportData, selectedDateKey, selectedDate }) {
       pushToast('Số liệu ngày này đã bị khóa sau 1 ngày. Chỉ Admin mới có quyền chỉnh sửa.', 'error');
       return;
     }
-    const docRef = doc(db, 'meal_reports', selectedDateKey);
 
     const prev = reportData?.[shift]?.reports?.[userRole] || {};
     const fulfilled = reportData?.[shift]?.overtimeFulfilled?.[userRole];
@@ -366,7 +399,7 @@ function DepartmentView({ user, reportData, selectedDateKey, selectedDate }) {
     // Chuẩn bị payload báo cáo của bộ phận
     const reportPayload = {
       ...formData[shift],
-      lastUpdated: serverTimestamp(),
+      lastUpdated: new Date().toISOString(),
       user: user.name
     };
 
@@ -385,27 +418,28 @@ function DepartmentView({ user, reportData, selectedDateKey, selectedDate }) {
         const surplusSua = Math.max(0, fulfilled.sua - newTangCaSua);
 
         try {
-          await updateDoc(docRef, {
+          const updatedHistory = await getUpdatedHistory(selectedDateKey, {
+            user: user.name, role: userRole, action, shift, 
+            details: details + ` Yêu cầu thu hồi thừa: ${surplusMi} mì, ${surplusSua} sữa.`,
+            timestampMs: Date.now()
+          });
+          await dbService.updateDoc('meal_reports', selectedDateKey, {
             [`${shift}.reports.${userRole}`]: reportPayload,
             [`${shift}.overtimeFulfilled.${userRole}.recallPending`]: true,
             [`${shift}.overtimeFulfilled.${userRole}.recallEhsAck`]: null,
             [`${shift}.overtimeFulfilled.${userRole}.recallReturnedToCanteen`]: null,
             [`${shift}.overtimeFulfilled.${userRole}.recallCanteenAck`]: null,
-            history: arrayUnion({
-              user: user.name, role: userRole, action, shift, 
-              details: details + ` Yêu cầu thu hồi thừa: ${surplusMi} mì, ${surplusSua} sữa.`,
-              timestampMs: Date.now()
-            }),
-            lastHistoryAt: serverTimestamp()
+            history: updatedHistory,
+            lastHistoryAt: new Date().toISOString()
           });
           pushToast(`Đã giảm tăng ca thành công. Vui lòng bàn giao lại ${surplusMi} mì và ${surplusSua} sữa thừa cho EHS.`, 'success');
-          await addDoc(collection(db, "notifications"), {
+          await dbService.createDoc("notifications", {
             type: "meal_registration",
             message: `Bộ phận ${userRole} đã báo GIẢM Tăng Ca ca ${SHIFT_NAMES[shift]}. Sẽ trả lại ${surplusMi} mì, ${surplusSua} sữa thừa cho EHS.`,
             targetRoles: ["admin", "ehs"],
             readBy: [],
             createdBy: user.uid || "",
-            timestamp: serverTimestamp()
+            timestamp: new Date().toISOString()
           });
         } catch (e) {
           console.error(e);
@@ -421,24 +455,25 @@ function DepartmentView({ user, reportData, selectedDateKey, selectedDate }) {
         const diffSua = newTangCaSua - prevTangCaSua;
 
         try {
-          await updateDoc(docRef, {
+          const updatedHistory = await getUpdatedHistory(selectedDateKey, {
+            user: user.name, role: userRole, action, shift, 
+            details: details + ` Số lượng cần phát bù: ${diffMi > 0 ? `${diffMi} mì` : ''}${diffMi > 0 && diffSua > 0 ? ', ' : ''}${diffSua > 0 ? `${diffSua} sữa` : ''}.`,
+            timestampMs: Date.now()
+          });
+          await dbService.updateDoc('meal_reports', selectedDateKey, {
             [`${shift}.reports.${userRole}`]: reportPayload,
             [`${shift}.overtimeFulfilled.${userRole}.recallPending`]: false,
-            history: arrayUnion({
-              user: user.name, role: userRole, action, shift, 
-              details: details + ` Số lượng cần phát bù: ${diffMi > 0 ? `${diffMi} mì` : ''}${diffMi > 0 && diffSua > 0 ? ', ' : ''}${diffSua > 0 ? `${diffSua} sữa` : ''}.`,
-              timestampMs: Date.now()
-            }),
-            lastHistoryAt: serverTimestamp()
+            history: updatedHistory,
+            lastHistoryAt: new Date().toISOString()
           });
           pushToast(`Đã cập nhật tăng thêm thành công. Vui lòng liên hệ Nhà Ăn để nhận phát bù ${diffMi > 0 ? `${diffMi} mì` : ''}${diffMi > 0 && diffSua > 0 ? ' và ' : ''}${diffSua > 0 ? `${diffSua} sữa` : ''}.`, 'success');
-          await addDoc(collection(db, "notifications"), {
+          await dbService.createDoc("notifications", {
             type: "meal_registration",
             message: `Bộ phận ${userRole} đã báo TĂNG Tăng Ca ca ${SHIFT_NAMES[shift]}. Số lượng cần phát bù: ${diffMi > 0 ? `${diffMi} mì` : ''}${diffMi > 0 && diffSua > 0 ? ', ' : ''}${diffSua > 0 ? `${diffSua} sữa` : ''}.`,
             targetRoles: ["admin", "ehs", "Nhà Ăn"],
             readBy: [],
             createdBy: user.uid || "",
-            timestamp: serverTimestamp()
+            timestamp: new Date().toISOString()
           });
         } catch (e) {
           console.error(e);
@@ -452,28 +487,38 @@ function DepartmentView({ user, reportData, selectedDateKey, selectedDate }) {
         reportPayload.changePending = false; // nếu trước đó có cờ pending thì bỏ
       }
 
-      const payload = {
-        [shift]: {
-          reports: { [userRole]: reportPayload },
-          lastReportAt: serverTimestamp()
-        },
-        history: arrayUnion({
+      try {
+        const latestDoc = await dbService.getDoc('meal_reports', selectedDateKey);
+        const currentHistory = latestDoc.history || [];
+        const newItem = {
           user: user.name, role: userRole, action, shift, details,
           timestampMs: Date.now()
-        }),
-        lastHistoryAt: serverTimestamp()
-      };
-
-      try {
-        await setDoc(docRef, payload, { merge: true });
+        };
+        const updatedHistory = [...currentHistory, newItem];
+        
+        const currentShiftData = latestDoc[shift] || {};
+        const mergedShiftData = {
+          ...currentShiftData,
+          reports: {
+            ...(currentShiftData.reports || {}),
+            [userRole]: reportPayload
+          },
+          lastReportAt: new Date().toISOString()
+        };
+        
+        await dbService.updateDoc('meal_reports', selectedDateKey, {
+          [shift]: mergedShiftData,
+          history: updatedHistory,
+          lastHistoryAt: new Date().toISOString()
+        });
         pushToast(`Đã lưu báo cơm cho ${SHIFT_NAMES[shift]}.`, 'success');
-        await addDoc(collection(db, "notifications"), {
+        await dbService.createDoc("notifications", {
           type: "meal_registration",
           message: `${user.name} đã báo cơm cho ${SHIFT_NAMES[shift]} thuộc bộ phận ${userRole}.`,
           targetRoles: ["admin", "ehs"],
           readBy: [],
           createdBy: user.uid || "",
-          timestamp: serverTimestamp()
+          timestamp: new Date().toISOString()
         });
       } catch (e) {
         console.error(e);
@@ -783,53 +828,49 @@ function AdminView({ user, reportData, selectedDateKey, onDeptClick, onOpenExpor
       "Phê duyệt yêu cầu thay đổi"
     ))) return;
 
-    const docRef = doc(db, 'meal_reports', selectedDateKey);
-    const batch = writeBatch(db);
-
-    // 1. Xóa cờ pending trên báo cáo bộ phận
-    batch.update(docRef, {
-      [`${req.shift}.reports.${req.dept}.changePending`]: false,
-    });
-
-    let details = `Duyệt thay đổi Tăng Ca: Mì [${req.fulMi} -> ${req.newMi}], Sữa [${req.fulSua} -> ${req.newSua}].`;
-
-    if (req.type === 'decrease') {
-      const surplusMi = Math.max(0, req.fulMi - req.newMi);
-      const surplusSua = Math.max(0, req.fulSua - req.newSua);
-      
-      // 2. Nếu là giảm, bật cờ recallPending để EHS vào xác nhận thu hồi
-      batch.update(docRef, {
-        [`${req.shift}.overtimeFulfilled.${req.dept}.recallPending`]: true,
-      });
-
-      details += ` Đã kích hoạt yêu cầu thu hồi thừa: ${surplusMi} mì, ${surplusSua} sữa.`;
-    }
-
-    // 3. Ghi lịch sử hoạt động
-    batch.update(docRef, {
-      history: arrayUnion({
-        user: user.name,
-        role: Array.isArray(user.role) ? user.role.join(", ") : user.role,
-        action: `EHS ${actionText} Tăng Ca`,
-        shift: req.shift,
-        details,
-        timestampMs: Date.now()
-      }),
-      lastHistoryAt: serverTimestamp()
-    });
-
     try {
-      await batch.commit();
+      const latestDoc = await dbService.getDoc('meal_reports', selectedDateKey);
+      const currentHistory = latestDoc.history || [];
+      
+      let details = `Duyệt thay đổi Tăng Ca: Mì [${req.fulMi} -> ${req.newMi}], Sữa [${req.fulSua} -> ${req.newSua}].`;
+      if (req.type === 'decrease') {
+        const surplusMi = Math.max(0, req.fulMi - req.newMi);
+        const surplusSua = Math.max(0, req.fulSua - req.newSua);
+        details += ` Đã kích hoạt yêu cầu thu hồi thừa: ${surplusMi} mì, ${surplusSua} sữa.`;
+      }
+      
+      const updatedHistory = [
+        ...currentHistory,
+        {
+          user: user.name,
+          role: Array.isArray(user.role) ? user.role.join(", ") : user.role,
+          action: `EHS ${actionText} Tăng Ca`,
+          shift: req.shift,
+          details,
+          timestampMs: Date.now()
+        }
+      ];
+
+      const updatePayload = {
+        [`${req.shift}.reports.${req.dept}.changePending`]: false,
+        history: updatedHistory,
+        lastHistoryAt: new Date().toISOString()
+      };
+      if (req.type === 'decrease') {
+        updatePayload[`${req.shift}.overtimeFulfilled.${req.dept}.recallPending`] = true;
+      }
+
+      await dbService.updateDoc('meal_reports', selectedDateKey, updatePayload);
       pushToast('Đã phê duyệt yêu cầu thay đổi số lượng tăng ca.', 'success');
       
       // Gửi thông báo
-      await addDoc(collection(db, "notifications"), {
+      await dbService.createDoc("notifications", {
         type: "meal_registration",
         message: `EHS đã PHÊ DUYỆT yêu cầu thay đổi Tăng Ca ${SHIFT_NAMES[req.shift]} (${req.dept}): Mì [${req.fulMi}→${req.newMi}], Sữa [${req.fulSua}→${req.newSua}].`,
         targetRoles: ["admin", "ehs", "Nhà Ăn", req.dept],
         readBy: [],
         createdBy: user.uid || "",
-        timestamp: serverTimestamp()
+        timestamp: new Date().toISOString()
       });
     } catch (e) {
       console.error(e);
@@ -845,41 +886,38 @@ function AdminView({ user, reportData, selectedDateKey, onDeptClick, onOpenExpor
       "Từ chối yêu cầu thay đổi"
     ))) return;
 
-    const docRef = doc(db, 'meal_reports', selectedDateKey);
-    const batch = writeBatch(db);
-
-    // Trả số lượng yêu cầu về bằng số thực phát và xóa cờ pending
-    batch.update(docRef, {
-      [`${req.shift}.reports.${req.dept}.tangCaMi`]: req.fulMi,
-      [`${req.shift}.reports.${req.dept}.tangCaSua`]: req.fulSua,
-      [`${req.shift}.reports.${req.dept}.changePending`]: false,
-    });
-
-    // Ghi lịch sử hoạt động
-    batch.update(docRef, {
-      history: arrayUnion({
-        user: user.name,
-        role: Array.isArray(user.role) ? user.role.join(", ") : user.role,
-        action: 'EHS từ chối Y/C thay đổi Tăng Ca',
-        shift: req.shift,
-        details: `${req.dept}: Từ chối đổi số lượng. Giữ nguyên số đã phát: Mì [${req.fulMi}], Sữa [${req.fulSua}].`,
-        timestampMs: Date.now()
-      }),
-      lastHistoryAt: serverTimestamp()
-    });
-
     try {
-      await batch.commit();
+      const latestDoc = await dbService.getDoc('meal_reports', selectedDateKey);
+      const currentHistory = latestDoc.history || [];
+      const updatedHistory = [
+        ...currentHistory,
+        {
+          user: user.name,
+          role: Array.isArray(user.role) ? user.role.join(", ") : user.role,
+          action: 'EHS từ chối Y/C thay đổi Tăng Ca',
+          shift: req.shift,
+          details: `${req.dept}: Từ chối đổi số lượng. Giữ nguyên số đã phát: Mì [${req.fulMi}], Sữa [${req.fulSua}].`,
+          timestampMs: Date.now()
+        }
+      ];
+
+      await dbService.updateDoc('meal_reports', selectedDateKey, {
+        [`${req.shift}.reports.${req.dept}.tangCaMi`]: req.fulMi,
+        [`${req.shift}.reports.${req.dept}.tangCaSua`]: req.fulSua,
+        [`${req.shift}.reports.${req.dept}.changePending`]: false,
+        history: updatedHistory,
+        lastHistoryAt: new Date().toISOString()
+      });
       pushToast('Đã từ chối yêu cầu thay đổi số lượng tăng ca.', 'info');
 
       // Gửi thông báo
-      await addDoc(collection(db, "notifications"), {
+      await dbService.createDoc("notifications", {
         type: "meal_registration",
         message: `EHS đã TỪ CHỐI yêu cầu thay đổi Tăng Ca ${SHIFT_NAMES[req.shift]} (${req.dept}). Giữ nguyên số đã phát: Mì [${req.fulMi}], Sữa [${req.fulSua}].`,
         targetRoles: ["admin", "ehs", req.dept],
         readBy: [],
         createdBy: user.uid || "",
-        timestamp: serverTimestamp()
+        timestamp: new Date().toISOString()
       });
     } catch (e) {
       console.error(e);
@@ -952,19 +990,19 @@ function AdminView({ user, reportData, selectedDateKey, onDeptClick, onOpenExpor
       `Xác nhận EHS đã nhận lại ${recall.surplusMi} mì và ${recall.surplusSua} sữa từ bộ phận ${recall.dept} (${SHIFT_NAMES[recall.shift]})?`,
       "EHS xác nhận nhận từ bộ phận"
     ))) return;
-    const docRef = doc(db, 'meal_reports', selectedDateKey);
     try {
-      await updateDoc(docRef, {
+      const updatedHistory = await getUpdatedHistory(selectedDateKey, {
+        user: user.name,
+        role: Array.isArray(user.role) ? user.role.join(", ") : user.role,
+        action: 'EHS nhận từ bộ phận',
+        shift: recall.shift,
+        details: `${recall.dept}: EHS đã nhận lại ${recall.surplusMi} mì, ${recall.surplusSua} sữa từ bộ phận.`,
+        timestampMs: Date.now()
+      });
+      await dbService.updateDoc('meal_reports', selectedDateKey, {
         [`${recall.shift}.overtimeFulfilled.${recall.dept}.recallEhsAck`]: user.name,
-        history: arrayUnion({
-          user: user.name,
-          role: Array.isArray(user.role) ? user.role.join(", ") : user.role,
-          action: 'EHS nhận từ bộ phận',
-          shift: recall.shift,
-          details: `${recall.dept}: EHS đã nhận lại ${recall.surplusMi} mì, ${recall.surplusSua} sữa từ bộ phận.`,
-          timestampMs: Date.now()
-        }),
-        lastHistoryAt: serverTimestamp()
+        history: updatedHistory,
+        lastHistoryAt: new Date().toISOString()
       });
       pushToast('EHS đã xác nhận nhận lại từ bộ phận. Chờ trả Nhà Ăn.', 'success');
     } catch (e) {
@@ -978,28 +1016,28 @@ function AdminView({ user, reportData, selectedDateKey, onDeptClick, onOpenExpor
       `Xác nhận EHS đã trả lại ${recall.surplusMi} mì và ${recall.surplusSua} sữa cho Nhà Ăn (${SHIFT_NAMES[recall.shift]} - ${recall.dept})?`,
       "EHS xác nhận trả Nhà Ăn"
     ))) return;
-    const docRef = doc(db, 'meal_reports', selectedDateKey);
     try {
-      await updateDoc(docRef, {
+      const updatedHistory = await getUpdatedHistory(selectedDateKey, {
+        user: user.name,
+        role: Array.isArray(user.role) ? user.role.join(", ") : user.role,
+        action: 'EHS trả lại Nhà Ăn',
+        shift: recall.shift,
+        details: `${recall.dept}: EHS đã trả lại ${recall.surplusMi} mì, ${recall.surplusSua} sữa cho Nhà Ăn.`,
+        timestampMs: Date.now()
+      });
+      await dbService.updateDoc('meal_reports', selectedDateKey, {
         [`${recall.shift}.overtimeFulfilled.${recall.dept}.recallReturnedToCanteen`]: user.name,
-        history: arrayUnion({
-          user: user.name,
-          role: Array.isArray(user.role) ? user.role.join(", ") : user.role,
-          action: 'EHS trả lại Nhà Ăn',
-          shift: recall.shift,
-          details: `${recall.dept}: EHS đã trả lại ${recall.surplusMi} mì, ${recall.surplusSua} sữa cho Nhà Ăn.`,
-          timestampMs: Date.now()
-        }),
-        lastHistoryAt: serverTimestamp()
+        history: updatedHistory,
+        lastHistoryAt: new Date().toISOString()
       });
       pushToast('Đã xác nhận trả Nhà Ăn. Chờ Nhà Ăn xác nhận nhận lại.', 'success');
-      await addDoc(collection(db, "notifications"), {
+      await dbService.createDoc("notifications", {
         type: "meal_registration",
         message: `EHS đã bàn giao trả lại ${recall.surplusMi} mì, ${recall.surplusSua} sữa (${recall.dept} - ${SHIFT_NAMES[recall.shift]}) cho Nhà Ăn. Vui lòng xác nhận.`,
         targetRoles: ["Nhà Ăn"],
         readBy: [],
         createdBy: user.uid || "",
-        timestamp: serverTimestamp()
+        timestamp: new Date().toISOString()
       });
     } catch (e) {
       console.error(e);
@@ -1049,79 +1087,77 @@ function AdminView({ user, reportData, selectedDateKey, onDeptClick, onOpenExpor
 
   const confirmShift = async (shift) => {
     if (!(await askConfirm(`Xác nhận & gửi ${SHIFT_NAMES[shift]} cho Nhà Ăn?`, "Xác nhận gửi số liệu"))) return;
-    const docRef = doc(db, 'meal_reports', selectedDateKey);
-    const batch = writeBatch(db);
+    try {
+      const latestDoc = await dbService.getDoc('meal_reports', selectedDateKey);
+      const currentHistory = latestDoc.history || [];
+      
+      const before = summary[shift] || {};
+      const after  = adjustedTotals[shift] || {};
+      const changes = [];
+      ALL_MEAL_KEYS.forEach(k => {
+        if ((before[k] || 0) !== (after[k] || 0)) {
+          const delta = (after[k] || 0) - (before[k] || 0);
+          const sign = delta > 0 ? `+${delta}` : `${delta}`;
+          changes.push(`${LABEL_BY_KEY[k]}: ${sign}`);
+        }
+      });
 
-    // Chuẩn bị dữ liệu trước và sau khi điều chỉnh để ghi lịch sử thay đổi
-    const before = summary[shift] || {};
-    const after  = adjustedTotals[shift] || {};
-    const changes = [];
-    ALL_MEAL_KEYS.forEach(k => {
-      if ((before[k] || 0) !== (after[k] || 0)) {
-        const delta = (after[k] || 0) - (before[k] || 0);
-        const sign = delta > 0 ? `+${delta}` : `${delta}`;
-        changes.push(`${LABEL_BY_KEY[k]}: ${sign}`);
-      }
-    });
+      const updatedHistory = [
+        ...currentHistory,
+        {
+          user: user.name,
+          role: Array.isArray(user.role) ? user.role.join(", ") : user.role,
+          action: 'Xác nhận & gửi cho Nhà Ăn',
+          shift,
+          details: changes.length ? changes.join(', ') : 'Không điều chỉnh so với tổng.',
+          timestampMs: Date.now()
+        }
+      ];
 
-    // Cập nhật tổng hợp và ghi nhận người xác nhận (Admin)
-    const payload = {
-      summary: after,
-      confirmedByAdmin: user.name,
-      confirmedAtAdmin: serverTimestamp(),
-      confirmedByCanteen: reportData?.[shift]?.confirmedByCanteen || null,
-      confirmedAtCanteen: reportData?.[shift]?.confirmedAtCanteen || null,
-    };
-    batch.set(docRef, { [shift]: payload }, { merge: true });
+      const currentShiftNode = latestDoc[shift] || {};
+      const updatePayload = {
+        [shift]: {
+          ...currentShiftNode,
+          summary: after,
+          confirmedByAdmin: user.name,
+          confirmedAtAdmin: new Date().toISOString(),
+          confirmedByCanteen: reportData?.[shift]?.confirmedByCanteen || null,
+          confirmedAtCanteen: reportData?.[shift]?.confirmedAtCanteen || null,
+        },
+        history: updatedHistory,
+        lastHistoryAt: new Date().toISOString()
+      };
 
-    // Kiểm tra các bộ phận đã phát tăng ca vượt quá yêu cầu để đánh dấu chờ thu hồi
-    const reports = reportData?.[shift]?.reports || {};
-    const fulfilled = reportData?.[shift]?.overtimeFulfilled || {};
-    for (const dept in fulfilled) {
-      if (
-        !fulfilled[dept].recallPending &&    // chưa chờ thu hồi
-        !reports[dept]?.changePending        // bộ phận không có yêu cầu thay đổi
-      ) {
-        const reqMi = Number(reports[dept]?.tangCaMi || 0);
-        const reqSua = Number(reports[dept]?.tangCaSua || 0);
-        const fulMi = Number(fulfilled[dept]?.mi || 0);
-        const fulSua = Number(fulfilled[dept]?.sua || 0);
-        if (reqMi < fulMi || reqSua < fulSua) {
-          // nếu số đã phát > số yêu cầu thì đánh dấu cần thu hồi
-          batch.update(docRef, {
-            [`${shift}.overtimeFulfilled.${dept}.recallPending`]: true,
-            [`${shift}.overtimeFulfilled.${dept}.recallEhsAck`]: null,
-            [`${shift}.overtimeFulfilled.${dept}.recallReturnedToCanteen`]: null,
-            [`${shift}.overtimeFulfilled.${dept}.recallCanteenAck`]: null,
-          });
+      const reports = reportData?.[shift]?.reports || {};
+      const fulfilled = reportData?.[shift]?.overtimeFulfilled || {};
+      for (const dept in fulfilled) {
+        if (
+          !fulfilled[dept].recallPending &&
+          !reports[dept]?.changePending
+        ) {
+          const reqMi = Number(reports[dept]?.tangCaMi || 0);
+          const reqSua = Number(reports[dept]?.tangCaSua || 0);
+          const fulMi = Number(fulfilled[dept]?.mi || 0);
+          const fulSua = Number(fulfilled[dept]?.sua || 0);
+          if (reqMi < fulMi || reqSua < fulSua) {
+            updatePayload[`${shift}.overtimeFulfilled.${dept}.recallPending`] = true;
+            updatePayload[`${shift}.overtimeFulfilled.${dept}.recallEhsAck`] = null;
+            updatePayload[`${shift}.overtimeFulfilled.${dept}.recallReturnedToCanteen`] = null;
+            updatePayload[`${shift}.overtimeFulfilled.${dept}.recallCanteenAck`] = null;
+          }
         }
       }
-    }
 
-    // Ghi lịch sử xác nhận gửi Nhà ăn
-    batch.update(docRef, {
-      history: arrayUnion({
-        user: user.name,
-        role: Array.isArray(user.role) ? user.role.join(", ") : user.role,
-        action: 'Xác nhận & gửi cho Nhà Ăn',
-        shift,
-        details: changes.length ? changes.join(', ') : 'Không điều chỉnh so với tổng.',
-        timestampMs: Date.now()
-      }),
-      lastHistoryAt: serverTimestamp()
-    });
-
-    try {
-      await batch.commit();
+      await dbService.updateDoc('meal_reports', selectedDateKey, updatePayload);
       const alreadySentBefore = !!reportData?.[shift]?.confirmedByAdmin;
       pushToast(`${alreadySentBefore ? 'Đã gửi lại' : 'Đã gửi'} ${SHIFT_NAMES[shift]} cho Nhà Ăn.`, 'success');
-      await addDoc(collection(db, "notifications"), {
+      await dbService.createDoc("notifications", {
         type: "meal_registration",
         message: `Aldila đã ${alreadySentBefore ? 'cập nhật và gửi lại' : 'gửi'} số liệu cơm ${SHIFT_NAMES[shift]} cho Nhà Ăn.`,
         targetRoles: ["Nhà Ăn"],
         readBy: [],
         createdBy: user.uid || "",
-        timestamp: serverTimestamp()
+        timestamp: new Date().toISOString()
       });
     } catch (e) {
       console.error(e);
@@ -1583,35 +1619,35 @@ function CanteenView({ user, reportData, selectedDateKey, isMobile }) {
       `Xác nhận Nhà Ăn đã nhận lại ${surplusMi > 0 ? `${surplusMi} mì` : ''}${surplusMi > 0 && surplusSua > 0 ? ' và ' : ''}${surplusSua > 0 ? `${surplusSua} sữa` : ''} từ EHS (${SHIFT_NAMES[shift]} - ${dept})?`,
       "Nhà Ăn xác nhận nhận lại từ EHS"
     ))) return;
-    const docRef = doc(db, 'meal_reports', selectedDateKey);
     const reports = reportData[shift]?.reports || {};
     const reqMi = Number(reports[dept]?.tangCaMi || 0);
     const reqSua = Number(reports[dept]?.tangCaSua || 0);
     try {
-      await updateDoc(docRef, {
+      const updatedHistory = await getUpdatedHistory(selectedDateKey, {
+        user: canteenName,
+        role: user?.role || 'Nhà Ăn',
+        action: 'Nhà Ăn xác nhận nhận lại từ EHS',
+        shift,
+        details: `Đã nhận lại ${surplusMi} mì, ${surplusSua} sữa từ EHS (${dept}). Chốt suất phát thực tế: Mì [${reqMi}], Sữa [${reqSua}].`,
+        timestampMs: Date.now()
+      });
+      await dbService.updateDoc('meal_reports', selectedDateKey, {
         [`${shift}.overtimeFulfilled.${dept}.recallCanteenAck`]: canteenName,
-        [`${shift}.overtimeFulfilled.${dept}.recallCanteenAckAt`]: serverTimestamp(),
+        [`${shift}.overtimeFulfilled.${dept}.recallCanteenAckAt`]: new Date().toISOString(),
         [`${shift}.overtimeFulfilled.${dept}.mi`]: reqMi,
         [`${shift}.overtimeFulfilled.${dept}.sua`]: reqSua,
         [`${shift}.overtimeFulfilled.${dept}.recallPending`]: false,
-        history: arrayUnion({
-          user: canteenName,
-          role: user?.role || 'Nhà Ăn',
-          action: 'Nhà Ăn xác nhận nhận lại từ EHS',
-          shift,
-          details: `Đã nhận lại ${surplusMi} mì, ${surplusSua} sữa từ EHS (${dept}). Chốt suất phát thực tế: Mì [${reqMi}], Sữa [${reqSua}].`,
-          timestampMs: Date.now()
-        }),
-        lastHistoryAt: serverTimestamp()
+        history: updatedHistory,
+        lastHistoryAt: new Date().toISOString()
       });
       pushToast('Đã xác nhận nhận lại từ EHS.', 'success');
-      await addDoc(collection(db, "notifications"), {
+      await dbService.createDoc("notifications", {
         type: "meal_registration",
         message: `Nhà Ăn đã xác nhận nhận lại ${surplusMi} mì, ${surplusSua} sữa từ EHS (${dept} - ${SHIFT_NAMES[shift]}). Quy trình thu hồi hoàn tất.`,
         targetRoles: ["admin", "ehs"],
         readBy: [],
         createdBy: user.uid || "",
-        timestamp: serverTimestamp()
+        timestamp: new Date().toISOString()
       });
     } catch (e) {
       console.error(e);
@@ -1622,32 +1658,32 @@ function CanteenView({ user, reportData, selectedDateKey, isMobile }) {
   const confirmShift = async (shift, isReconfirm = false) => {
     const actionText = isReconfirm ? 'xác nhận thay đổi' : 'nhận số liệu';
     if (!(await askConfirm(`Xác nhận đã ${actionText} cho ${SHIFT_NAMES[shift]}?`, "Xác nhận nhận số liệu"))) return;
-    const docRef = doc(db, 'meal_reports', selectedDateKey);
     // Lấy số liệu summary mới nhất mà Admin vừa gửi
     const currentSummary = reportData[shift]?.summary || {};
     try {
-      await updateDoc(docRef, {
+      const updatedHistory = await getUpdatedHistory(selectedDateKey, {
+        user: canteenName,
+        role: user?.role || 'Nhà Ăn',
+        action: `Nhà Ăn ${actionText}`,
+        shift,
+        details: `Đã ${actionText} từ Aldila.`,
+        timestampMs: Date.now()
+      });
+      await dbService.updateDoc('meal_reports', selectedDateKey, {
         [`${shift}.confirmedSummary`]: currentSummary, // Lưu snapshot số liệu tại thời điểm xác nhận
         [`${shift}.confirmedByCanteen`]: canteenName,
-        [`${shift}.confirmedAtCanteen`]: serverTimestamp(),
-        history: arrayUnion({
-          user: canteenName,
-          role: user?.role || 'Nhà Ăn',
-          action: `Nhà Ăn ${actionText}`,
-          shift,
-          details: `Đã ${actionText} từ Aldila.`,
-          timestampMs: Date.now()
-        }),
-        lastHistoryAt: serverTimestamp()
+        [`${shift}.confirmedAtCanteen`]: new Date().toISOString(),
+        history: updatedHistory,
+        lastHistoryAt: new Date().toISOString()
       });
       pushToast(`Đã xác nhận ${SHIFT_NAMES[shift]}.`, 'success');
-      await addDoc(collection(db, "notifications"), {
+      await dbService.createDoc("notifications", {
         type: "meal_registration",
         message: `Nhà Ăn đã ${actionText} suất ăn ca ${SHIFT_NAMES[shift]}.`,
         targetRoles: ["admin", "ehs"],
         readBy: [],
         createdBy: user.uid || "",
-        timestamp: serverTimestamp()
+        timestamp: new Date().toISOString()
       });
     } catch (e) {
       console.error(e);
@@ -1665,35 +1701,35 @@ function CanteenView({ user, reportData, selectedDateKey, isMobile }) {
     if (!(await askConfirm(`Xác nhận ${actionText} ${miToFulfill} mì và ${suaToFulfill} sữa cho ${dept} (${SHIFT_NAMES[shift]})?`, "Xác nhận phát tăng ca"))) {
       return;
     }
-    const docRef = doc(db, 'meal_reports', selectedDateKey);
     try {
-      await updateDoc(docRef, {
+      const updatedHistory = await getUpdatedHistory(selectedDateKey, {
+        user: canteenName,
+        role: user?.role || 'Nhà Ăn',
+        action: `Nhà ăn ${actionText} tăng ca`,
+        shift,
+        details: `${dept} - Mì: +${miToFulfill}, Sữa: +${suaToFulfill} (Tổng phát: ${reqMi} Mì, ${reqSua} Sữa)`,
+        timestampMs: Date.now()
+      });
+      await dbService.updateDoc('meal_reports', selectedDateKey, {
         [`${shift}.overtimeFulfilled.${dept}`]: {
           by: canteenName,
-          at: serverTimestamp(),
+          at: new Date().toISOString(),
           mi: reqMi,
           sua: reqSua,
           recallPending: false,
           deptAck: null,
           deptAckAt: null
         },
-        history: arrayUnion({
-          user: canteenName,
-          role: user?.role || 'Nhà Ăn',
-          action: `Nhà ăn ${actionText} tăng ca`,
-          shift,
-          details: `${dept} - Mì: +${miToFulfill}, Sữa: +${suaToFulfill} (Tổng phát: ${reqMi} Mì, ${reqSua} Sữa)`,
-          timestampMs: Date.now()
-        }),
+        history: updatedHistory,
       });
       pushToast(`Đã ${actionText} cho ${dept}.`, 'success');
-      await addDoc(collection(db, "notifications"), {
+      await dbService.createDoc("notifications", {
         type: "meal_registration",
         message: `Nhà Ăn đã ${actionText} ${miToFulfill} mì và ${suaToFulfill} sữa tăng ca cho bộ phận ${dept} (${SHIFT_NAMES[shift]}).`,
         targetRoles: ["admin", "ehs", dept],
         readBy: [],
         createdBy: user.uid || "",
-        timestamp: serverTimestamp()
+        timestamp: new Date().toISOString()
       });
     } catch (e) {
       console.error(e);
@@ -2181,22 +2217,37 @@ export default function BaoCom({ user, isMobile }) {
     return deptRoles;
   }, [isAdmin, isProxy, deptRoles, user?.mealDept]);
 
-  // Lắng nghe dữ liệu báo cáo của ngày được chọn (real-time)
+  const fetchMealReport = async () => {
+    try {
+      const data = await dbService.getDoc('meal_reports', selectedDateKey);
+      setReportData(data && data._exists !== false ? data : {});
+    } catch (error) {
+      console.error("Lỗi lấy dữ liệu meal_reports:", error);
+      setReportData({});
+    }
+  };
+
+  useEffect(() => {
+    globalRefreshCallback = fetchMealReport;
+    return () => {
+      globalRefreshCallback = null;
+    };
+  }, [selectedDateKey]);
+
+  // Lắng nghe dữ liệu báo cáo của ngày được chọn (real-time qua polling)
   useEffect(() => {
     setLoading(true);
-    const ref = doc(db, 'meal_reports', selectedDateKey);
-    const unsub = onSnapshot(ref, (snap) => {
-      const data = snap.exists() ? snap.data() : {};
-      setReportData(data);
-      setLoading(false);
-    },
-    (error) => {
-      // Firestore deny hoặc lỗi mạng → không để loading treo vĩnh viễn
-      console.error("Lỗi onSnapshot meal_reports:", error.code, error.message);
-      setReportData({});
-      setLoading(false);
+    fetchMealReport().finally(() => setLoading(false));
+
+    const unsub = realtimeService.subscribeToPath("meal_reports", () => {
+      fetchMealReport();
     });
-    return () => unsub();
+
+    const interval = setInterval(fetchMealReport, 30000);
+    return () => {
+      unsub();
+      clearInterval(interval);
+    };
   }, [selectedDateKey]);
 
   // Chọn nội dung giao diện hiển thị tùy theo vai trò người dùng

@@ -23,7 +23,7 @@ export const normalizeRole = (r) =>
   stripDiacritics(String(r || "").trim()).toLowerCase();
 
 /**
- * Format ngày thành chuỗi YYYY-MM-DD (dùng làm document ID trong Firestore)
+ * Format ngày thành chuỗi YYYY-MM-DD (dùng làm document ID)
  * @param {Date} date
  * @returns {string}
  */
@@ -69,7 +69,7 @@ export const getWeekDates = (baseDate) => {
 
 /**
  * Format thời gian tương đối kiểu Facebook ("5 phút trước", "Hôm qua"...)
- * @param {object|number} timestamp - Firestore Timestamp hoặc milliseconds
+ * @param {object|number} timestamp - Timestamp object hoặc milliseconds
  * @returns {string}
  */
 export const formatRelativeTime = (timestamp) => {

@@ -1,10 +1,36 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo } from "react";
-import { collection, query, where, onSnapshot, doc, updateDoc, arrayUnion, writeBatch } from "firebase/firestore";
-import { db } from "../firebase";
 import { colors } from "../theme";
 import { useToast } from "./LightboxSwipeOnly";
 import { DEPARTMENT_ROLES } from "../constants/roles";
-import { getWeekNumber, formatRelativeTime } from "../utils/string";
+import { getWeekNumber, formatRelativeTime, normalizeRole } from "../utils/string";
+import originalDbService from "../services/dbService";
+import realtimeService from "../services/realtimeService";
+
+let globalRefreshCallback = null;
+const dbService = {
+  getDoc: (col, id) => originalDbService.getDoc(col, id),
+  getDocs: (col) => originalDbService.getDocs(col),
+  createDoc: async (col, data) => {
+    const res = await originalDbService.createDoc(col, data);
+    if (globalRefreshCallback) globalRefreshCallback();
+    return res;
+  },
+  updateDoc: async (col, id, data) => {
+    const res = await originalDbService.updateDoc(col, id, data);
+    if (globalRefreshCallback) globalRefreshCallback();
+    return res;
+  },
+  deleteDoc: async (col, id) => {
+    const res = await originalDbService.deleteDoc(col, id);
+    if (globalRefreshCallback) globalRefreshCallback();
+    return res;
+  },
+  commitBatch: async (ops) => {
+    const res = await originalDbService.commitBatch(ops);
+    if (globalRefreshCallback) globalRefreshCallback();
+    return res;
+  }
+};
 
 const NOTIFICATION_TYPES_CONFIG = [
   {
@@ -96,6 +122,27 @@ const getTabForNotification = (type) => {
     default: return null;
   }
 };
+
+// Hiển thị Web Notification của trình duyệt (chỉ gọi khi tab đang ẩn + đã cấp quyền)
+function showBrowserNotification(notif) {
+  try {
+    if (typeof window === "undefined" || !("Notification" in window)) return;
+    if (Notification.permission !== "granted") return;
+
+    const icon = getNotificationIcon(notif.type);
+    const n = new Notification(`${icon} SafeOne — Thông báo mới`, {
+      body: notif.message || "Bạn có thông báo mới",
+      icon: "/favicon.png",
+      tag: `safeone-notif-${notif.id}`, // gộp trùng cùng một thông báo
+    });
+    n.onclick = () => {
+      window.focus();
+      n.close();
+    };
+  } catch {
+    // Bỏ qua nếu trình duyệt chặn/không hỗ trợ
+  }
+}
 
 /* ===== TOAST POPUP COMPONENT (Facebook-style) ===== */
 function ToastPopup({ toast, onDismiss, onNavigate }) {
@@ -268,9 +315,63 @@ export default function NotificationBell({ user, setActiveTab }) {
   }, [settings]);
   
   // Tích hợp 2 lớp khiên: Cuốn sổ lưu ID và Thẻ báo cáo initialLoad
-  const seenIdsRef = useRef(new Set()); 
+  const seenIdsRef = useRef(new Set());
   const initialLoadRole = useRef(true);
   const initialLoadUser = useRef(true);
+
+  // === Xin quyền hiển thị Web Notification ngay khi user đăng nhập / vào trang ===
+  useEffect(() => {
+    if (!user) return;
+    if (typeof window === "undefined" || !("Notification" in window)) return;
+    if (Notification.permission === "default") {
+      Notification.requestPermission().catch(() => {});
+    }
+  }, [user]);
+
+  // === Web Notification khi tab đang ẨN (luôn bật, không phụ thuộc isPageVisible) ===
+  // Effect fetch chính bên dưới tự ngắt khi tab ẩn nên không bắt được thông báo lúc vắng mặt.
+  // Effect riêng này lắng nghe socket realtime và bắn browser notification khi tab ẩn,
+  // dùng chung seenIdsRef để không toast trùng lại khi user quay lại tab.
+  useEffect(() => {
+    if (!user) return;
+    if (typeof window === "undefined" || !("Notification" in window)) return;
+
+    const rawRolesList = user?.role
+      ? (Array.isArray(user.role) ? user.role : String(user.role).split(',').map(r => r.trim()).filter(Boolean))
+      : [];
+    const rolesNormalizedSet = new Set(rawRolesList.map(r => normalizeRole(r)));
+
+    const isTypeEnabled = (type) => {
+      let t = type;
+      if (type === "shift_assign" || type === "shift_note") t = "shift_reminder";
+      return settingsRef.current[t] !== false;
+    };
+
+    const pushIfHidden = async () => {
+      if (document.visibilityState !== "hidden") return;   // chỉ bắn khi tab đang ẩn
+      if (Notification.permission !== "granted") return;   // phải được cấp quyền
+      try {
+        const list = await dbService.getDocs("notifications");
+        if (!Array.isArray(list)) return;
+        list.forEach(n => {
+          const forMe = n.target_user_id === user.uid ||
+            (Array.isArray(n.target_roles) && n.target_roles.some(role => rolesNormalizedSet.has(normalizeRole(role))));
+          if (!forMe) return;
+          if (seenIdsRef.current.has(n.id)) return;          // đã xử lý
+          seenIdsRef.current.add(n.id);                      // đánh dấu để khỏi toast trùng khi quay lại
+          if ((n.read_by || []).includes(user.uid)) return;  // đã đọc
+          if (n.created_by === user.uid) return;             // do chính mình tạo
+          if (!isTypeEnabled(n.type)) return;                // bị tắt trong cài đặt
+          showBrowserNotification({ id: n.id, type: n.type, message: n.message });
+        });
+      } catch (e) {
+        console.warn("Không thể kiểm tra thông báo nền:", e);
+      }
+    };
+
+    const unsub = realtimeService.subscribeToPath("notifications", pushIfHidden);
+    return () => unsub();
+  }, [user]);
 
   const dbNotifications = useMemo(() => {
     const combinedMap = new Map();
@@ -287,45 +388,44 @@ export default function NotificationBell({ user, setActiveTab }) {
     if (!user || !isPageVisible) {
       setRoleNotifications([]);
       setUserNotifications([]);
+      setLocalNotifications([]);
       return;
     }
 
     const rawRolesList = user?.role ? (Array.isArray(user.role) ? user.role : String(user.role).split(',').map(r => r.trim()).filter(Boolean)) : [];
-    initialLoadUser.current = true;
+    const rolesNormalizedSet = new Set(rawRolesList.map(r => normalizeRole(r)));
 
-    // Quản lý việc load lần đầu của từng role
-    const initialLoadMap = {};
-    rawRolesList.forEach(role => {
-      initialLoadMap[role] = true;
-    });
+    const fetchNotifications = async () => {
+      try {
+        const list = await dbService.getDocs("notifications");
+        if (!Array.isArray(list)) return;
 
-    const roleNotificationsMap = {};
-    const unsubs = [];
+        // Filter and map notifications to camelCase for UI compatibility
+        const filteredList = list.filter(n => {
+          if (n.target_user_id === user.uid) return true;
+          if (n.target_roles && Array.isArray(n.target_roles)) {
+            return n.target_roles.some(role => rolesNormalizedSet.has(normalizeRole(role)));
+          }
+          return false;
+        }).map(n => ({
+          id: n.id,
+          type: n.type,
+          message: n.message,
+          targetRoles: n.target_roles || [],
+          targetUserId: n.target_user_id || null,
+          readBy: n.read_by || [],
+          createdBy: n.created_by || null,
+          timestamp: n.timestamp ? { seconds: Math.floor(new Date(n.timestamp).getTime() / 1000) } : { seconds: 0 }
+        }));
 
-    rawRolesList.forEach(role => {
-      const qRole = query(
-        collection(db, "notifications"),
-        where("targetRoles", "array-contains", role)
-      );
+        // Split into role vs user notifications to maintain original state structure
+        const roleNotifs = filteredList.filter(n => n.targetRoles.length > 0);
+        const userNotifs = filteredList.filter(n => n.targetUserId === user.uid);
 
-      const unsub = onSnapshot(qRole, (snap) => {
-        const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        roleNotificationsMap[role] = list;
+        setRoleNotifications(roleNotifs);
+        setUserNotifications(userNotifs);
 
-        // Gộp tất cả các list lại
-        const combinedMap = new Map();
-        rawRolesList.forEach(r => {
-          const l = roleNotificationsMap[r] || [];
-          l.forEach(n => combinedMap.set(n.id, n));
-        });
-        setRoleNotifications(Array.from(combinedMap.values()));
-
-        if (initialLoadMap[role]) {
-          snap.docs.forEach(d => seenIdsRef.current.add(d.id));
-          initialLoadMap[role] = false;
-          return;
-        }
-
+        // Toast notifications logic for newly loaded notifications
         const isNotifTypeEnabledRef = (type) => {
           let targetType = type;
           if (type === "shift_assign" || type === "shift_note") {
@@ -334,101 +434,48 @@ export default function NotificationBell({ user, setActiveTab }) {
           return settingsRef.current[targetType] !== false;
         };
 
-        // Lọc thông báo mới, chưa đọc, và KHÔNG phải do chính mình tạo
-        const newNotifs = list
+        const freshNotifs = filteredList
           .filter(n => !seenIdsRef.current.has(n.id))
           .filter(n =>
-            !(n.readBy || []).includes(user.uid) && // chưa đọc
-            n.createdBy !== user.uid &&             // không phải do mình tạo
-            isNotifTypeEnabledRef(n.type)          // chưa bị tắt
+            !(n.readBy || []).includes(user.uid) &&
+            n.createdBy !== user.uid &&
+            isNotifTypeEnabledRef(n.type)
           );
 
-        newNotifs.forEach(n => {
-          seenIdsRef.current.add(n.id);
-          setToastQueue(prev => [...prev, { ...n, toastId: `${n.id}-${Date.now()}` }]);
-        });
-        
-        snap.docs.forEach(d => seenIdsRef.current.add(d.id));
-      }, (err) => console.error(`Lỗi Role Notif (${role}):`, err));
+        if (initialLoadUser.current) {
+          filteredList.forEach(n => seenIdsRef.current.add(n.id));
+          initialLoadUser.current = false;
+        } else {
+          freshNotifs.forEach(n => {
+            seenIdsRef.current.add(n.id);
+            setToastQueue(prev => [...prev, { ...n, toastId: `${n.id}-${Date.now()}` }]);
+          });
+        }
+      } catch (err) {
+        console.error("Lỗi lấy danh sách thông báo:", err);
+      }
+    };
 
-      unsubs.push(unsub);
-    });
-
-    const qUser = query(
-      collection(db, "notifications"),
-      where("targetUserId", "==", user.uid)
-    );
-
-    const unsubUser = onSnapshot(qUser, (snap) => {
-      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      setUserNotifications(list);
-
-      if (initialLoadUser.current) {
-        snap.docs.forEach(d => seenIdsRef.current.add(d.id));
-        initialLoadUser.current = false; 
+    const checkLocalShiftReminder = async () => {
+      if (!rolesNormalizedSet.has(normalizeRole("ehs committee"))) {
+        setLocalNotifications([]);
         return;
       }
 
-      const isNotifTypeEnabledRef = (type) => {
-        let targetType = type;
-        if (type === "shift_assign" || type === "shift_note") {
-          targetType = "shift_reminder";
-        }
-        return settingsRef.current[targetType] !== false;
-      };
-
-      // Lọc thông báo mới, chưa đọc, và KHÔNG phải do chính mình tạo
-      const newNotifs = list
-        .filter(n => !seenIdsRef.current.has(n.id))
-        .filter(n =>
-          !(n.readBy || []).includes(user.uid) && // chưa đọc
-          n.createdBy !== user.uid &&             // không phải do mình tạo
-          isNotifTypeEnabledRef(n.type)          // chưa bị tắt
-        );
-
-      newNotifs.forEach(n => {
-        seenIdsRef.current.add(n.id);
-        setToastQueue(prev => [...prev, { ...n, toastId: `${n.id}-${Date.now()}` }]);
-      });
+      const today = new Date();
+      const dayOfWeek = today.getDay(); 
+      const hour = today.getHours();
       
-      snap.docs.forEach(d => seenIdsRef.current.add(d.id));
-    }, (err) => console.error("Lỗi User Notif:", err));
+      if (dayOfWeek === 0 && hour >= 8) {
+        const nextWeekDate = new Date();
+        nextWeekDate.setDate(today.getDate() + 7);
+        const nextWeekId = `${nextWeekDate.getFullYear()}-${getWeekNumber(nextWeekDate)}`;
 
-    return () => {
-      unsubs.forEach(unsub => unsub());
-      unsubUser();
-    };
-  }, [user, isPageVisible]);
-
-  // Logic nhắc nhở chọn ca
-  useEffect(() => {
-    if (!user || !user.name) return;
-
-    // CHỈ áp dụng thông báo cho users có vai trò là "ehs committee"
-    const rawRolesList = user?.role ? (Array.isArray(user.role) ? user.role : String(user.role).split(',').map(r => r.trim()).filter(Boolean)) : [];
-    const rolesNormalized = rawRolesList.map(r => String(r).toLowerCase());
-    if (!rolesNormalized.includes("ehs committee")) {
-      setLocalNotifications([]);
-      return;
-    }
-
-    const today = new Date();
-    const dayOfWeek = today.getDay(); 
-    const hour = today.getHours();
-    
-    // CHỈ nhận thông báo từ 08:00 sáng Chủ nhật hàng tuần (dayOfWeek === 0 và hour >= 8)
-    if (dayOfWeek === 0 && hour >= 8) {
-      const nextWeekDate = new Date();
-      nextWeekDate.setDate(today.getDate() + 7);
-      const nextWeekId = `${nextWeekDate.getFullYear()}-${getWeekNumber(nextWeekDate)}`;
-
-      const unsub = onSnapshot(
-        doc(db, "weekly_shifts", nextWeekId),
-        (snap) => {
+        try {
+          const snap = await dbService.getDoc("weekly_shifts", nextWeekId);
           let hasShift = false;
-          if (snap.exists()) {
-            const data = snap.data();
-            if (data[user.name]) hasShift = true;
+          if (snap && snap._exists !== false) {
+            if (snap[user.name]) hasShift = true;
           }
           if (!hasShift) {
             setLocalNotifications([{
@@ -442,17 +489,35 @@ export default function NotificationBell({ user, setActiveTab }) {
           } else {
             setLocalNotifications([]);
           }
-        },
-        (error) => {
-          console.warn("Không thể đọc weekly_shifts để nhắc nhở ca:", error.code);
+        } catch (error) {
+          console.warn("Không thể đọc weekly_shifts để nhắc nhở ca:", error);
           setLocalNotifications([]);
         }
-      );
-      return () => unsub();
-    } else {
-      setLocalNotifications([]);
-    }
-  }, [user]);
+      } else {
+        setLocalNotifications([]);
+      }
+    };
+
+    globalRefreshCallback = fetchNotifications;
+
+    const runChecks = () => {
+      fetchNotifications();
+      checkLocalShiftReminder();
+    };
+
+    runChecks();
+
+    const unsub = realtimeService.subscribeToPath("notifications", () => {
+      fetchNotifications();
+    });
+
+    const intervalId = setInterval(runChecks, 30 * 1000);
+    return () => {
+      globalRefreshCallback = null;
+      unsub();
+      clearInterval(intervalId);
+    };
+  }, [user, isPageVisible]);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -484,8 +549,8 @@ export default function NotificationBell({ user, setActiveTab }) {
     // Đánh dấu đã đọc
     if (!notif.isLocal && !(notif.readBy || []).includes(user.uid)) {
       try {
-        await updateDoc(doc(db, "notifications", notif.id), {
-          readBy: arrayUnion(user.uid)
+        await dbService.updateDoc("notifications", notif.id, {
+          read_by: { type: "arrayUnion", elements: [user.uid] }
         });
       } catch (e) {
         console.error("Lỗi đánh dấu đã đọc", e);
@@ -511,15 +576,20 @@ export default function NotificationBell({ user, setActiveTab }) {
   const markAllAsRead = async () => {
     const unread = filteredNotifications.filter(n => !n.isLocal && !(n.readBy || []).includes(user.uid));
     if (unread.length === 0) return;
+
+    // Optimistic update: thêm uid vào readBy ngay lập tức → badge unread về 0 tức thì
+    const addSelfRead = (n) =>
+      (n.readBy || []).includes(user.uid) ? n : { ...n, readBy: [...(n.readBy || []), user.uid] };
+    setRoleNotifications(prev => prev.map(addSelfRead));
+    setUserNotifications(prev => prev.map(addSelfRead));
+
     try {
-      const batch = writeBatch(db);
-      unread.forEach(n => {
-        const ref = doc(db, "notifications", n.id);
-        batch.update(ref, { readBy: arrayUnion(user.uid) });
-      });
-      await batch.commit();
+      // 1 request gộp: PUT /api/notifications/read-all (cập nhật MySQL)
+      await originalDbService.markAllNotificationsRead();
     } catch (e) {
       console.error("Lỗi đánh dấu tất cả đã đọc", e);
+      // Thất bại → refetch để khôi phục trạng thái thực từ server
+      if (globalRefreshCallback) globalRefreshCallback();
     }
   };
 
@@ -800,13 +870,13 @@ export default function NotificationBell({ user, setActiveTab }) {
                 try {
                   localStorage.setItem(`notif_settings_${user?.uid}`, JSON.stringify(settings));
                   
-                  // Đồng bộ Firestore dạng best-effort
+                  // Đồng bộ best-effort cài đặt vào hồ sơ người dùng qua REST API
                   try {
-                    await updateDoc(doc(db, "users", user.uid), {
+                    await dbService.updateDoc("users", user.uid, {
                       notificationSettings: settings
                     });
-                  } catch (fsErr) {
-                    console.warn("Firestore sync warning (Security Rules might restrict write):", fsErr);
+                  } catch (syncErr) {
+                    console.warn("User settings sync warning:", syncErr);
                   }
                   
                   pushToast("Đã lưu cài đặt thông báo thành công!", "success");

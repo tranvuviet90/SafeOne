@@ -1,8 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useI18n } from '../i18n/I18nProvider';
-import { auth, functions } from '../firebase';
-import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
-import { httpsCallable } from 'firebase/functions';
+import apiClient from '../services/apiClient';
+import authService from '../services/authService';
 import { IoSettingsOutline } from 'react-icons/io5';
 import { useToast } from './LightboxSwipeOnly';
 import LanguageSwitcher from './LanguageSwitcher';
@@ -49,21 +48,16 @@ export default function UserSettings({ user, onLogout }) {
     }
     setIsUpdatingPass(true);
     try {
-      const currentUser = auth.currentUser;
-      const credential = EmailAuthProvider.credential(currentUser.email, oldPassword);
-      await reauthenticateWithCredential(currentUser, credential);
-      await updatePassword(currentUser, newPassword);
+      await authService.verifyPassword(oldPassword);
+      await authService.updatePassword(newPassword);
       pushToast(t('common.success'), 'success');
       setModalType(null);
       setOldPassword('');
       setNewPassword('');
     } catch (error) {
       console.error(error);
-      if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-        pushToast(t('login.error.invalid'), 'error');
-      } else {
-        pushToast(error.message, 'error');
-      }
+      const errorMsg = error.response?.data?.error || error.message || t('login.error.invalid');
+      pushToast(errorMsg, 'error');
     } finally {
       setIsUpdatingPass(false);
     }
@@ -73,8 +67,7 @@ export default function UserSettings({ user, onLogout }) {
     e.preventDefault();
     setIsRequestingRole(true);
     try {
-      const submitRoleRequest = httpsCallable(functions, 'submitRoleRequest');
-      await submitRoleRequest({
+      await apiClient.post('/api/functions/submitRoleRequest', {
         requestedRole,
         currentRole: user.role,
         name: user.name,

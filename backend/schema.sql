@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS notifications (
   target_user_id VARCHAR(128) DEFAULT NULL,
   read_by JSON DEFAULT NULL, -- Mảng các UID đã đọc thông báo này
   created_by VARCHAR(128) DEFAULT NULL,
+  related_id VARCHAR(255) DEFAULT NULL,
   timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
@@ -107,6 +108,4 @@ CREATE TABLE IF NOT EXISTS msds_chemicals (
   last_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
--- Gieo hạt tài khoản Admin mặc định ban đầu
-INSERT IGNORE INTO users (uid, email, password_hash, name, role) 
-VALUES ('admin-uid-default', 'admin', 'admin', 'Default Admin', 'admin');
+-- Gieo hạt tài khoản Admin mặc định sẽ được thực hiện qua seed.js khi khởi động hệ thống.

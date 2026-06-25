@@ -15,6 +15,15 @@ import React, {
  =========================================================== */
 const ToastCtx = createContext({ pushToast: () => {} });
 
+// Cấu hình màu sắc / icon / tiêu đề theo loại toast (emoji vì project không dùng lucide-react)
+const TOAST_STYLES = {
+  success: { color: "#16a34a", bg: "#e6f4ea", icon: "✅", title: "Thành công" },
+  error:   { color: "#dc2626", bg: "#fee2e2", icon: "❌", title: "Lỗi" },
+  warning: { color: "#d97706", bg: "#fef3c7", icon: "⚠️", title: "Cảnh báo" },
+  info:    { color: "#1f80e0", bg: "#e8f0fe", icon: "🔔", title: "Thông báo" },
+};
+const getToastStyle = (type) => TOAST_STYLES[type] || TOAST_STYLES.info;
+
 export function useToast() {
   const ctx = useContext(ToastCtx);
   return useMemo(() => ({
@@ -57,19 +66,15 @@ export function ToastProvider({ children }) {
             to { transform: translateX(0); opacity: 1; }
           }
         `}</style>
-        {toasts.map((t) => (
+        {toasts.map((t) => {
+          const s = getToastStyle(t.type);
+          return (
           <div
             key={t.id}
             style={{
               background: "#ffffff",
               color: "#222222",
-              borderLeft: `5px solid ${
-                t.type === "error"
-                  ? "#dc2626"
-                  : t.type === "success"
-                  ? "#16a34a"
-                  : "#1f80e0"
-              }`,
+              borderLeft: `5px solid ${s.color}`,
               borderRadius: 12,
               padding: "14px 16px",
               boxShadow: "0 8px 32px rgba(0,0,0,0.15), 0 2px 8px rgba(0,0,0,0.08)",
@@ -84,12 +89,7 @@ export function ToastProvider({ children }) {
           >
             <div
               style={{
-                background:
-                  t.type === "error"
-                    ? "#fee2e2"
-                    : t.type === "success"
-                    ? "#e6f4ea"
-                    : "#e8f0fe",
+                background: s.bg,
                 borderRadius: "50%",
                 width: 32,
                 height: 32,
@@ -100,16 +100,12 @@ export function ToastProvider({ children }) {
                 flexShrink: 0,
               }}
             >
-              {t.type === "error" ? "🚨" : t.type === "success" ? "✅" : "🔔"}
+              {s.icon}
             </div>
 
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontWeight: 700, fontSize: 14, color: "#111", marginBottom: 3 }}>
-                {t.type === "error"
-                  ? "Cảnh báo"
-                  : t.type === "success"
-                  ? "Thành công"
-                  : "Thông báo"}
+                {s.title}
               </div>
               <div style={{ fontSize: 13, color: "#444", lineHeight: 1.45 }}>{t.msg}</div>
             </div>
@@ -134,7 +130,8 @@ export function ToastProvider({ children }) {
               ✕
             </button>
           </div>
-        ))}
+          );
+        })}
       </div>
     </ToastCtx.Provider>
   );

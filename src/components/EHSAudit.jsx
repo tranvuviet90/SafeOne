@@ -2,20 +2,16 @@
 // Đã có key={dep.name} và các sửa lỗi khác.
 
 import React, { useState, useEffect, useRef } from "react";
-import { db, storage } from "../firebase";
-import {
-  doc, setDoc, onSnapshot, collection, addDoc, serverTimestamp,
-  query, where, getDocs, Timestamp, writeBatch, deleteDoc, getDoc,
-  updateDoc, arrayUnion
-} from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
+import dbService from "../services/dbService";
+import apiClient from "../services/apiClient";
 import imageCompression from "browser-image-compression";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { colors } from "../theme";
 import { useI18n } from "../i18n/I18nProvider";
 import LightboxSwipeOnly, { useConfirm } from "./LightboxSwipeOnly";
-import { callAIService } from "../utils/aiAdapter";
+import { callAIService, callSpellCheckService } from "../utils/aiAdapter";
+import realtimeService from "../services/realtimeService";
 
 /* ====================== BIỂU TƯỢNG (ICON) ====================== */
 function ImprovementIcon({ color = 'currentColor', size = 18 }) {
@@ -52,6 +48,16 @@ const errorGroups = [
   { group: "Thái độ hợp tác", items: [ { code: "12.1", desc: "Không hợp tác xử lý an toàn", point: 6 }, { code: "12.2", desc: "Thái độ đe dọa", point: 6 }, { code: "12.3", desc: "Đánh người", point: 6 }, { code: "12.4", desc: "QL không xử lý vi phạm của nhân viên", point: 6 }, { code: "12.other", desc: "Lỗi khác (Thái độ)", point: 0 } ] },
   { group: "Lỗi Khác", items: []},
 ];
+
+const serverTimestamp = () => new Date().toISOString();
+const Timestamp = {
+  fromDate(date) {
+    return date.toISOString();
+  },
+  now() {
+    return new Date().toISOString();
+  }
+};
 
 /* =========================
    Hàm hỗ trợ ảnh và thời gian
@@ -97,10 +103,11 @@ async function makeThumbDataURL(url, maxW = 96, maxH = 96, quality = 0.55) {
 
 const safeTsToDate = (ts) => {
     if (!ts) return null;
-    if (ts instanceof Timestamp) return ts.toDate();
     if (ts.seconds) return new Date(ts.seconds * 1000);
     if (ts instanceof Date) return ts;
     if (typeof ts === 'string') {
+        const d = new Date(ts);
+        if (!isNaN(d.getTime())) return d;
         const parts = ts.match(/(\d+)/g);
         if (parts && parts.length === 6) {
             const [h, m, s, day, month, year] = parts.map(Number);
@@ -129,6 +136,28 @@ const formatDateStr = (d) => {
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
+};
+
+// ===== Chuẩn hóa tương thích ngược =====
+// Hỗ trợ cả định dạng phẳng mới và định dạng lồng cũ { department, error: {...} }
+const normalizeEvent = (ev) => {
+  if (!ev) return null;
+  if (ev.error && typeof ev.error === 'object') {
+    // Định dạng cũ: dữ liệu vi phạm nằm trong ev.error
+    return {
+      id: ev.id || ev.uid,
+      department: ev.department,
+      heSo: ev.heSo,
+      peopleCount: ev.peopleCount,
+      addedBy: ev.addedBy,
+      addedByUid: ev.addedByUid,
+      is_deleted: ev.is_deleted,
+      ...ev.error,
+      timestamp: ev.timestamp || ev.error.timestamp,
+    };
+  }
+  // Định dạng mới: phẳng
+  return { id: ev.id || ev.uid, ...ev };
 };
 
 /* =========================
@@ -169,7 +198,7 @@ function ExportModal({ onClose, departments }) {
     let rowIndex = 7;
     for (let i = 0; i < rows.length; i++) {
       const r = rows[i];
-      const findings = r.note ? `${r.desc}\n\nGhi chú: ${r.note}` : r.desc;
+      const findings = r.note || r.desc;
       
       const borderThin = {
         left: { style: 'thin', color: { auto: true } },
@@ -182,29 +211,22 @@ function ExportModal({ onClose, departments }) {
         const cell = ws.getCell(rowIndex, c);
         cell.border = borderThin;
         cell.font = { name: 'Times New Roman', size: 11 };
-        if (c === 1 || c === 3 || c === 4 || c === 8 || c === 9 || c === 10) {
-          cell.alignment = { horizontal: 'center', vertical: 'middle' };
-        } else {
+        if (c === 2 || c === 7 || c === 13 || c === 14) {
           cell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+        } else {
+          cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
         }
       }
 
       // Calculate Progress Status and Comment dynamically
-      let progressStatus = "Chưa thực hiện";
+      let progressStatus = "Chưa tiến hành";
       let ehsComment = "";
 
-      const hasImprovementInfo = r.responsiblePerson || r.dueDate || r.progressNotes || r.completionDate || r.afterUrl;
+      const hasImprovementInfo = r.pic || r.dueDate || r.progressNotes || r.afterUrl;
 
-      if (r.completionDate) {
+      if (r.ehsVerified) {
         progressStatus = "Đã hoàn thành";
-        const compDate = parseDateStr(r.completionDate);
-        const limitDate = r.dueDate ? parseDateStr(r.dueDate) : null;
-        if (compDate && limitDate && compDate > limitDate) {
-          ehsComment = `Hoàn thành trễ hạn (Hạn: ${r.dueDate.split('-').reverse().join('/')}, Hoàn thành: ${r.completionDate.split('-').reverse().join('/')})`;
-        } else {
-          ehsComment = "Hoàn thành đúng hạn";
-        }
-      } else if (hasImprovementInfo) {
+      } else {
         if (r.dueDate) {
           const limitDate = parseDateStr(r.dueDate);
           const today = new Date();
@@ -212,17 +234,14 @@ function ExportModal({ onClose, departments }) {
           if (limitDate) {
             limitDate.setHours(0, 0, 0, 0);
             if (today > limitDate) {
-              progressStatus = "Quá hạn";
-              const diffTime = Math.abs(today - limitDate);
-              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-              ehsComment = `Quá hạn từ ngày ${r.dueDate.split('-').reverse().join('/')} (Quá hạn ${diffDays} ngày)`;
-            } else {
+              progressStatus = "Trễ hạn hoàn thành";
+            } else if (hasImprovementInfo) {
               progressStatus = "Đang tiến hành";
             }
-          } else {
+          } else if (hasImprovementInfo) {
             progressStatus = "Đang tiến hành";
           }
-        } else {
+        } else if (hasImprovementInfo) {
           progressStatus = "Đang tiến hành";
         }
       }
@@ -234,12 +253,12 @@ function ExportModal({ onClose, departments }) {
 
       ws.getCell(rowIndex, 1).value = i + 1; // No.
       ws.getCell(rowIndex, 2).value = findings; // Findings
-      ws.getCell(rowIndex, 3).value = r.dateISO; // Audit date
+      ws.getCell(rowIndex, 3).value = r.ca ? `${r.dateISO}\nCa: ${r.ca}` : r.dateISO; // Audit date
       ws.getCell(rowIndex, 4).value = r.addedBy || ""; // Auditor
       ws.getCell(rowIndex, 5).value = r.department || ""; // Responsible Department
       ws.getCell(rowIndex, 6).value = r.responsiblePerson || ""; // Information Recipient (Người nhận thông tin)
       ws.getCell(rowIndex, 7).value = r.progressNotes || ""; // Corrective Action
-      ws.getCell(rowIndex, 8).value = r.responsiblePerson || ""; // PIC
+      ws.getCell(rowIndex, 8).value = r.pic || ""; // PIC (Người cải thiện)
       ws.getCell(rowIndex, 9).value = progressStatus; // Progress Status
       ws.getCell(rowIndex, 10).value = r.dueDate || ""; // Estimated Completion Date
       ws.getCell(rowIndex, 13).value = ""; // EHS Assessment (blank)
@@ -319,8 +338,6 @@ function ExportModal({ onClose, departments }) {
       // Dòng 39: gộp cả "Khác" và "Lỗi Khác" (custom errors) vào chung
       { group: "__KHAC__",               startRow: 39, defaultRows: 1 },
     ];
-    // Dòng 40 là dòng tính toán (C40=100 cố định, D-F40 gộp "Tổng điểm trừ")
-    // Chúng ta chỉ ghi G40=SUM, G41=100-G40, không đụng C40/D40/E40/F40
     const ORIGINAL_TOTAL_ROW = 40;
 
     // Gom dữ liệu theo bộ phận
@@ -399,15 +416,12 @@ function ExportModal({ onClose, departments }) {
           ws.getCell(`F${targetRow}`).value = v.adjusted;
           ws.getCell(`G${targetRow}`).value = { formula: `C${targetRow}*F${targetRow}` };
           if (v.notes.length > 0) {
-            // Mỗi ghi chú trên một dòng riêng - dễ đọc hơn trong Excel
             ws.getCell(`H${targetRow}`).value = v.notes.join('\n');
             ws.getCell(`H${targetRow}`).alignment = { wrapText: true, vertical: 'top' };
           }
         });
       }
 
-      // Dòng 40: chỉ ghi G40=SUM tổng điểm trừ, không đụng C40/D-F40
-      // Dòng 41: G41 = 100 - G40
       const totalRow = lastDataRow + 1;  // = 40 + rowOffset
       const scoreRow = lastDataRow + 2;  // = 41 + rowOffset
       ws.getCell(`G${totalRow}`).value = { formula: `SUM(G5:G${lastDataRow})` };
@@ -419,66 +433,61 @@ function ExportModal({ onClose, departments }) {
   };
 
   const handleExport = async (mode) => {
+    if (!startDate || !endDate) {
+      alert("Vui lòng chọn ngày tháng trước khi xuất báo cáo.");
+      return;
+    }
     setIsGenerating(true);
     try {
       const { start, end, label } = getDateRange();
-      let qy = query(
-        collection(db, "gemba_events"),
-        where("timestamp", ">=", Timestamp.fromDate(start)),
-        where("timestamp", "<=", Timestamp.fromDate(end))
-      );
-      
-      if (mode === 'cap' && selectedDept !== 'all') {
-        qy = query(qy, where("department", "==", selectedDept));
-      }
 
-      const eventsSnapshot = await getDocs(qy);
-      if (eventsSnapshot.empty) {
-        alert(`Không có dữ liệu trong khoảng thời gian / bộ phận đã chọn.`);
+      // T\u1ea3i d\u1eef li\u1ec7u vi ph\u1ea1m ph\u1eb3ng t\u1eeb gemba_events v\u00e0 chu\u1ea9n h\u00f3a
+      const allEvents = await dbService.getDocs("gemba_events");
+      const filteredEvents = allEvents.filter(ev => {
+        if (ev.is_deleted) return false;
+        const ts = safeTsToDate(ev.timestamp);
+        if (!ts) return false;
+        const matchesDate = ts >= start && ts <= end;
+        const matchesDept = selectedDept === 'all' || ev.department === selectedDept;
+        return matchesDate && matchesDept;
+      });
+
+      if (filteredEvents.length === 0) {
+        alert(`Kh\u00f4ng c\u00f3 d\u1eef li\u1ec7u trong kho\u1ea3ng th\u1eddi gian / b\u1ed9 ph\u1eadn \u0111\u00e3 ch\u1ecdn.`);
         setIsGenerating(false); return;
       }
 
-      // Fetch all scores from gemba_scores for backwards compatibility to merge updated improvement fields
-      const gembaScoresCollectionRef = collection(db, "gemba_scores");
-      const scoresSnapshot = await getDocs(gembaScoresCollectionRef);
-      const allScoresMap = new Map();
-      scoresSnapshot.forEach(docSnap => {
-        allScoresMap.set(docSnap.id, docSnap.data().scores || []);
-      });
+      // T\u1ea3i s\u1ed1 nh\u00e2n s\u1ef1 t\u1eeb gemba_scores (\u0111\u1ec3 xu\u1ea5t B\u1ea3ng ch\u1ea5m \u0111i\u1ec3m)
+      const allScoresDocs = await dbService.getDocs("gemba_scores");
 
       const rows = [];
-      eventsSnapshot.forEach((docSnap) => {
-        const ev = docSnap.data();
-        const ts = safeTsToDate(ev.timestamp);
+      filteredEvents.forEach((ev) => {
+        const normalized = normalizeEvent(ev);
+        if (!normalized) return;
+        const ts = safeTsToDate(normalized.timestamp);
         const dateISO = ts ? ts.toISOString().slice(0, 10) : "";
-
-        // Merge latest data from gemba_scores array
-        const deptScores = allScoresMap.get(ev.department) || [];
-        const matchedScore = deptScores.find(s => {
-          if (s.code !== ev.error?.code) return false;
-          const sTime = s.timestamp ? safeTsToDate(s.timestamp) : null;
-          const evTime = ev.timestamp ? safeTsToDate(ev.timestamp) : null;
-          if (sTime && evTime) {
-            return Math.abs(sTime.getTime() - evTime.getTime()) < 600000;
-          }
-          return s.note === ev.error?.note;
-        });
-
-        const errorData = matchedScore ? { ...ev.error, ...matchedScore } : ev.error;
+        const deptDoc = allScoresDocs.find(d => (d.id || d.uid) === normalized.department);
+        const deptPeople = deptDoc?.people !== undefined
+          ? deptDoc.people
+          : (departments.find(d => d.name === normalized.department)?.defaultPeople ?? 0);
+        const eventHeSo = Number.isFinite(normalized.heSo) ? normalized.heSo : calcHeSo(deptPeople);
 
         rows.push({
-          dateISO, department: ev.department || "", ...errorData,
-          basePoint: Number.isFinite(errorData?.point) ? errorData.point : 0,
-          heSo: ev.heSo, adjusted: Number(((errorData.point + ev.heSo) / 2).toFixed(2)),
-          addedBy: ev.addedBy || "", 
-          beforeUrl: errorData.imageUrl || "", 
-          imageUrls: errorData.imageUrls || [],
-          afterUrl: errorData.improvementImageUrl || "",
+          dateISO,
+          department: normalized.department || "",
+          ...normalized,
+          ca: normalized.ca || "",
+          basePoint: Number.isFinite(normalized.point) ? normalized.point : 0,
+          heSo: eventHeSo,
+          adjusted: Number(((normalized.point + eventHeSo) / 2).toFixed(2)),
+          addedBy: normalized.addedBy || "",
+          beforeUrl: (normalized.imageUrls && normalized.imageUrls[0]) || normalized.imageUrl || "",
+          imageUrls: normalized.imageUrls || [],
+          afterUrl: normalized.improvementImageUrl || "",
         });
       });
 
       if (mode === "cap") {
-        // Sắp xếp các hạng mục từ trên xuống dưới theo bộ phận
         rows.sort((a, b) => {
           const deptA = (a.department || "").toLowerCase();
           const deptB = (b.department || "").toLowerCase();
@@ -486,18 +495,23 @@ function ExportModal({ onClose, departments }) {
         });
         await exportCAP(rows, label, selectedDept);
       } else {
+        // X\u00e2y d\u1ef1ng allDeptData Map \u2013 ch\u1ec9 c\u1ea7n peopleCount cho exportBangChamDiem
         const allDeptData = new Map();
-        scoresSnapshot.forEach(doc => { allDeptData.set(doc.id, doc.data()); });
-        // Dùng trực tiếp rows từ gemba_events (không filter theo timestamp vì server/client timestamp khác nhau)
+        departments.forEach(dept => {
+          const deptDoc = allScoresDocs.find(d => (d.id || d.uid) === dept.name);
+          const people = deptDoc?.people !== undefined ? deptDoc.people : dept.defaultPeople;
+          allDeptData.set(dept.name, { people });
+        });
         await exportBangChamDiem(rows.filter(r => !r.isReminder), label, allDeptData);
       }
     } catch (err) {
-      console.error("Có lỗi khi xuất báo cáo:", err);
-      alert(`Xuất báo cáo thất bại: ${err.message}`);
+      console.error("C\u00f3 l\u1ed7i khi xu\u1ea5t b\u00e1o c\u00e1o:", err);
+      alert(`Xu\u1ea5t b\u00e1o c\u00e1o th\u1ea5t b\u1ea1i: ${err.message}`);
     } finally {
       setIsGenerating(false);
     }
   };
+
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 1200 }}>
@@ -529,8 +543,8 @@ function ExportModal({ onClose, departments }) {
         <style>{`.date-picker-wrapper{width:100%}.date-picker-input{width:100%;padding:8px;border-radius:6px;border:1px solid ${colors.border};box-sizing:border-box}`}</style>
         <div style={{ display: "flex", gap: 12, marginTop: 20, justifyContent: "flex-end", flexWrap: "wrap" }}>
           <button onClick={onClose} disabled={isGenerating} style={{ padding: "8px 16px", borderRadius: 6, border: `1px solid ${colors.border}`, background: colors.background, cursor: "pointer" }}>Hủy</button>
-          <button onClick={() => handleExport("bang")} disabled={isGenerating || !startDate || !endDate} style={{ padding: "8px 16px", borderRadius: 6, border: "none", background: colors.success, color: colors.white, fontWeight: 700, cursor: "pointer" }}>{isGenerating ? "Đang xử lý..." : "Xuất BẢNG CHẤM ĐIỂM"}</button>
-          <button onClick={() => handleExport("cap")} disabled={isGenerating || !startDate || !endDate} style={{ padding: "8px 16px", borderRadius: 6, border: "none", background: "#1f80e0", color: colors.white, fontWeight: 700, cursor: "pointer" }}>{isGenerating ? "Đang xử lý..." : "Xuất CAP"}</button>
+          <button onClick={() => handleExport("bang")} disabled={isGenerating} style={{ padding: "8px 16px", borderRadius: 6, border: "none", background: colors.success, color: colors.white, fontWeight: 700, cursor: "pointer" }}>{isGenerating ? "Đang xử lý..." : "Xuất BẢNG CHẤM ĐIỂM"}</button>
+          <button onClick={() => handleExport("cap")} disabled={isGenerating} style={{ padding: "8px 16px", borderRadius: 6, border: "none", background: "#1f80e0", color: colors.white, fontWeight: 700, cursor: "pointer" }}>{isGenerating ? "Đang xử lý..." : "Xuất CAP"}</button>
         </div>
       </div>
     </div>
@@ -541,10 +555,10 @@ function ExportModal({ onClose, departments }) {
    CỬA SỔ (MODAL) CẢI THIỆN
    ========================= */
 function ImprovementModal({ modalData, onClose, onSave }) {
-  const [responsiblePerson, setResponsiblePerson] = useState(modalData.error?.responsiblePerson || "");
+  const [pic, setPic] = useState(modalData.error?.pic || "");
   const [dueDate, setDueDate] = useState(modalData.error?.dueDate || "");
   const [progressNotes, setProgressNotes] = useState(modalData.error?.progressNotes || "");
-  const [completionDate, setCompletionDate] = useState(modalData.error?.completionDate || "");
+  const [ehsVerified, setEhsVerified] = useState(modalData.error?.ehsVerified || false);
   const [improvementImageFile, setImprovementImageFile] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -564,14 +578,19 @@ function ImprovementModal({ modalData, onClose, onSave }) {
       setImprovementImageFile(null);
     }
   };
+
   const handleSave = async () => {
     setIsSaving(true);
     let imageUrl = modalData.error?.improvementImageUrl || null;
     if (improvementImageFile) {
       try {
-        const imageRef = ref(storage, `gemba_improvement_images/${Date.now()}_${improvementImageFile.name}`);
-        await uploadBytes(imageRef, improvementImageFile);
-        imageUrl = await getDownloadURL(imageRef);
+        const formData = new FormData();
+        formData.append("file", improvementImageFile);
+        formData.append("path", `gemba_improvement_images/${Date.now()}_${improvementImageFile.name}`);
+        const res = await apiClient.post("/api/storage/upload", formData, {
+          headers: { "Content-Type": "multipart/form-data" }
+        });
+        imageUrl = res.data.url;
       } catch (error) {
         console.error("Lỗi tải ảnh cải thiện: ", error);
         alert("Tải ảnh cải thiện thất bại!");
@@ -579,11 +598,12 @@ function ImprovementModal({ modalData, onClose, onSave }) {
         return;
       }
     }
-    const improvementData = { responsiblePerson, dueDate, progressNotes, completionDate, improvementImageUrl: imageUrl };
-    await onSave(modalData.index, improvementData);
+    const improvementData = { pic, dueDate, progressNotes, ehsVerified, improvementImageUrl: imageUrl };
+    await onSave(modalData.logId, improvementData);
     setIsSaving(false);
     onClose();
   };
+
   const inputStyle = { width: '100%', padding: 8, borderRadius: 6, border: `1px solid ${colors.border}`, marginTop: 5, boxSizing: 'border-box' };
   const labelStyle = { fontWeight: 600, color: '#333' };
 
@@ -593,7 +613,7 @@ function ImprovementModal({ modalData, onClose, onSave }) {
         <h3 style={{ marginTop: 0, color: colors.primary, borderBottom: `2px solid ${colors.primaryLight}`, paddingBottom: 10 }}>Cập nhật Cải thiện & Khắc phục</h3>
         <p><b>Lỗi:</b> {modalData.error.desc}</p>
         <div style={{ display: 'grid', gap: 12 }}>
-          <div> <label style={labelStyle}>Người nhận Thông tin</label> <input type="text" value={responsiblePerson} onChange={e => setResponsiblePerson(e.target.value)} style={inputStyle} /> </div>
+          <div> <label style={labelStyle}>P.I.C</label> <input type="text" value={pic} onChange={e => setPic(e.target.value)} style={inputStyle} placeholder="Người chịu trách nhiệm cải thiện" /> </div>
           <div>
             <label style={labelStyle}>Ngày dự kiến hoàn thành</label>
             <DatePicker
@@ -605,17 +625,17 @@ function ImprovementModal({ modalData, onClose, onSave }) {
               customInput={<input style={inputStyle} />}
             />
           </div>
-          <div> <label style={labelStyle}>Ghi chú tiến độ</label> <textarea value={progressNotes} onChange={e => setProgressNotes(e.target.value)} style={{...inputStyle, minHeight: 70}} /> </div>
-          <div>
-            <label style={labelStyle}>Ngày hoàn thành</label>
-            <DatePicker
-              selected={completionDate ? parseDateStr(completionDate) : null}
-              onChange={(date) => setCompletionDate(formatDateStr(date))}
-              dateFormat="dd/MM/yyyy"
-              placeholderText="dd/mm/yyyy"
-              className="date-picker-input"
-              customInput={<input style={inputStyle} />}
-            />
+          <div> <label style={labelStyle}>Biện pháp khắc phục</label> <textarea value={progressNotes} onChange={e => setProgressNotes(e.target.value)} style={{...inputStyle, minHeight: 70}} /> </div>
+          <div style={{ marginTop: 4 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none', ...labelStyle }}>
+              <input
+                type="checkbox"
+                checked={ehsVerified}
+                onChange={e => setEhsVerified(e.target.checked)}
+                style={{ width: 18, height: 18, accentColor: colors.primary, cursor: 'pointer' }}
+              />
+              <span>Xác nhận đã hoàn thành của EHS</span>
+            </label>
           </div>
           <div>
             <label style={labelStyle}>Ảnh cải thiện</label>
@@ -671,10 +691,8 @@ function GembaReportDashboard({ onClose, onExport, departments, allDeptScores, s
     const people = data.people !== undefined ? data.people : dept.defaultPeople;
     const heSo = calcHeSo(people);
     const monthScores = scores.filter((s) => {
-      const d = s.timestamp instanceof Object && s.timestamp.seconds
-        ? new Date(s.timestamp.seconds * 1000)
-        : (s.timestamp instanceof Date ? s.timestamp : new Date(s.timestamp));
-      return !isNaN(d.getTime()) && d.toISOString().slice(0, 7) === month;
+      const d = safeTsToDate(s.timestamp);
+      return d && !isNaN(d.getTime()) && d.toISOString().slice(0, 7) === month;
     });
     const totalDeduction = monthScores.reduce((sum, e) => sum + (e.isReminder ? 0 : (e.point + heSo) / 2), 0);
     const remaining = Math.max(0, 100 - totalDeduction);
@@ -686,11 +704,35 @@ function GembaReportDashboard({ onClose, onExport, departments, allDeptScores, s
     return { name: dept.name, remaining, errorCount, reminderCount, heSo, people, topGroups, totalDeduction };
   });
 
-  // Sort high → low
   const deptStats = calcStats(activeMonth).sort((a, b) => b.remaining - a.remaining);
 
-  const CHART_H = isMobile ? 180 : 260; // px height of chart area
+  // Cột "Trung bình" ở cuối chart: điểm trung bình + gộp thống kê nhóm lỗi toàn bộ bộ phận
+  const averageEntry = (() => {
+    const cnt = deptStats.length;
+    const avgRemaining = cnt ? deptStats.reduce((s, d) => s + d.remaining, 0) / cnt : 0;
+    const aggGroupCounts = {};
+    deptStats.forEach(d => d.topGroups.forEach(([g, c]) => { aggGroupCounts[g] = (aggGroupCounts[g] || 0) + c; }));
+    const avgTopGroups = Object.entries(aggGroupCounts).sort((a, b) => b[1] - a[1]).slice(0, 3);
+    return {
+      name: 'TB',
+      remaining: avgRemaining,
+      errorCount: deptStats.reduce((s, d) => s + d.errorCount, 0),
+      reminderCount: deptStats.reduce((s, d) => s + d.reminderCount, 0),
+      heSo: '-',
+      people: deptStats.reduce((s, d) => s + d.people, 0),
+      topGroups: avgTopGroups,
+      totalDeduction: deptStats.reduce((s, d) => s + d.totalDeduction, 0),
+      isAverage: true,
+    };
+  })();
+  // Dữ liệu vẽ chart = các bộ phận + cột trung bình ở cuối (bảng chi tiết vẫn dùng deptStats)
+  const chartStats = deptStats.length ? [...deptStats, averageEntry] : deptStats;
+
+  const CHART_H = isMobile ? 180 : 260;
   const BAR_MAX = 100;
+
+  // Bảng màu riêng cho cột trung bình (xám) để phân biệt với cột bộ phận
+  const AVG_COLORS = { main: '#90a4ae', top: '#b0bec5', side: '#607d8b', light: '#eceff1', score: '#ffffff' };
 
   const getColors = (score) => {
     if (score >= 90) return { main: '#1565c0', top: '#5b9bd5', side: '#0d47a1', light: '#e3f0ff', score: '#7ec8ff' };
@@ -707,40 +749,38 @@ function GembaReportDashboard({ onClose, onExport, departments, allDeptScores, s
     setTooltip({ visible: true, x: rect.left + rect.width / 2, y: side === 'top' ? rect.top : rect.bottom, dept, side });
   };
 
-  // SVG chart constants
-  const n = deptStats.length;
+  const n = chartStats.length;
   const SVG_W = isMobile ? Math.max(320, n * 46) : Math.max(560, n * 72);
   const SVG_H = isMobile ? 260 : 340;
-  const PAD_L = isMobile ? 30 : 38;   // left for y-axis labels
+  const PAD_L = isMobile ? 30 : 38;   
   const PAD_R = isMobile ? 10 : 14;
-  const PAD_T = isMobile ? 16 : 20;   // top (for top-face overhang)
-  const PAD_B = isMobile ? 44 : 52;   // bottom for dept labels
+  const PAD_T = isMobile ? 16 : 20;   
+  const PAD_B = isMobile ? 44 : 52;   
   const RPT_CHART_H = SVG_H - PAD_T - PAD_B;
+  const RPT_BAR_MAX = 100;          // thang điểm tối đa của biểu đồ báo cáo (100%)
+  const DX = isMobile ? 6 : 10;     // độ lệch chiều sâu khối 3D theo trục X
+  const DY = isMobile ? 6 : 10;     // độ lệch chiều sâu khối 3D theo trục Y
   const CHART_W = SVG_W - PAD_L - PAD_R;
-  const RPT_BAR_MAX = 100;
-  const DX = isMobile ? 7 : 10;  // 3D depth x
-  const DY = isMobile ? 4 : 6;   // 3D depth y
   const slotW = CHART_W / n;
   const barW = Math.min(isMobile ? 26 : 40, slotW * 0.62);
 
-  // Isometric 3D bar rendered as SVG polygons
-  // origin: bottom-left of front face = (x0, yBase)
-  const Bar3D = ({ x0, yBase, barH, c, score, deptName, idx, onEnter, onLeave }) => {
+  // Khối cột 3D đẳng cự — render bằng SVG polygon + animate (SMIL) y nguyên acp360
+  const Bar3D = ({ x0, yBase, barH, c, score, deptName, idx, onEnter, onLeave, isAverage }) => {
     const animDelay = idx * 55;
     const animId = `gemba-clip-${idx}`;
-    // Front face corners (rect)
+    // Mặt trước (rect)
     const fx0 = x0, fy0 = yBase - barH, fx1 = x0 + barW, fy1 = yBase;
-    // Top face parallelogram: front-top-left → shift by (DX, -DY)
+    // Mặt trên (hình bình hành)
     const tx0 = fx0,       ty0 = fy0;
     const tx1 = fx1,       ty1 = fy0;
     const tx2 = fx1 + DX,  ty2 = fy0 - DY;
     const tx3 = fx0 + DX,  ty3 = fy0 - DY;
-    // Right face: top-right-front → top-right-back → bottom-right-back → bottom-right-front
+    // Mặt phải
     const rx0 = fx1,       ry0 = fy0;
     const rx1 = fx1 + DX,  ry1 = fy0 - DY;
     const rx2 = fx1 + DX,  ry2 = yBase - DY;
     const rx3 = fx1,       ry3 = yBase;
-    const labelY = fy0 + barH / 2;  // vertical centre of front face
+    const labelY = fy0 + barH / 2;
 
     return (
       <g
@@ -786,21 +826,15 @@ function GembaReportDashboard({ onClose, onExport, departments, allDeptScores, s
         </defs>
 
         <g clipPath={`url(#${animId})`}>
-          {/* Right side face */}
-          <polygon
-            points={`${rx0},${ry0} ${rx1},${ry1} ${rx2},${ry2} ${rx3},${ry3}`}
-            fill={c.side}
-          />
-          {/* Top face */}
-          <polygon
-            points={`${tx0},${ty0} ${tx1},${ty1} ${tx2},${ty2} ${tx3},${ty3}`}
-            fill={c.top}
-          />
-          {/* Front face */}
-          <rect x={fx0} y={fy0} width={barW} height={barH} fill={`url(#gf${idx})`} />
+          {/* Mặt phải */}
+          <polygon points={`${rx0},${ry0} ${rx1},${ry1} ${rx2},${ry2} ${rx3},${ry3}`} fill={c.side} />
+          {/* Mặt trên */}
+          <polygon points={`${tx0},${ty0} ${tx1},${ty1} ${tx2},${ty2} ${tx3},${ty3}`} fill={c.top} />
+          {/* Mặt trước */}
+          <rect x={fx0} y={fy0} width={barW} height={barH} fill={`url(#gf${idx})`} stroke={isAverage ? '#ffffff' : 'none'} strokeWidth={isAverage ? 1.5 : 0} strokeDasharray={isAverage ? '4 3' : '0'} />
         </g>
 
-        {/* Score label — always centred on front face, shown when tall enough */}
+        {/* Số điểm — giữa mặt trước khi cột đủ cao */}
         {barH >= 22 && (
           <text
             x={fx0 + barW / 2}
@@ -815,7 +849,7 @@ function GembaReportDashboard({ onClose, onExport, departments, allDeptScores, s
             {score}
           </text>
         )}
-        {/* Score above bar when bar is too short */}
+        {/* Số điểm phía trên cột khi cột quá thấp */}
         {barH < 22 && (
           <text
             x={fx0 + barW / 2}
@@ -831,15 +865,16 @@ function GembaReportDashboard({ onClose, onExport, departments, allDeptScores, s
           </text>
         )}
 
-        {/* Dept name label below baseline */}
+        {/* Tên bộ phận dưới chân cột */}
         <text
           x={fx0 + barW / 2 + DX / 2}
           y={yBase + (isMobile ? 13 : 16)}
           textAnchor="middle"
-          fill="#7a9ac8"
+          fill={isAverage ? '#cfd8e3' : '#7a9ac8'}
           fontWeight="700"
           fontSize={isMobile ? 8 : 10}
           fontFamily="sans-serif"
+          fontStyle={isAverage ? 'italic' : 'normal'}
           style={{ pointerEvents: 'none' }}
         >
           {deptName.length > 8 ? deptName.slice(0, 7) + '…' : deptName}
@@ -850,16 +885,16 @@ function GembaReportDashboard({ onClose, onExport, departments, allDeptScores, s
 
   return (
     <div
-      style={{ position: 'fixed', inset: 0, zIndex: 1100, background: 'rgba(8,16,36,0.78)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: isMobile ? 8 : 24 }}
+      style={{ position: 'fixed', inset: 0, zIndex: 1100, background: 'rgba(8,16,36,0.78)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: isMobile ? 8 : 24, backdropFilter: 'blur(6px)' }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div style={{ background: 'linear-gradient(160deg,#1a2540 0%,#0f1c38 100%)', borderRadius: 22, width: '100%', maxWidth: 940, maxHeight: '94vh', overflowY: 'auto', overflowX: 'hidden', boxShadow: '0 16px 64px rgba(0,0,0,0.55)', padding: isMobile ? '16px 10px 20px' : '28px 36px 32px', position: 'relative' }}>
+      <div style={{ background: 'linear-gradient(160deg,#1a2540 0%,#0f1c38 100%)', borderRadius: 22, width: '100%', maxWidth: 1040, maxHeight: '94vh', overflowY: 'auto', overflowX: 'hidden', boxShadow: '0 16px 64px rgba(0,0,0,0.55)', padding: isMobile ? '16px 10px 20px' : '28px 36px 32px', position: 'relative' }}>
 
-        {/* Header row */}
+        {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
           <div>
             <div style={{ fontWeight: 800, fontSize: isMobile ? 16 : 21, color: '#e8f0fe', letterSpacing: '-0.3px' }}>
-              📊 Báo cáo Gemba — {monthLabel}
+              📊 Báo cáo kết quả EHS Audit — {monthLabel}
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -871,19 +906,7 @@ function GembaReportDashboard({ onClose, onExport, departments, allDeptScores, s
             />
             <button
               onClick={onExport}
-              style={{
-                background: colors.success,
-                color: colors.white,
-                border: "none",
-                padding: "6px 15px",
-                borderRadius: 8,
-                fontWeight: "bold",
-                cursor: "pointer",
-                fontSize: 14,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 5
-              }}
+              style={{ background: colors.success, color: colors.white, border: "none", padding: "6px 15px", borderRadius: 8, fontWeight: "bold", cursor: "pointer", fontSize: 14, display: 'flex', alignItems: 'center', gap: 5 }}
             >
               📥 {t("common.export")}
             </button>
@@ -909,7 +932,7 @@ function GembaReportDashboard({ onClose, onExport, departments, allDeptScores, s
             viewBox={`0 0 ${SVG_W} ${SVG_H}`}
             style={{ display: 'block', minWidth: SVG_W }}
           >
-            {/* Y-axis gridlines & labels */}
+            {/* Lưới trục Y + nhãn */}
             {[0, 25, 50, 75, 100].map(v => {
               const gy = PAD_T + RPT_CHART_H - (v / RPT_BAR_MAX) * RPT_CHART_H;
               return (
@@ -933,24 +956,25 @@ function GembaReportDashboard({ onClose, onExport, departments, allDeptScores, s
               );
             })}
 
-            {/* Bars */}
-            {deptStats.map((d, idx) => {
-              const c = getColors(d.remaining);
-              const barH = Math.max(4, (d.remaining / RPT_BAR_MAX) * RPT_CHART_H);
+            {/* Cột (gồm cả cột Trung bình ở cuối) */}
+            {chartStats.map((stat, i) => {
+              const c = stat.isAverage ? AVG_COLORS : getColors(stat.remaining);
+              const barH = Math.max(4, (stat.remaining / RPT_BAR_MAX) * RPT_CHART_H);
               const yBase = PAD_T + RPT_CHART_H;
-              const xCenter = PAD_L + (idx + 0.5) * slotW;
+              const xCenter = PAD_L + (i + 0.5) * slotW;
               const x0 = xCenter - barW / 2;
               return (
                 <Bar3D
-                  key={d.name}
+                  key={stat.name}
                   x0={x0}
                   yBase={yBase}
                   barH={barH}
                   c={c}
-                  score={d.remaining.toFixed(1)}
-                  deptName={d.name}
-                  idx={idx}
-                  onEnter={(e) => handleBarEnter(e, d)}
+                  score={stat.remaining.toFixed(1)}
+                  deptName={stat.name}
+                  idx={i}
+                  isAverage={stat.isAverage}
+                  onEnter={(e) => handleBarEnter(e, stat)}
                   onLeave={() => setTooltip(t => ({ ...t, visible: false }))}
                 />
               );
@@ -958,10 +982,52 @@ function GembaReportDashboard({ onClose, onExport, departments, allDeptScores, s
           </svg>
         </div>
 
-        {/* Tooltip */}
+          {/* Details Grid */}
+          <div style={{ marginTop: 24 }}>
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontWeight: 800, color: '#e8f0fe', fontSize: 16 }}>Bảng chi tiết thông số</div>
+            </div>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 14 }}>
+              {deptStats.map((stat) => {
+                const c = getColors(stat.remaining);
+                return (
+                  <div key={stat.name} style={{ border: `1.5px solid ${colors.border}`, borderRadius: 12, padding: 14, display: 'flex', flexDirection: 'column', gap: 8, background: colors.surface }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: 16, fontWeight: 800, color: colors.textPrimary }}>{stat.name}</span>
+                      <span style={{ padding: '4px 10px', borderRadius: 20, fontSize: 13, fontWeight: 800, color: c.main, background: c.light }}>
+                        {stat.remaining.toFixed(2)}đ
+                      </span>
+                    </div>
+                    
+                    <div style={{ display: 'flex', gap: 16, fontSize: 13, color: '#666' }}>
+                      <div>Nhân sự: <b>{stat.people}</b> (hệ số {stat.heSo})</div>
+                      <div>Lỗi trừ: <b style={{ color: '#d32f2f' }}>{stat.errorCount}</b></div>
+                      <div>Nhắc nhở: <b style={{ color: '#ff9800' }}>{stat.reminderCount}</b></div>
+                    </div>
+
+                    {stat.topGroups.length > 0 && (
+                      <div style={{ marginTop: 4, borderTop: '1px solid #f1f3f4', paddingTop: 8 }}>
+                        <div style={{ fontSize: 11, color: '#999', fontWeight: 700, textTransform: 'uppercase', marginBottom: 4 }}>Nhóm lỗi phổ biến:</div>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          {stat.topGroups.map(([group, count]) => (
+                            <span key={group} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, background: '#f5f5f5', color: '#555', fontWeight: 600 }}>
+                              {group} ({count})
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+        {/* Hover Tooltip — kiểu acp360 (giàu thông tin, nền tối) */}
         {tooltip.visible && tooltip.dept && (() => {
           const d = tooltip.dept;
-          const c = getColors(d.remaining);
+          const c = d.isAverage ? AVG_COLORS : getColors(d.remaining);
           const tipW = 220;
           const rawLeft = Math.max(tipW / 2 + 8, Math.min(tooltip.x, window.innerWidth - tipW / 2 - 8));
           return (
@@ -982,9 +1048,11 @@ function GembaReportDashboard({ onClose, onExport, departments, allDeptScores, s
               lineHeight: 1.65,
               border: `1.5px solid ${c.main}55`,
             }}>
-              {/* Coloured top stripe */}
+              {/* Dải màu trên cùng */}
               <div style={{ height: 4, background: `linear-gradient(90deg,${c.top},${c.main})`, margin: '-14px -18px 10px', borderRadius: '12px 12px 0 0' }} />
-              <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 8, color: '#e8f0fe' }}>{d.name}</div>
+              <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 8, color: '#e8f0fe' }}>
+                {d.isAverage ? 'Trung bình toàn nhà máy' : d.name}
+              </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                 <span style={{ color: '#7b9bd4' }}>Điểm còn lại</span>
                 <span style={{ fontWeight: 900, fontSize: 16, color: c.score }}>{d.remaining.toFixed(2)}</span>
@@ -1007,9 +1075,11 @@ function GembaReportDashboard({ onClose, onExport, departments, allDeptScores, s
                   <span style={{ fontWeight: 600, color: '#ffe082' }}>{d.reminderCount}</span>
                 </div>
               )}
-              {d.topGroups.length > 0 && (
+              {d.topGroups && d.topGroups.length > 0 && (
                 <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                  <div style={{ fontSize: 11, color: '#4a6098', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Top vi phạm</div>
+                  <div style={{ fontSize: 11, color: '#4a6098', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    {d.isAverage ? 'Nhóm lỗi nhiều nhất' : 'Top vi phạm'}
+                  </div>
                   {d.topGroups.map(([group, count]) => (
                     <div key={group} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
                       <span style={{ color: '#9ab0d8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 155 }}>• {group}</span>
@@ -1018,7 +1088,7 @@ function GembaReportDashboard({ onClose, onExport, departments, allDeptScores, s
                   ))}
                 </div>
               )}
-              {d.errorCount === 0 && (
+              {!d.isAverage && d.errorCount === 0 && (
                 <div style={{ marginTop: 8, color: '#a5d6a7', fontWeight: 700, fontSize: 13, textAlign: 'center' }}>🎉 Hoàn hảo tháng này!</div>
               )}
             </div>
@@ -1032,6 +1102,175 @@ function GembaReportDashboard({ onClose, onExport, departments, allDeptScores, s
 /* =========================
    Component chính DailyAudit
    ========================= */
+/* =========================
+   MODAL SỬA LỖI (Edit) — cho phép sửa group, desc, note, point.
+   KHÔNG cho sửa department / timestamp / addedBy.
+   ========================= */
+function EditErrorModal({ modalData, onClose, onSave }) {
+  const err = modalData.error || {};
+  const [group, setGroup] = useState(err.group || "");
+  const [code, setCode] = useState(err.code || "");
+  const [desc, setDesc] = useState(err.desc || "");
+  const [note, setNote] = useState(err.note || "");
+  const [point, setPoint] = useState(err.point ?? 0);
+  const [ca, setCa] = useState(err.ca || "S1");
+  const [responsiblePerson, setResponsiblePerson] = useState(err.responsiblePerson || "");
+  const [severity, setSeverity] = useState(err.severity || "Nhẹ");
+  // Tách timestamp thành ngày + giờ để chỉnh sửa
+  const initDate = err.timestamp ? safeTsToDate(err.timestamp) : new Date();
+  const [editDate, setEditDate] = useState(initDate || new Date());
+  const [editTime, setEditTime] = useState(
+    initDate ? `${String(initDate.getHours()).padStart(2, '0')}:${String(initDate.getMinutes()).padStart(2, '0')}` : "08:00"
+  );
+  const [saving, setSaving] = useState(false);
+
+  const isOther = group === "Lỗi Khác";
+  const codeItems = (errorGroups.find(g => g.group === group)?.items) || [];
+
+  // Chọn nhóm → reset chi tiết lỗi cho khớp nhóm mới
+  const handleGroupChange = (g) => {
+    setGroup(g);
+    if (g === "Lỗi Khác") {
+      setCode(err.code && String(err.code).startsWith("custom-") ? err.code : `custom-${Date.now()}`);
+      setDesc(err.code && String(err.code).startsWith("custom-") ? (err.desc || "Lỗi khác") : "Lỗi khác");
+    } else {
+      setCode("");
+    }
+  };
+
+  // Chọn chi tiết lỗi → tự điền mô tả + điểm trừ cơ bản (vẫn cho admin chỉnh tay điểm sau)
+  const handleCodeChange = (c) => {
+    setCode(c);
+    const item = codeItems.find(it => it.code === c);
+    if (item) {
+      setDesc(item.desc);
+      if (Number.isFinite(item.point)) setPoint(item.point);
+    }
+  };
+
+  const handleSubmit = async () => {
+    setSaving(true);
+    try {
+      const [hh, mm] = editTime.split(':').map(Number);
+      const newDate = new Date(editDate);
+      newDate.setHours(hh || 0, mm || 0, 0, 0);
+      await onSave(modalData.logId, {
+        group,
+        code,
+        desc,
+        note,
+        point: Number(point) || 0,
+        ca,
+        responsiblePerson,
+        severity,
+        timestamp: newDate.toISOString(),
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const labelStyle = { fontSize: 14, fontWeight: 600, marginBottom: 5, color: colors.textPrimary };
+  const fieldStyle = { width: '100%', boxSizing: 'border-box', padding: '8px 12px', borderRadius: 8, border: `1.5px solid ${colors.primaryLight}`, fontSize: 15, fontFamily: 'sans-serif' };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1300 }}>
+      <div style={{ background: '#fff', padding: 26, borderRadius: 16, width: '92%', maxWidth: 520, boxShadow: '0 6px 32px rgba(0,0,0,.25)', maxHeight: '90vh', overflowY: 'auto' }}>
+        <h3 style={{ marginTop: 0, color: colors.primary, display: 'flex', alignItems: 'center', gap: 8 }}>✏️ Sửa lỗi</h3>
+
+        {/* Thông tin KHÔNG cho sửa */}
+        <div style={{ fontSize: 12, color: '#888', marginBottom: 16, lineHeight: 1.6 }}>
+          Bộ phận: <b>{modalData.department || ''}</b> · Người ghi: <b>{err.addedBy || ''}</b>
+        </div>
+
+        {/* Ngày + Giờ phát hiện */}
+        <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
+          <div style={{ flex: 1 }}>
+            <div style={labelStyle}>Ngày phát hiện</div>
+            <DatePicker
+              selected={editDate}
+              onChange={(date) => setEditDate(date)}
+              dateFormat="dd/MM/yyyy"
+              className="date-picker-input"
+              customInput={<input style={fieldStyle} />}
+            />
+          </div>
+          <div style={{ width: 120 }}>
+            <div style={labelStyle}>Giờ</div>
+            <input type="time" value={editTime} onChange={e => setEditTime(e.target.value)} style={fieldStyle} />
+          </div>
+        </div>
+
+        {/* Người nhận + Ca */}
+        <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
+          <div style={{ flex: 1 }}>
+            <div style={labelStyle}>Người nhận Thông tin</div>
+            <input type="text" value={responsiblePerson} onChange={e => setResponsiblePerson(e.target.value)} style={fieldStyle} />
+          </div>
+          <div style={{ width: 120 }}>
+            <div style={labelStyle}>Ca</div>
+            <select value={ca} onChange={e => setCa(e.target.value)} style={fieldStyle}>
+              {["S1", "S2", "S3", "S8"].map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+        </div>
+
+        {/* Nhóm lỗi */}
+        <div style={{ marginBottom: 14 }}>
+          <div style={labelStyle}>Nhóm lỗi</div>
+          <select value={group} onChange={e => handleGroupChange(e.target.value)} style={fieldStyle}>
+            {errorGroups.map(g => <option key={g.group} value={g.group}>{g.group}</option>)}
+            {group && !errorGroups.some(g => g.group === group) && <option value={group}>{group}</option>}
+          </select>
+        </div>
+
+        {/* Chi tiết lỗi (dropdown code) — chỉ khi không phải "Lỗi Khác" */}
+        {!isOther && (
+          <div style={{ marginBottom: 14 }}>
+            <div style={labelStyle}>Chi tiết lỗi</div>
+            <select value={code} onChange={e => handleCodeChange(e.target.value)} style={fieldStyle}>
+              <option value="">-- Chọn chi tiết --</option>
+              {codeItems.map(it => <option key={it.code} value={it.code}>{it.code} - {it.desc}</option>)}
+              {code && !codeItems.some(it => it.code === code) && <option value={code}>{code} - {desc}</option>}
+            </select>
+          </div>
+        )}
+
+        {/* Mức độ nghiêm trọng */}
+        <div style={{ marginBottom: 14 }}>
+          <div style={labelStyle}>Mức độ nghiêm trọng</div>
+          <select value={severity} onChange={e => setSeverity(e.target.value)} style={{ ...fieldStyle, width: 200 }}>
+            {["Nhẹ", "Trung bình", "Nặng"].map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </div>
+
+        {/* Mô tả lỗi */}
+        <div style={{ marginBottom: 14 }}>
+          <div style={labelStyle}>Mô tả lỗi</div>
+          <textarea value={desc} onChange={e => setDesc(e.target.value)} style={{ ...fieldStyle, minHeight: 60 }} />
+        </div>
+
+        {/* Ghi chú */}
+        <div style={{ marginBottom: 14 }}>
+          <div style={labelStyle}>Ghi chú</div>
+          <textarea value={note} onChange={e => setNote(e.target.value)} style={{ ...fieldStyle, minHeight: 50 }} />
+        </div>
+
+        {/* Điểm trừ cơ bản */}
+        <div style={{ marginBottom: 22 }}>
+          <div style={labelStyle}>Điểm trừ cơ bản</div>
+          <input type="number" value={point} min={0} onChange={e => setPoint(e.target.value)} style={{ ...fieldStyle, width: 120 }} />
+        </div>
+
+        <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+          <button onClick={onClose} disabled={saving} style={{ padding: '8px 18px', borderRadius: 8, border: `1px solid ${colors.border}`, background: '#f5f5f5', cursor: 'pointer', fontWeight: 600 }}>Hủy</button>
+          <button onClick={handleSubmit} disabled={saving} style={{ padding: '8px 22px', borderRadius: 8, border: 'none', background: colors.primary, color: '#fff', cursor: 'pointer', fontWeight: 700 }}>{saving ? 'Đang lưu...' : '✓ Lưu'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
   const { t } = useI18n();
   const { askConfirm } = useConfirm();
@@ -1039,8 +1278,8 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
   const [selectedGroup, setSelectedGroup] = useState("");
   const [selectedError, setSelectedError] = useState("");
   const [allScores, setAllScores] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [peopleCount, setPeopleCount] = useState(0);
+  const [loading, setLoading] = useState(true);
   const [showExportModal, setShowExportModal] = useState(false);
   const [showReportDashboard, setShowReportDashboard] = useState(false);
   const [allDeptScores, setAllDeptScores] = useState({});
@@ -1050,17 +1289,19 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
 
   const [isUploading, setIsUploading] = useState(false);
   const [viewer, setViewer] = useState({ open: false, list: [], index: 0 });
+  const [isReminder, setIsReminder] = useState(false);
   const [otherErrorSeverity, setOtherErrorSeverity] = useState("Nhẹ");
   const [note, setNote] = useState("");
   const [responsiblePerson, setResponsiblePerson] = useState("");
+  const [ca, setCa] = useState("S1");
   const fileRef = useRef();
   const [thumbMap, setThumbMap] = useState({});
-  const [improvementModal, setImprovementModal] = useState({ isOpen: false, error: null, index: -1 });
+  const [improvementModal, setImprovementModal] = useState({ isOpen: false, error: null, logId: "" });
+  const [editModal, setEditModal] = useState({ isOpen: false, error: null, logId: "", department: "" });
   const [commentModal, setCommentModal] = useState({ isOpen: false, eventId: "", error: null });
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   
   const dep = departments[depIndex];
-  const heSo = calcHeSo(peopleCount);
   const isCustomError = selectedGroup === "Lỗi Khác" || (selectedError && selectedError.endsWith(".other"));
   const userRolesList = user?.role ? (Array.isArray(user.role) ? user.role.map(r => String(r).toLowerCase()) : String(user.role).split(',').map(r => r.trim().toLowerCase())) : [];
   const isAdminOrEhs = userRolesList.some(r => r === 'admin' || r === 'ehs');
@@ -1071,10 +1312,11 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
   // === Tự sửa chính tả ===
   const CLOUD_FUNCTION_URL = 'https://askai-zvblqnzylq-as.a.run.app';
   const [autoCorrect, setAutoCorrect] = useState(true);
-  const [isReminder, setIsReminder] = useState(false);
   const [isCorrecting, setIsCorrecting] = useState(false);
   const [showCorrectModal, setShowCorrectModal] = useState(false);
   const [correctedNote, setCorrectedNote] = useState("");
+
+  const heSo = calcHeSo(peopleCount);
 
   const scoreList = allScores
     .filter(score => {
@@ -1092,27 +1334,57 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
   const sum = scoreList.reduce((total, error) => total + (error.isReminder ? 0 : (error.point + heSo) / 2), 0);
   const remainingScore = 100 - sum;
 
+  const fetchScores = async () => {
+    if (!dep) return;
+    try {
+      const defaultPeople = dep.defaultPeople || 0;
+      // Tải số nhân sự từ gemba_scores
+      const scoreDoc = await dbService.getDoc("gemba_scores", dep.name).catch(() => null);
+      const people = (scoreDoc && scoreDoc.people !== undefined) ? scoreDoc.people : defaultPeople;
+      setPeopleCount(people);
+
+      // Tải tất cả sự kiện từ gemba_events và lọc theo bộ phận
+      const allEvents = await dbService.getDocs("gemba_events");
+      const deptEvents = allEvents
+        .filter(ev => ev.department === dep.name && !ev.is_deleted)
+        .map(normalizeEvent)
+        .filter(Boolean);
+
+      // Tương thích ngược: bổ sung các bản ghi cũ từ gemba_scores.scores[] chưa được lưu vào gemba_events
+      if (scoreDoc && Array.isArray(scoreDoc.scores) && scoreDoc.scores.length > 0) {
+        const existingTs = new Set(deptEvents.map(e => e.timestamp));
+        const legacyScores = scoreDoc.scores
+          .filter(s => !s.is_deleted && !existingTs.has(s.timestamp))
+          .map(s => ({
+            id: `legacy-${dep.name}-${safeTsToDate(s.timestamp)?.getTime() || Date.now()}`,
+            department: dep.name,
+            ...s
+          }));
+        setAllScores([...deptEvents, ...legacyScores]);
+      } else {
+        setAllScores(deptEvents);
+      }
+    } catch (error) {
+      console.warn("Lỗi fetch gemba_events:", error);
+      setAllScores([]);
+      setPeopleCount(dep.defaultPeople || 0);
+    }
+  };
+
   useEffect(() => {
     if (!dep) return;
     setLoading(true);
-    const docRef = doc(db, "gemba_scores", dep.name);
-    const unsub = onSnapshot(docRef, (snap) => {
-      const defaultPeople = dep.defaultPeople || 0;
-      if (snap.exists()) {
-        const data = snap.data();
-        setAllScores(data.scores || []);
-        setPeopleCount(data.people !== undefined ? data.people : defaultPeople);
-      } else {
-        setAllScores([]); setPeopleCount(defaultPeople);
-      }
-      setLoading(false);
-    }, (error) => {
-      // Không có quyền đọc gemba_scores → render trang trống, không crash
-      console.warn("Lỗi onSnapshot gemba_scores:", error.code);
-      setAllScores([]);
-      setLoading(false);
+    fetchScores().finally(() => setLoading(false));
+
+    const unsub = realtimeService.subscribeToPath("gemba_events", () => {
+      fetchScores();
     });
-    return () => unsub();
+
+    const interval = setInterval(fetchScores, 30000);
+    return () => {
+      unsub();
+      clearInterval(interval);
+    };
   }, [dep]);
 
   useEffect(() => {
@@ -1122,16 +1394,56 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
   // Load tất cả điểm bộ phận cho dashboard báo cáo
   useEffect(() => {
     if (!showReportDashboard) return;
-    const unsubs = departments.map((dept) => {
-      const docRef = doc(db, "gemba_scores", dept.name);
-      return onSnapshot(docRef, (snap) => {
-        setAllDeptScores(prev => ({
-          ...prev,
-          [dept.name]: snap.exists() ? snap.data() : { scores: [], people: dept.defaultPeople }
-        }));
-      });
+    const fetchAllDeptScores = async () => {
+      try {
+        const [allEventsDocs, allScoresDocs] = await Promise.all([
+          dbService.getDocs("gemba_events"),
+          dbService.getDocs("gemba_scores"),
+        ]);
+
+        const nextScores = {};
+        departments.forEach((dept) => {
+          const deptName = dept.name;
+          const deptDoc = allScoresDocs.find(d => (d.id || d.uid) === deptName);
+          const people = deptDoc?.people !== undefined ? deptDoc.people : dept.defaultPeople;
+
+          // Tập hợp sự kiện phẳng từ gemba_events
+          const flatEvents = allEventsDocs
+            .filter(ev => ev.department === deptName && !ev.is_deleted)
+            .map(normalizeEvent)
+            .filter(Boolean);
+
+          // Tương thích ngược: bổ sung bản ghi cũ từ gemba_scores.scores[]
+          const scores = [...flatEvents];
+          if (deptDoc && Array.isArray(deptDoc.scores)) {
+            const existingTs = new Set(flatEvents.map(e => e.timestamp));
+            deptDoc.scores
+              .filter(s => !s.is_deleted && !existingTs.has(s.timestamp))
+              .forEach(s => scores.push({
+                id: `legacy-${deptName}-${safeTsToDate(s.timestamp)?.getTime()}`,
+                department: deptName,
+                ...s
+              }));
+          }
+
+          nextScores[deptName] = { scores, people };
+        });
+        setAllDeptScores(nextScores);
+      } catch (err) {
+        console.error("Lỗi fetch all dept scores:", err);
+      }
+    };
+    fetchAllDeptScores();
+
+    const unsub = realtimeService.subscribeToPath("gemba_events", () => {
+      fetchAllDeptScores();
     });
-    return () => unsubs.forEach(u => u());
+
+    const interval = setInterval(fetchAllDeptScores, 30000);
+    return () => {
+      unsub();
+      clearInterval(interval);
+    };
   }, [showReportDashboard]);
 
   useEffect(() => {
@@ -1161,10 +1473,8 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
         const timestamps = JSON.parse(localStorage.getItem(storageKey) || "{}");
         timestamps[departmentName] = now;
         localStorage.setItem(storageKey, JSON.stringify(timestamps));
-        // Đồng bộ lên Firestore để sự dụng cross-device
         if (user && user.uid) {
-          const prefRef = doc(db, "user_prefs", user.uid);
-          setDoc(prefRef, { [storageKey]: timestamps }, { merge: true }).catch(e => console.warn("Lưu prefs lỗi:", e));
+          dbService.updateDoc("user_prefs", user.uid, { [storageKey]: timestamps }).catch(e => console.warn("Lưu prefs lỗi:", e));
         }
         const updatedCounts = { ...newErrorCounts, [departmentName]: 0 };
         setGembaNotifCounts(updatedCounts);
@@ -1173,9 +1483,13 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
   };
 
   async function handleSavePeople() {
-    const docRef = doc(db, "gemba_scores", dep.name);
-    try { await setDoc(docRef, { people: peopleCount }, { merge: true });
-    } catch (error) { console.error("Lỗi cập nhật số người: ", error); alert("Có lỗi xảy ra khi cập nhật."); }
+    try {
+      await dbService.updateDoc("gemba_scores", dep.name, { people: peopleCount });
+      await fetchScores();
+    } catch (error) {
+      console.error("Lỗi cập nhật số người: ", error);
+      alert("Có lỗi xảy ra khi cập nhật.");
+    }
   }
 
   const handleImageChange = async (e) => {
@@ -1212,55 +1526,68 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
     if (!note.trim()) { alert(t("gemba.alert.requireNote")); return; }
     if (imageFiles.length === 0) { alert(t("gemba.alert.requirePhoto")); return; }
 
-    // Nếu bật tự sửa và có ghi chú, gọi Gemini để sửa trước
     if (autoCorrect && note.trim()) {
       setIsCorrecting(true);
       try {
-        const data = await callAIService(
-          `Sửa lỗi chính tả, câu cú và dấu câu cho đoạn văn tiếng Việt sau. Chỉ trả về đoạn văn đã sửa, không giải thích, không thêm nội dung nào khác:\n${note.trim()}`,
-          [],
-          CLOUD_FUNCTION_URL
-        );
-        const corrected = (data.response || "").trim();
-        if (corrected) {
+        const corrected = await callSpellCheckService(note.trim());
+        if (corrected && corrected.toLowerCase() !== note.trim().toLowerCase()) {
           setCorrectedNote(corrected);
           setShowCorrectModal(true);
           setIsCorrecting(false);
-          return; // dừng ở đây, chờ người dùng xác nhận trong popup
+          return;
         }
       } catch (e) {
-        console.error("Lỗi sửa chính tả:", e);
-        alert("Không thể kết nối dịch vụ AI để tự động sửa chính tả. Hệ thống sẽ tiếp tục lưu với ghi chú gốc của bạn.");
+        console.error("Lỗi khi gọi AI sửa chính tả:", e);
       }
       setIsCorrecting(false);
     }
-
-    // Không sửa hoặc sửa thất bại → lưu thẳng
     await doSaveError(note);
   }
 
   async function doSaveError(noteToUse) {
     setIsUploading(true);
     let urls = [];
-    try {
-      urls = await Promise.all(
-        imageFiles.map(async (file) => {
-          const imageRef = ref(storage, `gemba_images/${Date.now()}_${file.name}`);
-          await uploadBytes(imageRef, file);
-          return await getDownloadURL(imageRef);
-        })
-      );
-    } catch (error) { 
-      console.error("Lỗi tải ảnh: ", error); 
-      alert("Tải ảnh thất bại!");
-      setIsUploading(false); 
-      return;
+    if (imageFiles.length > 0) {
+      try {
+        const uploadPromises = imageFiles.map(async file => {
+          const formData = new FormData();
+          formData.append("file", file);
+          formData.append("path", `gemba_images/${Date.now()}_${file.name}`);
+          const res = await apiClient.post("/api/storage/upload", formData, {
+            headers: { "Content-Type": "multipart/form-data" }
+          });
+          return res.data.url;
+        });
+        urls = await Promise.all(uploadPromises);
+      } catch (error) {
+        console.error("Lỗi tải ảnh: ", error);
+        alert("Tải ảnh thất bại!");
+        setIsUploading(false);
+        return;
+      }
     }
 
-    let newErrorObject;
     const pointsMap = { Nhẹ: 2, Nặng: 4, "Nghiêm trọng": 6 };
+    const nowStr = new Date().toISOString();
+    let newErrorData;
     if (selectedGroup === "Lỗi Khác") {
-      newErrorObject = { group: selectedGroup, code: `custom-${Date.now()}`, desc: "Lỗi khác", point: pointsMap[otherErrorSeverity], timestamp: Timestamp.now(), imageUrls: urls, note: noteToUse, addedBy: user.name, addedByUid: user.uid, isReminder, responsiblePerson };
+      newErrorData = {
+        department: dep.name,
+        group: selectedGroup,
+        code: `custom-${Date.now()}`,
+        desc: "Lỗi khác",
+        point: pointsMap[otherErrorSeverity],
+        timestamp: nowStr,
+        imageUrls: urls,
+        note: noteToUse,
+        addedBy: user.name,
+        addedByUid: user.uid,
+        isReminder,
+        responsiblePerson,
+        ca,
+        heSo,
+        peopleCount
+      };
     } else {
       const errors = (errorGroups.find((g) => g.group === selectedGroup) || { items: [] }).items;
       const err = errors.find((e) => e.code === selectedError);
@@ -1268,26 +1595,36 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
       if (selectedError && selectedError.endsWith(".other")) {
         finalPoint = pointsMap[otherErrorSeverity];
       }
-      newErrorObject = { group: selectedGroup, ...err, point: finalPoint, timestamp: Timestamp.now(), imageUrls: urls, note: noteToUse, addedBy: user.name, addedByUid: user.uid, isReminder, responsiblePerson };
+      newErrorObject = { group: selectedGroup, ...err, point: finalPoint, timestamp: nowStr, imageUrls: urls, note: noteToUse, addedBy: user.name, addedByUid: user.uid, isReminder, responsiblePerson, ca };
     }
-    const docRef = doc(db, "gemba_scores", dep.name);
-    const docSnap = await getDoc(docRef);
-    if (docSnap.exists()) { await updateDoc(docRef, { scores: arrayUnion(newErrorObject) });
-    } else { await setDoc(docRef, { scores: [newErrorObject], people: peopleCount }); }
-    const eventData = { department: dep.name, error: { ...newErrorObject, timestamp: new Date().toLocaleString("vi-VN") }, peopleCount: peopleCount, heSo: heSo, addedBy: user.name, timestamp: serverTimestamp() };
-    await addDoc(collection(db, "gemba_events"), eventData);
+    
+    try {
+      const docSnap = await dbService.getDoc("gemba_scores", dep.name).catch(() => null);
+      if (docSnap) {
+        const updatedScores = [...(docSnap.scores || []), newErrorObject];
+        await dbService.updateDoc("gemba_scores", dep.name, { scores: updatedScores });
+      } else {
+        await dbService.createDoc("gemba_scores", { id: dep.name, scores: [newErrorObject], people: peopleCount });
+      }
+    } catch (err) {
+      console.error("Lỗi ghi gemba_scores:", err);
+    }
+    
+    const eventData = { department: dep.name, error: { ...newErrorObject, timestamp: new Date().toLocaleString("vi-VN") }, peopleCount: peopleCount, heSo: heSo, addedBy: user.name, timestamp: nowStr };
+    await dbService.createDoc("gemba_events", eventData);
+    await fetchScores();
 
-    const errorTimeSec = newErrorObject.timestamp?.seconds || Math.floor(Date.now() / 1000);
+    const errorTimeSec = Math.floor(Date.now() / 1000);
     const notificationRelatedId = `gemba-${dep.name}-${newErrorObject.code || 'nocode'}-${errorTimeSec}`;
     try {
-      await addDoc(collection(db, "notifications"), {
+      await dbService.createDoc("notifications", {
         type: "new_gemba_error",
         message: `${user.name} đã thêm lỗi mới tại ${dep.name} - Người nhận: ${responsiblePerson || "Chưa xác định"} - ${newErrorObject.desc}`,
         targetRoles: ["ehs", "admin", "ehs committee"],
         createdBy: user.uid,
         readBy: [],
         relatedId: notificationRelatedId,
-        timestamp: serverTimestamp()
+        timestamp: nowStr
       });
     } catch (e) {
       console.error("Lỗi gửi thông báo:", e);
@@ -1299,147 +1636,162 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
     if (fileRef.current) fileRef.current.value = "";
     setOtherErrorSeverity("Nhẹ"); setNote(""); setIsUploading(false); setIsReminder(false);
     setResponsiblePerson("");
+    setCa("S1");
   }
 
-  async function handleDelete(idx) {
-    const errorToDelete = scoreList[idx];
+  async function handleDelete(logId) {
+    const errorToDelete = allScores.find(s => s.id === logId);
+    if (!errorToDelete) return;
     if (await askConfirm(`Bạn có chắc muốn XÓA VĨNH VIỄN lỗi "${errorToDelete.desc}" không?`, "Xác nhận xóa lỗi")) {
-        // 1. Cập nhật gemba_scores
-        const newAllScores = allScores.filter(score => score.timestamp !== errorToDelete.timestamp);
-        const docRef = doc(db, "gemba_scores", dep.name);
-        await setDoc(docRef, { scores: newAllScores }, { merge: true });
+        // Xóa khỏi gemba_events (bản ghi mới phẳng)
+        if (!String(logId).startsWith("legacy-")) {
+          try {
+            await dbService.updateDoc("gemba_events", logId, { is_deleted: true });
+          } catch (err) {
+            console.error("Lỗi đánh dấu gemba_events:", err);
+            alert("Xóa vi phạm thất bại!");
+            return;
+          }
+        } else {
+          // Bản ghi cũ (legacy) — loại khỏi gemba_scores.scores[]
+          try {
+            const docSnap = await dbService.getDoc("gemba_scores", dep.name).catch(() => null);
+            if (docSnap && Array.isArray(docSnap.scores)) {
+              const newScores = docSnap.scores.filter(s => s.timestamp !== errorToDelete.timestamp);
+              await dbService.updateDoc("gemba_scores", dep.name, { scores: newScores });
+            }
+          } catch (err) {
+            console.error("Lỗi xóa bản ghi cũ khỏi gemba_scores:", err);
+            alert("Xóa vi phạm thất bại!");
+            return;
+          }
+        }
 
-        // Xóa toàn bộ comment liên quan trong audit_comments
-        const evId = `${dep.name}_${errorToDelete.code || 'custom'}_${safeTsToDate(errorToDelete.timestamp)?.getTime() || 'notime'}`;
+        // Xóa bình luận liên quan (cả ID mới lẫn ID tổng hợp cũ)
+        const oldSyntheticId = `${dep.name}_${errorToDelete.code || 'custom'}_${safeTsToDate(errorToDelete.timestamp)?.getTime() || 'notime'}`;
         try {
-          const qComments = query(collection(db, "audit_comments"), where("eventId", "==", evId));
-          const snapComments = await getDocs(qComments);
-          if (!snapComments.empty) {
-            const batchComments = writeBatch(db);
-            snapComments.forEach(d => batchComments.delete(d.ref));
-            await batchComments.commit();
-            console.log("Đã xóa toàn bộ bình luận liên quan cho evId:", evId);
+          const allComments = await dbService.getDocs("audit_comments");
+          const relatedComments = allComments.filter(c => c.eventId === logId || c.eventId === oldSyntheticId);
+          if (relatedComments.length > 0) {
+            const batchOps = relatedComments.map(c => ({
+              type: "delete",
+              collection: "audit_comments",
+              id: c.id || c.uid
+            }));
+            await dbService.commitBatch(batchOps);
           }
         } catch (err) {
           console.error("Lỗi khi xóa bình luận liên quan:", err);
         }
 
-        // 2. Xóa ảnh khỏi Storage
         const images = errorToDelete.imageUrls || (errorToDelete.imageUrl ? [errorToDelete.imageUrl] : []);
         for (const url of images) {
-          try { await deleteObject(ref(storage, url)); } catch (e) { console.error("Lỗi xóa ảnh gốc:", e); }
+          try {
+            const filename = url.substring(url.lastIndexOf('/') + 1);
+            await apiClient.delete(`/api/storage/${filename}`);
+          } catch (e) {
+            console.error("Lỗi xóa ảnh gốc:", e);
+          }
         }
         if (errorToDelete.improvementImageUrl) {
-          try { await deleteObject(ref(storage, errorToDelete.improvementImageUrl)); } catch(e) { console.error("Lỗi xóa ảnh cải thiện:", e); }
+          try {
+            const url = errorToDelete.improvementImageUrl;
+            const filename = url.substring(url.lastIndexOf('/') + 1);
+            await apiClient.delete(`/api/storage/${filename}`);
+          } catch(e) {
+            console.error("Lỗi xóa ảnh cải thiện:", e);
+          }
         }
 
-        // 3. Xóa khỏi collection gemba_events
-        try {
-          const q = query(collection(db, "gemba_events"), where("department", "==", dep.name));
-          const snap = await getDocs(q);
-          const errorDateStr = safeTsToDate(errorToDelete.timestamp)?.toLocaleString("vi-VN");
-          
-          snap.forEach(async (d) => {
-            const ev = d.data();
-            const evError = ev.error || {};
-            
-            const hasSameImage = (evError.imageUrls && evError.imageUrls[0] && errorToDelete.imageUrls && evError.imageUrls[0] === errorToDelete.imageUrls[0]) || (evError.imageUrl && errorToDelete.imageUrl && evError.imageUrl === errorToDelete.imageUrl);
-            const isSameCustom = evError.code === errorToDelete.code && errorToDelete.code?.startsWith("custom-");
-            const isSameStandard = evError.code === errorToDelete.code && evError.addedBy === errorToDelete.addedBy && evError.timestamp === errorDateStr;
-
-            if (hasSameImage || isSameCustom || isSameStandard) {
-               await deleteDoc(d.ref);
-            }
-          });
-        } catch (e) { console.error("Lỗi xóa khỏi gemba_events:", e); }
-
-        // 4. Xóa thông báo liên quan
         let errorSec = 0;
         if (errorToDelete.timestamp) {
-          if (typeof errorToDelete.timestamp.seconds === 'number') {
-            errorSec = errorToDelete.timestamp.seconds;
-          } else {
-            const dt = safeTsToDate(errorToDelete.timestamp);
-            if (dt) errorSec = Math.floor(dt.getTime() / 1000);
-          }
+          const dt = safeTsToDate(errorToDelete.timestamp);
+          if (dt) errorSec = Math.floor(dt.getTime() / 1000);
         }
         const deleteRelatedId = `gemba-${dep.name}-${errorToDelete.code || 'nocode'}-${errorSec}`;
         try {
-          const qNotif = query(collection(db, "notifications"), where("relatedId", "==", deleteRelatedId));
-          const snapNotif = await getDocs(qNotif);
-          
-          if (!snapNotif.empty) {
-            const batchNotif = writeBatch(db);
-            snapNotif.forEach(d => batchNotif.delete(d.ref));
-            await batchNotif.commit();
-            console.log("Đã xóa thông báo liên quan bằng ID chính xác:", deleteRelatedId);
-          } else {
-            // FALLBACK: Tìm kiếm bằng prefix nếu lệch timestamp
-            console.log("Không tìm thấy thông báo bằng ID chính xác. Đang thử bằng prefix...");
-            const prefix = `gemba-${dep.name}-${errorToDelete.code || 'nocode'}-`;
-            const qPrefix = query(
-              collection(db, "notifications"),
-              where("relatedId", ">=", prefix),
-              where("relatedId", "<", prefix + "\uf8ff")
-            );
-            const snapPrefix = await getDocs(qPrefix);
-            if (!snapPrefix.empty) {
-              const batchNotif = writeBatch(db);
-              let deletedCount = 0;
-              snapPrefix.forEach(d => {
-                const data = d.data();
-                const notifRelatedId = data.relatedId || "";
-                const parts = notifRelatedId.split("-");
-                const notifSec = Number(parts[parts.length - 1]);
-                if (!isNaN(notifSec) && Math.abs(notifSec - errorSec) < 60) {
-                  batchNotif.delete(d.ref);
-                  deletedCount++;
-                } else if (errorToDelete.code?.startsWith("custom-")) {
-                  batchNotif.delete(d.ref);
-                  deletedCount++;
-                }
-              });
-              if (deletedCount > 0) {
-                await batchNotif.commit();
-                console.log(`Đã xóa thành công ${deletedCount} thông báo liên quan bằng cơ chế prefix fallback.`);
-              }
+          const allNotifs = await dbService.getDocs("notifications");
+          const prefix = `gemba-${dep.name}-${errorToDelete.code || 'nocode'}-`;
+          const relatedNotifs = allNotifs.filter(n => {
+            if (n.relatedId === deleteRelatedId) return true;
+            if (n.relatedId && n.relatedId.startsWith(prefix)) {
+              const parts = n.relatedId.split("-");
+              const notifSec = Number(parts[parts.length - 1]);
+              if (!isNaN(notifSec) && Math.abs(notifSec - errorSec) < 60) return true;
+              if (errorToDelete.code?.startsWith("custom-")) return true;
             }
+            return false;
+          });
+          if (relatedNotifs.length > 0) {
+            const batchOps = relatedNotifs.map(n => ({
+              type: "delete",
+              collection: "notifications",
+              id: n.id || n.uid
+            }));
+            await dbService.commitBatch(batchOps);
           }
         } catch (err) {
           console.error("Lỗi khi xóa thông báo liên quan:", err);
         }
+        await fetchScores();
     }
   }
 
-  async function handleDeleteRequest(idx) {
-    const errorToDelete = scoreList[idx];
-    const originalIndex = allScores.findIndex(s => s.timestamp === errorToDelete.timestamp);
-    if (originalIndex === -1) return;
+  async function handleDeleteRequest(logId) {
+    const errorToDelete = allScores.find(s => s.id === logId);
+    if (!errorToDelete) return;
     if (await askConfirm(`Bạn có chắc muốn gửi yêu cầu xóa lỗi "${errorToDelete.desc}" đến EHS duyệt không?`, "Yêu cầu xóa lỗi")) {
-      const newAllScores = [...allScores];
-      newAllScores[originalIndex] = {
-        ...newAllScores[originalIndex],
-        deleteRequested: true,
-        deleteRequestedBy: user.name,
-        deleteRequestedAt: new Date().toLocaleString("vi-VN")
-      };
-      const docRef = doc(db, "gemba_scores", dep.name);
-      await setDoc(docRef, { scores: newAllScores }, { merge: true });
-      alert("Đã gửi yêu cầu xóa lỗi. Vui lòng chờ EHS duyệt!");
+      try {
+        if (!String(logId).startsWith("legacy-")) {
+          await dbService.updateDoc("gemba_events", logId, {
+            deleteRequested: true,
+            deleteRequestedBy: user.name,
+            deleteRequestedAt: new Date().toLocaleString("vi-VN")
+          });
+        } else {
+          // Legacy: thao tác trên mảng gemba_scores.scores[]
+          const docSnap = await dbService.getDoc("gemba_scores", dep.name).catch(() => null);
+          if (docSnap && Array.isArray(docSnap.scores)) {
+            const idx = docSnap.scores.findIndex(s => s.timestamp === errorToDelete.timestamp);
+            if (idx !== -1) {
+              const newScores = [...docSnap.scores];
+              newScores[idx] = { ...newScores[idx], deleteRequested: true, deleteRequestedBy: user.name, deleteRequestedAt: new Date().toLocaleString("vi-VN") };
+              await dbService.updateDoc("gemba_scores", dep.name, { scores: newScores });
+            }
+          }
+        }
+        await fetchScores();
+        alert("Đã gửi yêu cầu xóa lỗi. Vui lòng chờ EHS duyệt!");
+      } catch (err) {
+        console.error("Lỗi gửi yêu cầu xóa:", err);
+        alert("Gửi yêu cầu xóa thất bại!");
+      }
     }
   }
 
-  async function handleCancelDeleteRequest(idx) {
-    const errorToDelete = scoreList[idx];
-    const originalIndex = allScores.findIndex(s => s.timestamp === errorToDelete.timestamp);
-    if (originalIndex === -1) return;
+  async function handleCancelDeleteRequest(logId) {
+    const errorToUpdate = allScores.find(s => s.id === logId);
     try {
-      const newAllScores = [...allScores];
-      delete newAllScores[originalIndex].deleteRequested;
-      delete newAllScores[originalIndex].deleteRequestedBy;
-      delete newAllScores[originalIndex].deleteRequestedAt;
-      const docRef = doc(db, "gemba_scores", dep.name);
-      await setDoc(docRef, { scores: newAllScores }, { merge: true });
+      if (!String(logId).startsWith("legacy-")) {
+        await dbService.updateDoc("gemba_events", logId, {
+          deleteRequested: null,
+          deleteRequestedBy: null,
+          deleteRequestedAt: null
+        });
+      } else if (errorToUpdate) {
+        const docSnap = await dbService.getDoc("gemba_scores", dep.name).catch(() => null);
+        if (docSnap && Array.isArray(docSnap.scores)) {
+          const idx = docSnap.scores.findIndex(s => s.timestamp === errorToUpdate.timestamp);
+          if (idx !== -1) {
+            const newScores = [...docSnap.scores];
+            delete newScores[idx].deleteRequested;
+            delete newScores[idx].deleteRequestedBy;
+            delete newScores[idx].deleteRequestedAt;
+            await dbService.updateDoc("gemba_scores", dep.name, { scores: newScores });
+          }
+        }
+      }
+      await fetchScores();
       alert("Đã từ chối yêu cầu xóa!");
     } catch (err) {
       console.error("Lỗi từ chối xóa:", err);
@@ -1447,12 +1799,10 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
     }
   }
   
-  const handleSaveImprovement = async (indexInFilteredList, improvementData) => {
-    const errorToUpdate = scoreList[indexInFilteredList];
-    const originalIndex = allScores.findIndex(s => s.timestamp === errorToUpdate.timestamp);
-    if (originalIndex === -1) return;
+  const handleSaveImprovement = async (logId, improvementData) => {
+    const errorToUpdate = allScores.find(s => s.id === logId);
+    if (!errorToUpdate) return;
 
-    // Track due date changes history
     const oldDueDate = errorToUpdate.dueDate || "";
     let newDueDateHistory = errorToUpdate.dueDateHistory || [];
     if (improvementData.dueDate && oldDueDate && improvementData.dueDate !== oldDueDate) {
@@ -1461,47 +1811,70 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
       newDueDateHistory.push(changeMsg);
     }
 
-    const newAllScores = [...allScores];
-    newAllScores[originalIndex] = { 
-      ...allScores[originalIndex], 
-      ...improvementData,
-      dueDateHistory: newDueDateHistory
-    };
-
-    const docRef = doc(db, "gemba_scores", dep.name);
-    await setDoc(docRef, { scores: newAllScores }, { merge: true });
-
-    // Synchronization with gemba_events collection
     try {
-      const qEvents = query(
-        collection(db, "gemba_events"),
-        where("department", "==", dep.name)
-      );
-      const eventsSnap = await getDocs(qEvents);
-      for (const d of eventsSnap.docs) {
-        const data = d.data();
-        if (data.error && data.error.code === errorToUpdate.code) {
-          const evTime = data.timestamp ? safeTsToDate(data.timestamp) : null;
-          const errTime = errorToUpdate.timestamp ? safeTsToDate(errorToUpdate.timestamp) : null;
-          
-          // Match by error code and check if timestamp is very close (within 10 minutes)
-          const timeMatches = (!evTime || !errTime) || (Math.abs(evTime.getTime() - errTime.getTime()) < 600000);
-          
-          if (timeMatches) {
-            const updatedError = {
-              ...data.error,
-              ...improvementData,
-              dueDateHistory: newDueDateHistory
-            };
-            await updateDoc(doc(db, "gemba_events", d.id), { error: updatedError });
+      if (!String(logId).startsWith("legacy-")) {
+        // Bản ghi mới (phẳng) — cập nhật trực tiếp vào gemba_events
+        await dbService.updateDoc("gemba_events", logId, {
+          ...improvementData,
+          dueDateHistory: newDueDateHistory
+        });
+      } else {
+        // Legacy: cập nhật mảng gemba_scores.scores[]
+        const docSnap = await dbService.getDoc("gemba_scores", dep.name).catch(() => null);
+        if (docSnap && Array.isArray(docSnap.scores)) {
+          const idx = docSnap.scores.findIndex(s => s.timestamp === errorToUpdate.timestamp);
+          if (idx !== -1) {
+            const newScores = [...docSnap.scores];
+            newScores[idx] = { ...newScores[idx], ...improvementData, dueDateHistory: newDueDateHistory };
+            await dbService.updateDoc("gemba_scores", dep.name, { scores: newScores });
+          }
+        }
+      }
+      await fetchScores();
+    } catch (err) {
+      console.error("Lỗi cập nhật cải thiện:", err);
+      alert("Lưu cải thiện thất bại!");
+    }
+  };
+  
+  // Sửa lỗi: cập nhật trực tiếp vào gemba_events (không cần thử thuật timestamp đồng bộ nữa)
+  const handleSaveEdit = async (logId, updated) => {
+    try {
+      if (!String(logId).startsWith("legacy-")) {
+        await dbService.updateDoc("gemba_events", logId, {
+          group: updated.group,
+          code: updated.code,
+          desc: updated.desc,
+          note: updated.note,
+          point: updated.point,
+          ca: updated.ca,
+          responsiblePerson: updated.responsiblePerson,
+          severity: updated.severity,
+          timestamp: updated.timestamp,
+        });
+      } else {
+        // Legacy: cập nhật mảng gemba_scores.scores[]
+        const errorToEdit = allScores.find(s => s.id === logId);
+        if (!errorToEdit) return;
+        const docSnap = await dbService.getDoc("gemba_scores", dep.name).catch(() => null);
+        if (docSnap && Array.isArray(docSnap.scores)) {
+          const idx = docSnap.scores.findIndex(s => s.timestamp === errorToEdit.timestamp);
+          if (idx !== -1) {
+            const newScores = [...docSnap.scores];
+            newScores[idx] = { ...newScores[idx], ...updated };
+            await dbService.updateDoc("gemba_scores", dep.name, { scores: newScores });
           }
         }
       }
     } catch (err) {
-      console.error("Lỗi đồng bộ sang gemba_events:", err);
+      console.error("Lỗi sửa lỗi:", err);
+      alert("Sửa thất bại!");
     }
+
+    await fetchScores();
+    setEditModal({ isOpen: false, error: null, logId: "", department: "" });
   };
-  
+
   const numberInputStyle = { width: 60, fontSize: 16, padding: "2px 5px", border: `1px solid ${colors.primaryLight}`, borderRadius: 4, MozAppearance: "textfield" };
   const numberInputWebkitStyle = `input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }`;
   const ActionButton = ({ onClick, title, children, color = "#555", bg = "#f0f0f0" }) => (
@@ -1530,7 +1903,8 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
             isMobile={isMobile}
           />
         )}
-        {improvementModal.isOpen && <ImprovementModal modalData={improvementModal} onClose={() => setImprovementModal({ isOpen: false, error: null, index: -1 })} onSave={handleSaveImprovement} />}
+        {improvementModal.isOpen && <ImprovementModal modalData={improvementModal} onClose={() => setImprovementModal({ isOpen: false, error: null, logId: "" })} onSave={handleSaveImprovement} />}
+        {editModal.isOpen && <EditErrorModal modalData={editModal} onClose={() => setEditModal({ isOpen: false, error: null, logId: "", department: "" })} onSave={handleSaveEdit} />}
 
         {/* Popup xác nhận sửa chính tả */}
         {showCorrectModal && (
@@ -1618,15 +1992,27 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
                     </div>
                 </div>
             )}
-            <div style={{ marginBottom: 15 }}>
-                <div style={{ fontSize: 15, color: colors.textPrimary, marginBottom: 5 }}>{t("gemba.recipient")}</div>
-                <input
-                  type="text"
-                  value={responsiblePerson}
-                  onChange={(e) => setResponsiblePerson(e.target.value)}
-                  placeholder={t("gemba.recipient.placeholder")}
-                  style={{ width: "100%", boxSizing: "border-box", padding: "8px 12px", borderRadius: 8, border: `1.5px solid ${colors.primaryLight}`, fontSize: 15 }}
-                />
+            <div style={{ display: 'flex', gap: 12, marginBottom: 15 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 15, color: colors.textPrimary, marginBottom: 5 }}>{t("gemba.recipient")}</div>
+                  <input
+                    type="text"
+                    value={responsiblePerson}
+                    onChange={(e) => setResponsiblePerson(e.target.value)}
+                    placeholder={t("gemba.recipient.placeholder")}
+                    style={{ width: "100%", boxSizing: "border-box", padding: "8px 12px", borderRadius: 8, border: `1.5px solid ${colors.primaryLight}`, fontSize: 15 }}
+                  />
+                </div>
+                <div style={{ width: 120 }}>
+                  <div style={{ fontSize: 15, color: colors.textPrimary, marginBottom: 5 }}>Ca</div>
+                  <select
+                    value={ca}
+                    onChange={(e) => setCa(e.target.value)}
+                    style={{ width: "100%", boxSizing: "border-box", padding: "8px 12px", borderRadius: 8, border: `1.5px solid ${colors.primaryLight}`, fontSize: 15 }}
+                  >
+                    {["S1", "S2", "S3", "S8"].map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
             </div>
             <div style={{ marginBottom: 8 }}>
                 <div style={{ fontSize: 15, color: colors.textPrimary, marginBottom: 5 }}>{t("gemba.note.label")}</div>
@@ -1677,12 +2063,12 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
                 <div style={{ display: 'grid', gap: 12 }}>
                   {scoreList.length > 0 ? scoreList.map((e, i) => {
                     const images = e.imageUrls || (e.imageUrl ? [e.imageUrl] : []);
-                    const isImproved = e.completionDate && e.improvementImageUrl;
+                    const isImproved = e.ehsVerified === true;
                     const dateForkey = safeTsToDate(e.timestamp);
                     return (
                       <div key={`${e.code}-${dateForkey ? dateForkey.getTime() : i}`} style={{ border: '1.2px solid ' + colors.primaryLight, borderRadius: 12, padding: 12, background: colors.surface, boxShadow: `0 1.5px 10px ${colors.primary}11` }}>
                         <div style={{ display:'flex', justifyContent:'space-between', gap:8, flexWrap:'wrap' }}>
-                          <div style={{ fontSize: 12, color: colors.textSecondary }}>{safeTsToDate(e.timestamp)?.toLocaleString('vi-VN')}</div>
+                          <div style={{ fontSize: 12, color: colors.textSecondary }}>{safeTsToDate(e.timestamp)?.toLocaleString('vi-VN')}{e.ca ? ` | Ca: ${e.ca}` : ''}</div>
                           <div style={{ fontWeight: 700, color: colors.primary }}>{e.group}</div>
                         </div>
                         <div style={{ marginTop: 6, overflowWrap:'anywhere' }}>
@@ -1693,6 +2079,11 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
                              </div>
                            )}
                            {e.addedBy && <div style={{fontSize: 11, color: colors.textSecondary, fontStyle:'italic', marginTop: 2}}>{t("gemba.by")} {e.addedBy}</div>}
+                           {e.ehsVerified && (
+                             <div style={{ fontSize: '12px', color: '#2e7d32', fontWeight: 700, background: '#e8f5e9', padding: '2px 8px', borderRadius: 6, marginTop: 4, display: 'inline-block' }}>
+                               ✅ Đã xác nhận hoàn thành
+                             </div>
+                           )}
                            {e.deleteRequested && (
                              <div style={{ fontSize: '12px', color: '#c62828', fontWeight: 'bold', background: '#ffebee', padding: '4px 8px', borderRadius: 6, marginTop: 6, display: 'inline-block' }}>
                                ⚠️ Chờ duyệt xóa (Yêu cầu bởi: {e.deleteRequestedBy})
@@ -1715,8 +2106,7 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
                         <div style={{ marginTop: 8, display:'flex', justifyContent:'flex-end', gap:6, alignItems:'center' }}>
                           <ActionButton 
                             onClick={() => {
-                              const evId = `${dep.name}_${e.code || 'custom'}_${safeTsToDate(e.timestamp)?.getTime() || 'notime'}`;
-                              setCommentModal({ isOpen: true, eventId: evId, error: e });
+                              setCommentModal({ isOpen: true, eventId: e.id, error: e });
                             }} 
                             title="Thảo luận / Bình luận" 
                             color={colors.white} 
@@ -1724,18 +2114,21 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
                           >
                             💬
                           </ActionButton>
-                          <ActionButton onClick={() => setImprovementModal({ isOpen: true, error: e, index: i })} title={t("gemba.improve.action")} color={colors.white} bg={isImproved ? '#4caf50' : '#f44336'}><ImprovementIcon /></ActionButton>
+                          <ActionButton onClick={() => setImprovementModal({ isOpen: true, error: e, logId: e.id })} title={t("gemba.improve.action")} color={colors.white} bg={isImproved ? '#4caf50' : '#f44336'}><ImprovementIcon /></ActionButton>
                           {isEhsCommitteeOnly && (e.addedByUid === user.uid || e.addedBy === user.name) && !e.deleteRequested && (
-                            <ActionButton onClick={() => handleDeleteRequest(i)} title="Yêu cầu xóa lỗi" color="#d32f2f" bg="transparent">x</ActionButton>
+                            <ActionButton onClick={() => handleDeleteRequest(e.id)} title="Yêu cầu xóa lỗi" color="#d32f2f" bg="transparent">x</ActionButton>
                           )}
                           {isAdminOrEhs && e.deleteRequested && (
                             <>
-                              <ActionButton onClick={() => handleDelete(i)} title="Duyệt xóa" color="#fff" bg="#2e7d32">✅</ActionButton>
-                              <ActionButton onClick={() => handleCancelDeleteRequest(i)} title="Từ chối xóa" color="#fff" bg="#e65100">❌</ActionButton>
+                              <ActionButton onClick={() => handleDelete(e.id)} title="Duyệt xóa" color="#fff" bg="#2e7d32">✅</ActionButton>
+                              <ActionButton onClick={() => handleCancelDeleteRequest(e.id)} title="Từ chối xóa" color="#fff" bg="#e65100">❌</ActionButton>
                             </>
                           )}
                           {(userRole === 'admin' || userRole === 'ehs') && !e.deleteRequested && (
-                            <ActionButton onClick={() => handleDelete(i)} title={t("gemba.delete.action")} color="#d32f2f" bg="transparent">x</ActionButton>
+                            <ActionButton onClick={() => setEditModal({ isOpen: true, error: e, logId: e.id, department: dep.name })} title="Sửa lỗi" color="#1565c0" bg="transparent">✏️</ActionButton>
+                          )}
+                          {(userRole === 'admin' || userRole === 'ehs') && !e.deleteRequested && (
+                            <ActionButton onClick={() => handleDelete(e.id)} title={t("gemba.delete.action")} color="#d32f2f" bg="transparent">x</ActionButton>
                           )}
                         </div>
                       </div>
@@ -1745,10 +2138,11 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
                   )}
                 </div>
               ) : (
-    <table style={{ marginTop: 10, width: "100%", borderCollapse: "separate", borderSpacing: 0, boxShadow: `0 1.5px 10px ${colors.primary}11`, border: `1.2px solid ${colors.primaryLight}`, background: colors.surface, borderRadius: 12, overflow: "hidden" }}>
+                <table style={{ marginTop: 10, width: "100%", borderCollapse: "separate", borderSpacing: 0, boxShadow: `0 1.5px 10px ${colors.primary}11`, border: `1.2px solid ${colors.primaryLight}`, background: colors.surface, borderRadius: 12, overflow: "hidden" }}>
                   <thead>
                     <tr style={{ background: colors.primaryLight }}>
                         <th style={{ padding: "10px 14px", color: colors.textPrimary }}>{t("gemba.table.time")}</th>
+                        <th style={{ padding: "10px 8px", color: colors.textPrimary }}>Ca</th>
                         <th style={{ padding: "10px 14px", color: colors.textPrimary }}>{t("gemba.table.group")}</th>
                         <th style={{ padding: "10px 14px", color: colors.textPrimary, width: "40%" }}>{t("gemba.table.desc")}</th>
                         <th style={{ padding: "10px 8px", color: colors.textPrimary }}>{t("gemba.table.photo")}</th>
@@ -1759,12 +2153,13 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
                   </thead>
                   <tbody key={dep.name}>
                   {scoreList.length > 0 ? scoreList.map((e, i) => {
-                     const isImproved = e.completionDate && e.improvementImageUrl;
+                     const isImproved = e.ehsVerified === true;
                      const images = e.imageUrls || (e.imageUrl ? [e.imageUrl] : []);
                      const dateForkey = safeTsToDate(e.timestamp);
                      return (
                       <tr key={`${e.code}-${dateForkey ? dateForkey.getTime() : i}`}>
                       <td style={{ padding: "10px 14px", fontSize: 12 }}>{safeTsToDate(e.timestamp)?.toLocaleString("vi-VN")}</td>
+                      <td style={{ padding: "10px 8px", textAlign: "center", fontWeight: 600, color: '#666' }}>{e.ca || ""}</td>
                       <td style={{ padding: "10px 14px" }}>{e.group}</td>
                       <td style={{ padding: "10px 14px" }}>
                         <div>{e.group === 'Lỗi Khác' ? 'Lỗi khác' : e.desc}</div>
@@ -1776,6 +2171,11 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
                         {e.addedBy && (
                           <div style={{ fontSize: '11px', color: colors.textSecondary, fontStyle: 'italic', marginTop: 2 }}>
                             {t("gemba.by")} {e.addedBy}
+                          </div>
+                        )}
+                        {e.ehsVerified && (
+                          <div style={{ fontSize: '11px', color: '#2e7d32', fontWeight: 700, background: '#e8f5e9', padding: '2px 6px', borderRadius: 4, marginTop: 4, display: 'inline-block' }}>
+                            ✅ Đã xác nhận hoàn thành
                           </div>
                         )}
                         {e.deleteRequested && (
@@ -1796,15 +2196,13 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
                           </div>
                         )}
                       </td>
-                      {/* Ghi chú: với Lỗi Khác, fallback về desc cũ nếu note trống (dữ liệu cũ lưu desc = text dài) */}
                       <td style={{ padding: "10px 8px", textAlign: "center" }}>{(e.note || (e.group === 'Lỗi Khác' && e.desc !== 'Lỗi khác' ? e.desc : null)) && <button onClick={() => alert(`Ghi chú:\n\n${e.note || e.desc}`)} style={{ border: "none", background: "transparent", fontSize: 24, cursor: "pointer" }} title="Xem ghi chú">🗒️</button>}</td>
                       <td style={{ padding: "10px 8px", fontWeight: 700, color: colors.primary, textAlign: "center", fontSize: e.isReminder ? 12 : 14 }}>{e.isReminder ? "Nhắc nhở" : ((e.point + heSo) / 2).toFixed(2)}</td>
                       <td style={{ textAlign: "center" }}>
                           <div style={{display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 4}}>
                             <ActionButton 
                               onClick={() => {
-                                const evId = `${dep.name}_${e.code || 'custom'}_${safeTsToDate(e.timestamp)?.getTime() || 'notime'}`;
-                                setCommentModal({ isOpen: true, eventId: evId, error: e });
+                                setCommentModal({ isOpen: true, eventId: e.id, error: e });
                               }} 
                               title="Thảo luận" 
                               color={colors.white} 
@@ -1812,23 +2210,26 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
                             >
                               💬
                             </ActionButton>
-                            <ActionButton onClick={() => setImprovementModal({ isOpen: true, error: e, index: i })} title="Cải thiện/Khắc phục" color={colors.white} bg={isImproved ? "#4caf50" : "#f44336"}> <ImprovementIcon /> </ActionButton>
+                            <ActionButton onClick={() => setImprovementModal({ isOpen: true, error: e, logId: e.id })} title="Cải thiện/Khắc phục" color={colors.white} bg={isImproved ? "#4caf50" : "#f44336"}> <ImprovementIcon /> </ActionButton>
                             {isEhsCommitteeOnly && (e.addedByUid === user.uid || e.addedBy === user.name) && !e.deleteRequested && (
-                              <ActionButton onClick={() => handleDeleteRequest(i)} title="Yêu cầu xóa lỗi" color="#d32f2f" bg="transparent">x</ActionButton>
+                              <ActionButton onClick={() => handleDeleteRequest(e.id)} title="Yêu cầu xóa lỗi" color="#d32f2f" bg="transparent">x</ActionButton>
                             )}
                             {isAdminOrEhs && e.deleteRequested && (
                               <>
-                                <ActionButton onClick={() => handleDelete(i)} title="Duyệt xóa" color="#fff" bg="#2e7d32">✅</ActionButton>
-                                <ActionButton onClick={() => handleCancelDeleteRequest(i)} title="Từ chối xóa" color="#fff" bg="#e65100">❌</ActionButton>
+                                <ActionButton onClick={() => handleDelete(e.id)} title="Duyệt xóa" color="#fff" bg="#2e7d32">✅</ActionButton>
+                                <ActionButton onClick={() => handleCancelDeleteRequest(e.id)} title="Từ chối xóa" color="#fff" bg="#e65100">❌</ActionButton>
                               </>
                             )}
                             {(userRole === "admin" || userRole === "ehs") && !e.deleteRequested && (
-                              <ActionButton onClick={() => handleDelete(i)} title="Xóa lỗi" color="#d32f2f" bg="transparent">x</ActionButton>
+                              <ActionButton onClick={() => setEditModal({ isOpen: true, error: e, logId: e.id, department: dep.name })} title="Sửa lỗi" color="#1565c0" bg="transparent">✏️</ActionButton>
+                            )}
+                            {(userRole === "admin" || userRole === "ehs") && !e.deleteRequested && (
+                              <ActionButton onClick={() => handleDelete(e.id)} title={t("gemba.delete.action")} color="#d32f2f" bg="transparent">x</ActionButton>
                             )}
                           </div>
                       </td>
                       </tr>
-                  )}) : ( <tr><td colSpan="7" style={{textAlign: 'center', padding: '20px'}}>{t("gemba.empty")}</td></tr> )}
+                  )}) : ( <tr><td colSpan="8" style={{textAlign: 'center', padding: '20px'}}>{t("gemba.empty")}</td></tr> )}
                   </tbody>
               </table>
               ))}
@@ -1883,61 +2284,63 @@ function CommentModal({ isOpen, onClose, eventId, user, error }) {
   const [loadingComments, setLoadingComments] = useState(false);
   const scrollRef = useRef();
 
+  const fetchComments = async () => {
+    try {
+      const allComments = await dbService.getDocs("audit_comments");
+      const filtered = allComments.filter(c => c.eventId === eventId);
+      filtered.sort((a, b) => {
+        const timeA = a.timestamp?.seconds ? a.timestamp.seconds * 1000 : (typeof a.timestamp === "string" ? new Date(a.timestamp).getTime() : 0);
+        const timeB = b.timestamp?.seconds ? b.timestamp.seconds * 1000 : (typeof b.timestamp === "string" ? new Date(b.timestamp).getTime() : 0);
+        return timeA - timeB;
+      });
+      setComments(filtered);
+    } catch (err) {
+      console.error("Lỗi lấy bình luận:", err);
+    }
+  };
+
   useEffect(() => {
     if (!isOpen || !eventId) return;
     setLoadingComments(true);
-    const q = query(
-      collection(db, "audit_comments"),
-      where("eventId", "==", eventId)
-    );
-    const unsub = onSnapshot(q, (snap) => {
-      const list = [];
-      snap.forEach(d => {
-        list.push({ id: d.id, ...d.data() });
-      });
-      list.sort((a, b) => {
-        const timeA = a.timestamp?.seconds ? a.timestamp.seconds * 1000 : a.timestamp || 0;
-        const timeB = b.timestamp?.seconds ? b.timestamp.seconds * 1000 : b.timestamp || 0;
-        return timeA - timeB;
-      });
-      setComments(list);
-      setLoadingComments(false);
-      
-      setTimeout(() => {
-        if (scrollRef.current) {
-          scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-        }
-      }, 50);
-    });
-    return unsub;
+    fetchComments().finally(() => setLoadingComments(false));
+    const interval = setInterval(fetchComments, 10000);
+    return () => clearInterval(interval);
   }, [isOpen, eventId]);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [comments]);
 
   const handleSend = async () => {
     if (!newComment.trim()) return;
     const txt = newComment.trim();
     setNewComment("");
     try {
-      await addDoc(collection(db, "audit_comments"), {
+      const nowStr = new Date().toISOString();
+      await dbService.createDoc("audit_comments", {
         eventId,
         userId: user.uid,
         userName: user.name,
         text: txt,
-        timestamp: serverTimestamp()
+        timestamp: nowStr
       });
 
       // Gửi thông báo cho người tạo lỗi nếu người comment khác người tạo lỗi
       const creatorUid = error?.addedByUid;
       if (creatorUid && creatorUid !== user.uid) {
         const errorDesc = error?.desc || "Lỗi vi phạm";
-        await addDoc(collection(db, "notifications"), {
+        await dbService.createDoc("notifications", {
           type: "new_ehs_audit_comment",
           message: `${user.name} đã bình luận về lỗi EHS Audit của bạn ("${errorDesc}")`,
           targetUserId: creatorUid,
           createdBy: user.uid,
           readBy: [],
-          timestamp: serverTimestamp()
+          timestamp: nowStr
         });
       }
+      await fetchComments();
     } catch (err) {
       console.error("Lỗi gửi bình luận:", err);
       alert("Không thể gửi bình luận.");
@@ -2008,46 +2411,49 @@ function CommentModal({ isOpen, onClose, eventId, user, error }) {
   );
 }
 
-
-
 // ====================== CLEANUP FUNCTION ======================
 async function runCleanup() {
     const oneYearAgo = new Date();
     oneYearAgo.setMonth(oneYearAgo.getMonth() - 12);
-    const oneYearAgoTimestamp = Timestamp.fromDate(oneYearAgo);
     try {
-        const oldEventsQuery = query(collection(db, "gemba_events"), where("timestamp", "<=", oneYearAgoTimestamp));
-        const oldEventsSnap = await getDocs(oldEventsQuery);
-        let batch = writeBatch(db); let count = 0;
-        for (const doc of oldEventsSnap.docs) {
-            batch.delete(doc.ref); count++;
-            if (count >= 400) { await batch.commit(); batch = writeBatch(db); count = 0; }
+        const allEvents = await dbService.getDocs("gemba_events");
+        const toDeleteEvents = allEvents.filter(ev => {
+          const ts = safeTsToDate(ev.timestamp);
+          return ts && ts <= oneYearAgo;
+        });
+        if (toDeleteEvents.length > 0) {
+          let batchOps = toDeleteEvents.map(ev => ({
+            type: "delete",
+            collection: "gemba_events",
+            id: ev.id || ev.uid
+          }));
+          for (let i = 0; i < batchOps.length; i += 400) {
+            await dbService.commitBatch(batchOps.slice(i, i + 400));
+          }
         }
-        if (count > 0) await batch.commit();
-        for (const dept of departments) {
-            const docRef = doc(db, "gemba_scores", dept.name);
-            const docSnap = await getDoc(docRef);
-            if (docSnap.exists()) {
-                const data = docSnap.data(); const scores = data.scores || [];
-                const imagesToDelete = [];
-                const recentScores = scores.filter(score => {
-                    const scoreDate = safeTsToDate(score.timestamp);
-                    if (scoreDate && scoreDate < oneYearAgo) {
-                        const allImages = [...(score.imageUrls || []), ...(score.imageUrl ? [score.imageUrl] : []), ...(score.improvementImageUrl ? [score.improvementImageUrl] : [])];
-                        imagesToDelete.push(...allImages);
-                        return false;
-                    }
-                    return true;
-                });
-                if (recentScores.length < scores.length) {
-                    await setDoc(docRef, { scores: recentScores }, { merge: true });
-                    for (const url of imagesToDelete) {
-                        try {
-                            const imageRef = ref(storage, url);
-                            await deleteObject(imageRef);
-                        } catch (error) {
-                            if (error.code !== 'storage/not-found') { console.error("Lỗi xóa ảnh cũ từ Storage:", error); }
-                        }
+        
+        const allScoresDocs = await dbService.getDocs("gemba_scores");
+        for (const docData of allScoresDocs) {
+            const scores = docData.scores || [];
+            const imagesToDelete = [];
+            const recentScores = scores.filter(score => {
+                const scoreDate = safeTsToDate(score.timestamp);
+                if (scoreDate && scoreDate < oneYearAgo) {
+                    const allImages = [...(score.imageUrls || []), ...(score.imageUrl ? [score.imageUrl] : []), ...(score.improvementImageUrl ? [score.improvementImageUrl] : [])];
+                    imagesToDelete.push(...allImages);
+                    return false;
+                }
+                return true;
+            });
+            if (recentScores.length < scores.length) {
+                const docId = docData.id || docData.uid;
+                await dbService.updateDoc("gemba_scores", docId, { scores: recentScores });
+                for (const url of imagesToDelete) {
+                    try {
+                        const filename = url.substring(url.lastIndexOf('/') + 1);
+                        await apiClient.delete(`/api/storage/${filename}`);
+                    } catch (error) {
+                        console.error("Lỗi xóa ảnh cũ từ Storage:", error);
                     }
                 }
             }

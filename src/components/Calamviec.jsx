@@ -1,18 +1,9 @@
 // Calamviec.jsx
 import React, { useEffect, useMemo, useState } from "react";
-import { db } from "../firebase";
-import {
-  doc,
-  onSnapshot,
-  setDoc,
-  collection,
-  getDocs,
-  getDoc,
-  addDoc,
-  serverTimestamp,
-} from "firebase/firestore";
+import dbService from "../services/dbService";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { useI18n } from "../i18n/I18nProvider";
+import realtimeService from "../services/realtimeService";
 
 /* ====== UI constants ====== */
 const orange = "#466E73";
@@ -189,36 +180,47 @@ function CaLamViec({ user, isMobile }) {
   );
 
   // 1. Fetch Dynamic Tasks
-  useEffect(() => {
-    const docRef = doc(db, "weekly_assignments_v6", "config_tasks");
-    const unsubTasks = onSnapshot(docRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        if (Array.isArray(data.tasks)) {
-          setTasks(data.tasks);
+  const fetchTasksConfig = async () => {
+    try {
+      const docSnap = await dbService.getDoc("weekly_assignments_v6", "config_tasks");
+      if (docSnap && docSnap._exists !== false) {
+        if (Array.isArray(docSnap.tasks)) {
+          setTasks(docSnap.tasks);
         } else {
           setTasks(DEFAULT_TASKS);
         }
       } else {
         setTasks(DEFAULT_TASKS);
         if (canPlanBoard) {
-          setDoc(docRef, { tasks: DEFAULT_TASKS }).catch(console.error);
+          await dbService.updateDoc("weekly_assignments_v6", "config_tasks", { tasks: DEFAULT_TASKS });
         }
       }
-    });
-    return () => unsubTasks();
+    } catch (err) {
+      console.error("Lỗi lấy danh sách nhiệm vụ:", err);
+      setTasks(DEFAULT_TASKS);
+    }
+  };
+
+  useEffect(() => {
+    fetchTasksConfig();
+
+    const unsubTasks = realtimeService.subscribeToPath("ehs_task_config", () => { fetchTasksConfig(); });
+
+    const intervalId = setInterval(fetchTasksConfig, 30000);
+    return () => {
+      unsubTasks();
+      clearInterval(intervalId);
+    };
   }, [canPlanBoard]);
 
   // 2. Fetch Users list
   useEffect(() => {
     const fetchAllUsers = async () => {
       try {
-        const querySnapshot = await getDocs(collection(db, "users"));
-        const usersList = querySnapshot.docs.map((docSnap) => ({
-          id: docSnap.id,
-          ...docSnap.data(),
-        }));
-        setAllUsers(usersList);
+        const usersList = await dbService.getDocs("users");
+        if (Array.isArray(usersList)) {
+          setAllUsers(usersList);
+        }
       } catch (error) {
         console.error("Lỗi khi lấy danh sách người dùng:", error);
         setAllUsers([]);
@@ -228,83 +230,74 @@ function CaLamViec({ user, isMobile }) {
   }, []);
 
   // 3. Fetch Shifts & Assignments
-  useEffect(() => {
-    if (tasks.length === 0) return; // Đợi tasks được load xong
+  const fetchAllData = async () => {
+    if (tasks.length === 0) return;
+    try {
+      // Fetch weekly_shifts
+      const docSnapShifts = await dbService.getDoc("weekly_shifts", weekId);
+      if (docSnapShifts && docSnapShifts._exists !== false) {
+        setUserShifts(docSnapShifts);
+      } else {
+        const prevDate = new Date(weekDates[0]);
+        prevDate.setDate(prevDate.getDate() - 7);
+        const prevWeekDates = getWeekDates(prevDate);
+        const prevWeekId = `${prevWeekDates[0].getFullYear()}-${getWeekNumber(prevWeekDates[0])}`;
+        
+        try {
+          const prevDocSnap = await dbService.getDoc("weekly_shifts", prevWeekId);
+          if (prevDocSnap && prevDocSnap._exists !== false) {
+            setUserShifts(prevDocSnap); 
+            if (canUpdateShift) { 
+              await dbService.updateDoc("weekly_shifts", weekId, prevDocSnap);
+            }
+          } else {
+            setUserShifts({}); 
+          }
+        } catch (error) {
+          console.error("Lỗi khi sao chép lịch tuần trước:", error);
+          setUserShifts({});
+        }
+      }
 
-    setLoading(true);
-    
-    const unsubShifts = onSnapshot(
-      doc(db, "weekly_shifts", weekId),
-      async (docSnap) => {
-        if (docSnap.exists()) {
-          setUserShifts(docSnap.data());
-        } else {
-          const prevDate = new Date(weekDates[0]);
-          prevDate.setDate(prevDate.getDate() - 7);
-          const prevWeekDates = getWeekDates(prevDate);
-          const prevWeekId = `${prevWeekDates[0].getFullYear()}-${getWeekNumber(prevWeekDates[0])}`;
-          
-          const prevDocRef = doc(db, "weekly_shifts", prevWeekId);
+      // Fetch weekly_assignments_v6
+      const docSnapAssignments = await dbService.getDoc("weekly_assignments_v6", weekId);
+      if (!docSnapAssignments || docSnapAssignments._exists === false) {
+        const emptyBoard = createEmptyBoardForWeek(weekDates, tasks);
+        if (canPlanBoard) {
           try {
-            const prevDocSnap = await getDoc(prevDocRef);
-            if (prevDocSnap.exists()) {
-              const prevWeekData = prevDocSnap.data();
-              setUserShifts(prevWeekData); 
-              if (canUpdateShift) { 
-                await setDoc(doc(db, "weekly_shifts", weekId), prevWeekData);
-              }
-            } else {
-              setUserShifts({}); 
-            }
-          } catch (error) {
-            console.error("Lỗi khi sao chép lịch tuần trước:", error);
-            setUserShifts({});
+            await dbService.updateDoc("weekly_assignments_v6", weekId, { board: emptyBoard });
+          } catch (e) {
+            console.error("Không thể tạo bảng phân công tuần mới:", e);
           }
         }
-      },
-      (error) => {
-        console.error("Lỗi onSnapshot weekly_shifts:", error);
-        setUserShifts({});
+        setBoard(emptyBoard);
+      } else {
+        const boardData = docSnapAssignments.board || createEmptyBoardForWeek(weekDates, tasks);
+        weekDates.forEach((d) => ensureDayInBoard(boardData, formatDateToId(d), tasks));
+        setBoard(boardData);
       }
-    );
+    } catch (err) {
+      console.error("Lỗi lấy lịch ca làm việc:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    const unsubAssignments = onSnapshot(
-      doc(db, "weekly_assignments_v6", weekId),
-      async (docSnap) => {
-        if (!docSnap.exists()) {
-          const emptyBoard = createEmptyBoardForWeek(weekDates, tasks);
-          if (canPlanBoard) {
-            try {
-              await setDoc(
-                doc(db, "weekly_assignments_v6", weekId),
-                { board: emptyBoard },
-                { merge: true }
-              );
-            } catch (e) {
-              console.error("Không thể tạo bảng phân công tuần mới:", e);
-            }
-          }
-          setBoard(emptyBoard);
-        } else {
-          const boardData = docSnap.data().board || createEmptyBoardForWeek(weekDates, tasks);
-          weekDates.forEach((d) => ensureDayInBoard(boardData, formatDateToId(d), tasks));
-          setBoard(boardData);
-        }
+  useEffect(() => {
+    if (tasks.length === 0) return;
+    setLoading(true);
+    fetchAllData();
 
-        setLoading(false);
-      },
-      (error) => {
-        console.error("Lỗi onSnapshot weekly_assignments_v6:", error);
-        setBoard(createEmptyBoardForWeek(weekDates, tasks));
-        setLoading(false);
-      }
-    );
+    const unsubShifts = realtimeService.subscribeToPath("weekly_shifts", () => { fetchAllData(); });
+    const unsubAssignments = realtimeService.subscribeToPath("weekly_assignments_v6", () => { fetchAllData(); });
 
+    const intervalId = setInterval(fetchAllData, 30000);
     return () => {
       unsubShifts();
       unsubAssignments();
+      clearInterval(intervalId);
     };
-  }, [weekId, canPlanBoard, tasks]); 
+  }, [weekId, tasks]); 
 
   // Helpers for managing task columns (Admin/EHS)
   const handleAddTask = async () => {
@@ -317,11 +310,12 @@ function CaLamViec({ user, isMobile }) {
     const newTaskId = `task_${Date.now()}`;
     const updatedTasks = [...tasks, { id: newTaskId, name: newTaskName.trim() }];
     try {
-      await setDoc(doc(db, "weekly_assignments_v6", "config_tasks"), { tasks: updatedTasks });
+      await dbService.updateDoc("weekly_assignments_v6", "config_tasks", { tasks: updatedTasks });
       setNewTaskName("");
+      fetchTasksConfig();
     } catch (error) {
       console.error("Lỗi khi thêm cột nhiệm vụ:", error);
-      alert("Không thể thêm nhiệm vụ. Kiểm tra cấu hình Security Rules.");
+      alert("Không thể thêm nhiệm vụ.");
     }
   };
 
@@ -334,8 +328,9 @@ function CaLamViec({ user, isMobile }) {
     }
     const updatedTasks = tasks.map(t => t.id === taskId ? { ...t, name: editingTaskName.trim() } : t);
     try {
-      await setDoc(doc(db, "weekly_assignments_v6", "config_tasks"), { tasks: updatedTasks });
+      await dbService.updateDoc("weekly_assignments_v6", "config_tasks", { tasks: updatedTasks });
       setEditingTaskId(null);
+      fetchTasksConfig();
     } catch (error) {
       console.error("Lỗi khi cập nhật tên nhiệm vụ:", error);
       alert("Không thể cập nhật tên nhiệm vụ.");
@@ -346,7 +341,8 @@ function CaLamViec({ user, isMobile }) {
     if (!window.confirm(`Bạn có chắc chắn muốn xóa cột nhiệm vụ "${taskName}"? Các dữ liệu đã phân công trong cột này sẽ bị ẩn.`)) return;
     const updatedTasks = tasks.filter(t => t.id !== taskId);
     try {
-      await setDoc(doc(db, "weekly_assignments_v6", "config_tasks"), { tasks: updatedTasks });
+      await dbService.updateDoc("weekly_assignments_v6", "config_tasks", { tasks: updatedTasks });
+      fetchTasksConfig();
     } catch (error) {
       console.error("Lỗi khi xóa nhiệm vụ:", error);
       alert("Không thể xóa nhiệm vụ.");
@@ -364,7 +360,7 @@ function CaLamViec({ user, isMobile }) {
     });
   };
 
-  // Save note to Firestore
+  // Save note via REST API
   const handleSaveNote = async () => {
     if (!noteModal) return;
     const { item, shiftKey, task, noteText } = noteModal;
@@ -382,11 +378,7 @@ function CaLamViec({ user, isMobile }) {
     setNoteModal(null);
     
     try {
-      await setDoc(
-        doc(db, "weekly_assignments_v6", weekId),
-        { board: newBoard },
-        { merge: true }
-      );
+      await dbService.updateDoc("weekly_assignments_v6", weekId, { board: newBoard });
       
       // Gửi thông báo đến người được note
       const targetUserObj = allUsers.find((u) => u.name === item.name);
@@ -396,12 +388,12 @@ function CaLamViec({ user, isMobile }) {
           ? `Bạn có ghi chú mới cho nhiệm vụ "${task.name}" ca ${SHIFTS[shiftKey] || shiftKey} ngày ${formattedDate}: "${noteText.trim()}"`
           : `Ghi chú cho nhiệm vụ "${task.name}" ca ${SHIFTS[shiftKey] || shiftKey} ngày ${formattedDate} đã được xóa.`;
         
-        await addDoc(collection(db, "notifications"), {
+        await dbService.createDoc("notifications", {
           type: "shift_note",
           message: msg,
-          targetUserId: targetUserObj.id,
-          readBy: [],
-          timestamp: serverTimestamp()
+          target_user_id: targetUserObj.id,
+          read_by: [],
+          timestamp: new Date().toISOString()
         });
       }
     } catch (e) {
@@ -412,13 +404,11 @@ function CaLamViec({ user, isMobile }) {
 
   const handleShiftChange = async (dayId, newShift) => {
     if (!selectedTargetUser || !canUpdateShift) return;
-    const docRef = doc(db, "weekly_shifts", weekId);
     try {
-      await setDoc(
-        docRef,
-        { [selectedTargetUser]: { [dayId]: newShift } },
-        { merge: true }
-      );
+      await dbService.updateDoc("weekly_shifts", weekId, {
+        [`${selectedTargetUser}.${dayId}`]: newShift
+      });
+      fetchAllData();
     } catch (error) {
       console.error("Lỗi khi cập nhật ca làm việc:", error);
       alert(t("errors.updateShift"));
@@ -539,11 +529,7 @@ function CaLamViec({ user, isMobile }) {
     setBoard(newBoard);
 
     try {
-      await setDoc(
-        doc(db, "weekly_assignments_v6", weekId),
-        { board: newBoard },
-        { merge: true }
-      );
+      await dbService.updateDoc("weekly_assignments_v6", weekId, { board: newBoard });
 
       // Gửi thông báo nếu kéo vào bảng phân công
       if (destIsBoard) {
@@ -551,16 +537,15 @@ function CaLamViec({ user, isMobile }) {
         try {
           const targetUserObj = allUsers.find((u) => u.name === draggedItem.name);
           if (targetUserObj && targetUserObj.id) {
-            // Lấy tên nhiệm vụ hiển thị trên UI từ tasks list
             const foundTask = tasks.find(t => t.id === dTask);
             const displayTaskName = foundTask ? foundTask.name : dTask;
             
-            await addDoc(collection(db, "notifications"), {
+            await dbService.createDoc("notifications", {
               type: "shift_assign",
               message: `Bạn được phân công nhiệm vụ "${displayTaskName}" ca ${SHIFTS[dShift] || dShift} ngày ${selectedDate.toLocaleDateString("vi-VN")}.`,
-              targetUserId: targetUserObj.id,
-              readBy: [],
-              timestamp: serverTimestamp()
+              target_user_id: targetUserObj.id,
+              read_by: [],
+              timestamp: new Date().toISOString()
             });
           }
         } catch (e) {

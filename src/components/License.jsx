@@ -1,7 +1,88 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { db, storage } from "../firebase";
-import { collection, onSnapshot, doc, setDoc, deleteDoc, writeBatch, getDoc } from "firebase/firestore";
-import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from "firebase/storage";
+import originalDbService from "../services/dbService";
+import apiClient from "../services/apiClient";
+import realtimeService from "../services/realtimeService";
+
+let globalRefreshCallback = null;
+const dbService = {
+  getDoc: (col, id) => originalDbService.getDoc(col, id),
+  getDocs: (col) => originalDbService.getDocs(col),
+  createDoc: async (col, data) => {
+    const res = await originalDbService.createDoc(col, data);
+    if (globalRefreshCallback) globalRefreshCallback();
+    return res;
+  },
+  updateDoc: async (col, id, data) => {
+    const res = await originalDbService.updateDoc(col, id, data);
+    if (globalRefreshCallback) globalRefreshCallback();
+    return res;
+  },
+  deleteDoc: async (col, id) => {
+    const res = await originalDbService.deleteDoc(col, id);
+    if (globalRefreshCallback) globalRefreshCallback();
+    return res;
+  },
+  commitBatch: async (ops) => {
+    const res = await originalDbService.commitBatch(ops);
+    if (globalRefreshCallback) globalRefreshCallback();
+    return res;
+  }
+};
+
+// REST API adapter (legacy doc/writeBatch shims)
+// The adapter shims ignore this handle (the REST layer needs no db handle),
+// but legacy call sites still pass `db` as the first arg, so define it once here.
+const db = null;
+const doc = (db, col, id) => ({ collection: col, id });
+const collection = (db, col) => ({ collection: col });
+const getDoc = async (docRef) => {
+  try {
+    const data = await dbService.getDoc(docRef.collection, docRef.id);
+    return {
+      exists() { return data && data._exists !== false; },
+      data() { return data; }
+    };
+  } catch (err) {
+    return {
+      exists() { return false; },
+      data() { return null; }
+    };
+  }
+};
+const setDoc = async (docRef, data) => {
+  return await dbService.updateDoc(docRef.collection, docRef.id, data);
+};
+const deleteDoc = async (docRef) => {
+  return await dbService.deleteDoc(docRef.collection, docRef.id);
+};
+const writeBatch = (db) => {
+  const operations = [];
+  return {
+    set(docRef, data) {
+      operations.push({
+        path: `/api/db/${docRef.collection}/${docRef.id}`,
+        method: "POST",
+        body: data
+      });
+    },
+    update(docRef, data) {
+      operations.push({
+        path: `/api/db/${docRef.collection}/${docRef.id}`,
+        method: "PATCH",
+        body: data
+      });
+    },
+    delete(docRef) {
+      operations.push({
+        path: `/api/db/${docRef.collection}/${docRef.id}`,
+        method: "DELETE"
+      });
+    },
+    async commit() {
+      await dbService.commitBatch(operations);
+    }
+  };
+};
 import { useI18n } from "../i18n/I18nProvider";
 import { colors } from "../theme";
 import { 
@@ -210,27 +291,51 @@ export default function License({ user, isMobile }) {
     return d.toISOString().slice(0, 10);
   };
 
-  // Fetch data
-  useEffect(() => {
-    const qRecords = collection(db, "operation_certifications");
-    const unsubRecords = onSnapshot(qRecords, (snap) => {
-      const list = [];
-      snap.forEach(d => list.push({ id: d.id, ...d.data() }));
-      setRecords(list);
-      setLoading(false);
-    });
+  const fetchRecords = async () => {
+    try {
+      const snap = await dbService.getDocs("operation_certifications");
+      setRecords(Array.isArray(snap) ? snap : []);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
-    const qChart = collection(db, "operation_certifications_chart");
-    const unsubChart = onSnapshot(qChart, (snap) => {
-      const list = [];
-      snap.forEach(d => list.push({ id: d.id, ...d.data() }));
+  const fetchCharts = async () => {
+    try {
+      const snap = await dbService.getDocs("operation_certifications_chart");
+      const list = Array.isArray(snap) ? snap : [];
       list.sort((a, b) => a.week.localeCompare(b.week));
       setChartData(list);
-    });
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
+  useEffect(() => {
+    globalRefreshCallback = () => {
+      fetchRecords();
+      fetchCharts();
+    };
+    return () => {
+      globalRefreshCallback = null;
+    };
+  }, []);
+
+  // Fetch data via Polling
+  useEffect(() => {
+    setLoading(true);
+    Promise.all([fetchRecords(), fetchCharts()]).finally(() => setLoading(false));
+
+    const unsubRecords = realtimeService.subscribeToPath("operation_certifications", () => { fetchRecords(); });
+    const unsubCharts = realtimeService.subscribeToPath("operation_certifications_chart", () => { fetchCharts(); });
+
+    const intervalRecords = setInterval(fetchRecords, 30000);
+    const intervalCharts = setInterval(fetchCharts, 30000);
     return () => {
       unsubRecords();
-      unsubChart();
+      unsubCharts();
+      clearInterval(intervalRecords);
+      clearInterval(intervalCharts);
     };
   }, []);
 
@@ -745,41 +850,34 @@ export default function License({ user, isMobile }) {
       setCompressing(false);
 
       const fileName = `license_${modalForm.deptCode}_${modalForm.msnv || Date.now()}_card.jpg`;
-      const storageRef = ref(storage, `license_cards/${fileName}`);
-      const uploadTask = uploadBytesResumable(storageRef, compressed);
+      const formData = new FormData();
+      formData.append("file", compressed, fileName);
+      setUploadProgress(10);
 
-      uploadTask.on(
-        "state_changed",
-        (snapshot) => {
-          const progress = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+      const res = await apiClient.post("/api/storage/upload", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+        onUploadProgress: (evt) => {
+          const progress = Math.round((evt.loaded * 100) / evt.total);
           setUploadProgress(progress);
-        },
-        (error) => {
-          console.error("Lỗi tải ảnh:", error);
-          alert("Lỗi tải ảnh lên Storage.");
-        },
-        async () => {
-          const url = await getDownloadURL(uploadTask.snapshot.ref);
-          setTempFileUrl(url);
-          setUploadProgress(0);
         }
-      );
+      });
+      setTempFileUrl(res.data.url);
+      setUploadProgress(0);
     } catch (err) {
       console.error(err);
       setCompressing(false);
-      alert("Nén ảnh thất bại.");
+      alert("Tải ảnh thất bại.");
+      setUploadProgress(0);
     }
   };
 
   const deleteTempPhoto = async () => {
     if (!tempFileUrl) return;
-    if (tempFileUrl.includes("license_cards/")) {
-      try {
-        const storageRef = ref(storage, tempFileUrl);
-        await deleteObject(storageRef);
-      } catch (e) {
-        console.warn("Lỗi xóa ảnh cũ trên Storage:", e);
-      }
+    try {
+      const filename = tempFileUrl.substring(tempFileUrl.lastIndexOf('/') + 1);
+      await apiClient.delete(`/api/storage/${filename}`);
+    } catch (e) {
+      console.warn("Lỗi xóa ảnh cũ trên Storage:", e);
     }
     setTempFileUrl("");
   };
@@ -820,14 +918,14 @@ export default function License({ user, isMobile }) {
     try {
       if (record.certificateCardUrl) {
         try {
-          const storageRef = ref(storage, record.certificateCardUrl);
-          await deleteObject(storageRef);
+          const filename = record.certificateCardUrl.substring(record.certificateCardUrl.lastIndexOf('/') + 1);
+          await apiClient.delete(`/api/storage/${filename}`);
         } catch (e) {
           console.warn("Lỗi xóa ảnh chứng chỉ:", e);
         }
       }
       const docId = `${record.deptCode}_${record.msnv}`;
-      await deleteDoc(doc(db, "operation_certifications", docId));
+      await deleteDoc(doc(null, "operation_certifications", docId));
       alert("Đã xóa chứng nhận thành công!");
     } catch (err) {
       console.error(err);

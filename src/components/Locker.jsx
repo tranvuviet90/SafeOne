@@ -1,6 +1,33 @@
 import React, { useState, useEffect } from "react";
-import { db } from "../firebase";
-import { collection, onSnapshot, doc, setDoc, writeBatch, arrayUnion, updateDoc, deleteField } from "firebase/firestore";
+import originalDbService from "../services/dbService";
+import apiClient from "../services/apiClient";
+import realtimeService from "../services/realtimeService";
+
+let globalRefreshCallback = null;
+const dbService = {
+  getDoc: (col, id) => originalDbService.getDoc(col, id),
+  getDocs: (col) => originalDbService.getDocs(col),
+  createDoc: async (col, data) => {
+    const res = await originalDbService.createDoc(col, data);
+    if (globalRefreshCallback) globalRefreshCallback();
+    return res;
+  },
+  updateDoc: async (col, id, data) => {
+    const res = await originalDbService.updateDoc(col, id, data);
+    if (globalRefreshCallback) globalRefreshCallback();
+    return res;
+  },
+  deleteDoc: async (col, id) => {
+    const res = await originalDbService.deleteDoc(col, id);
+    if (globalRefreshCallback) globalRefreshCallback();
+    return res;
+  },
+  commitBatch: async (ops) => {
+    const res = await originalDbService.commitBatch(ops);
+    if (globalRefreshCallback) globalRefreshCallback();
+    return res;
+  }
+};
 import { colors } from "../theme";
 import { useConfirm, useToast } from "./LightboxSwipeOnly";
 import { useI18n } from "../i18n/I18nProvider";
@@ -159,6 +186,10 @@ export default function Locker({ user }) {
   // Tìm kiếm
   const [searchQuery, setSearchQuery] = useState("");
 
+  // Nhập dữ liệu từ file Excel
+  const importInputRef = React.useRef(null);
+  const [isImporting, setIsImporting] = useState(false);
+
   // Cấu hình EHS
   const [configSuccessText, setConfigSuccessText] = useState("");
   const [isSavingConfig, setIsSavingConfig] = useState(false);
@@ -174,25 +205,42 @@ export default function Locker({ user }) {
   const userRolesList = user?.role ? (Array.isArray(user.role) ? user.role.map(r => String(r).toLowerCase()) : String(user.role).split(',').map(r => r.trim().toLowerCase())) : [];
   const isEhsOrAdmin = userRolesList.some(r => r === 'admin' || r === 'ehs');
 
-  // Load tủ đồ thời gian thực từ Firestore
-  useEffect(() => {
-    setLoading(true);
-    const unsub = onSnapshot(collection(db, "lockers"), (snap) => {
+  const fetchLockers = async () => {
+    try {
+      const snap = await dbService.getDocs("lockers");
       const data = {};
       snap.forEach((doc) => {
-        data[doc.id] = doc.data();
+        data[doc.id || doc.uid] = doc;
       });
       setLockersData(data);
-      setLoading(false);
-    }, (err) => {
-      console.error("Lỗi onSnapshot lockers:", err);
+    } catch (err) {
+      console.error("Lỗi fetch lockers:", err);
       toast.show("Không thể tải dữ liệu tủ đồ.", "error");
-      setLoading(false);
-    });
-    return () => unsub();
+    }
+  };
+
+  useEffect(() => {
+    globalRefreshCallback = fetchLockers;
+    return () => {
+      globalRefreshCallback = null;
+    };
   }, []);
 
-  // Ánh xạ dữ liệu cài đặt từ Firestore
+  // Load tủ đồ thời gian thực qua REST API
+  useEffect(() => {
+    setLoading(true);
+    fetchLockers().finally(() => setLoading(false));
+
+    const unsub = realtimeService.subscribeToPath("lockers", () => { fetchLockers(); });
+
+    const interval = setInterval(fetchLockers, 30000);
+    return () => {
+      unsub();
+      clearInterval(interval);
+    };
+  }, []);
+
+  // Ánh xạ dữ liệu cài đặt
   useEffect(() => {
     if (lockersData.settings) {
       const s = lockersData.settings;
@@ -254,7 +302,6 @@ export default function Locker({ user }) {
       return idxA - idxB;
     });
   };
-
   // Thu hồi tủ đồ hoặc từ chối yêu cầu đăng ký
   async function handleReleaseLocker(lockerId) {
     const locker = lockersData[lockerId];
@@ -268,16 +315,18 @@ export default function Locker({ user }) {
 
     if (await confirm.askConfirm(confirmMsg, confirmTitle)) {
       try {
-        const docRef = doc(db, "lockers", lockerId);
         const historyItem = {
           ...locker.currentUser,
           action: isPending ? "rejected" : "released",
           timestamp: new Date().toISOString()
         };
-        await setDoc(docRef, {
+        await dbService.updateDoc("lockers", lockerId, {
           currentUser: null,
-          history: arrayUnion(historyItem)
-        }, { merge: true });
+          history: {
+            type: "arrayUnion",
+            elements: [historyItem]
+          }
+        });
         toast.show(isPending ? `Đã từ chối đăng ký tủ ${lockerId}.` : `Đã thu hồi tủ ${lockerId} thành công.`, "success");
         setSelectedLockerId(null);
       } catch (err) {
@@ -293,19 +342,21 @@ export default function Locker({ user }) {
     if (!locker || !locker.currentUser) return;
 
     try {
-      const docRef = doc(db, "lockers", lockerId);
       const approvedUser = {
         ...locker.currentUser,
         status: "approved"
       };
-      await setDoc(docRef, {
+      await dbService.updateDoc("lockers", lockerId, {
         currentUser: approvedUser,
-        history: arrayUnion({
-          ...approvedUser,
-          action: "approved",
-          timestamp: new Date().toISOString()
-        })
-      }, { merge: true });
+        history: {
+          type: "arrayUnion",
+          elements: [{
+            ...approvedUser,
+            action: "approved",
+            timestamp: new Date().toISOString()
+          }]
+        }
+      });
       toast.show(`Đã phê duyệt sử dụng tủ ${lockerId} thành công.`, "success");
       setSelectedLockerId(null);
     } catch (err) {
@@ -319,9 +370,9 @@ export default function Locker({ user }) {
     e.preventDefault();
     setIsSavingConfig(true);
     try {
-      await setDoc(doc(db, "lockers", "settings"), {
+      await dbService.updateDoc("lockers", "settings", {
         successNotificationText: configSuccessText
-      }, { merge: true });
+      });
       toast.show("Cập nhật thông báo thành công!", "success");
     } catch (err) {
       console.error("Lỗi lưu cấu hình:", err);
@@ -343,9 +394,9 @@ export default function Locker({ user }) {
         ...(globalSettings.zoneDescriptions || {}),
         [activeZone]: tempDesc
       };
-      await setDoc(doc(db, "lockers", "settings"), {
+      await dbService.updateDoc("lockers", "settings", {
         zoneDescriptions: newZoneDescriptions
-      }, { merge: true });
+      });
       toast.show("Cập nhật mô tả khu vực thành công!", "success");
       setShowEditDescModal(false);
     } catch (err) {
@@ -353,7 +404,6 @@ export default function Locker({ user }) {
       toast.show("Không thể lưu mô tả khu vực.", "error");
     }
   }
-
   async function handleExportExcel() {
     try {
       const [{ default: ExcelJS }, { saveAs }] = await Promise.all([ import("exceljs"), import("file-saver") ]);
@@ -465,12 +515,121 @@ export default function Locker({ user }) {
       toast.show("Xuất báo cáo thất bại: " + err.message, "error");
     }
   }
+  // Nhập dữ liệu cấp phát tủ từ file Excel (cùng định dạng với file xuất ra)
+  async function handleImportExcel(e) {
+    const file = e.target.files?.[0];
+    // Reset input để có thể chọn lại cùng một file
+    if (e.target) e.target.value = "";
+    if (!file) return;
+
+    setIsImporting(true);
+    try {
+      const { default: ExcelJS } = await import("exceljs");
+      const wb = new ExcelJS.Workbook();
+      const buffer = await file.arrayBuffer();
+      await wb.xlsx.load(buffer);
+      const ws = wb.worksheets[0];
+      if (!ws) {
+        toast.show("File không hợp lệ: không tìm thấy trang tính.", "error");
+        return;
+      }
+
+      // Dò vị trí các cột dựa trên dòng tiêu đề (khớp với file xuất ra)
+      const colMap = {};
+      const headerRow = ws.getRow(1);
+      headerRow.eachCell((cell, colNumber) => {
+        const h = String(cell.value ?? "").trim().toLowerCase();
+        if (h.includes("mã tủ")) colMap.id = colNumber;
+        else if (h.includes("họ tên") || h.includes("nhân viên")) colMap.name = colNumber;
+        else if (h.includes("bộ phận")) colMap.department = colNumber;
+        else if (h.includes("msnv")) colMap.msnv = colNumber;
+        else if (h.includes("điện thoại")) colMap.phone = colNumber;
+        else if (h.includes("trạng thái")) colMap.status = colNumber;
+      });
+
+      if (!colMap.id) {
+        toast.show("Không tìm thấy cột 'Mã tủ'. Vui lòng dùng đúng mẫu file xuất ra.", "error");
+        return;
+      }
+
+      const cellText = (row, col) => {
+        if (!col) return "";
+        const v = row.getCell(col).value;
+        if (v == null) return "";
+        if (typeof v === "object") return String(v.text ?? v.result ?? v.richText?.map(r => r.text).join("") ?? "").trim();
+        return String(v).trim();
+      };
+
+      const operations = [];
+      const skipped = [];
+      const nowStr = new Date().toISOString();
+
+      ws.eachRow((row, rowNumber) => {
+        if (rowNumber === 1) return; // bỏ tiêu đề
+        const id = cellText(row, colMap.id).toUpperCase();
+        const name = cellText(row, colMap.name);
+        if (!id) return;
+        if (!name || name === "-") return; // bỏ tủ trống
+
+        const phone = cellText(row, colMap.phone).replace(/-/g, "").trim();
+        // Bỏ qua dòng có SĐT bị che (xuất bởi tài khoản không phải EHS) để tránh ghi dữ liệu sai
+        if (phone.includes("*")) {
+          skipped.push(`${id} (SĐT bị ẩn)`);
+          return;
+        }
+
+        const statusText = cellText(row, colMap.status).toLowerCase();
+        const status = statusText.includes("chờ") ? "pending" : "approved";
+
+        const payload = {
+          name,
+          department: cellText(row, colMap.department) || DEPARTMENTS[DEPARTMENTS.length - 1],
+          msnv: cellText(row, colMap.msnv).toUpperCase(),
+          phone,
+          assignedAt: nowStr,
+          status
+        };
+
+        operations.push({
+          method: "PATCH",
+          path: `/api/db/lockers/${id}`,
+          body: {
+            id,
+            currentUser: payload,
+            history: {
+              type: "arrayUnion",
+              elements: [{ ...payload, action: "imported_from_excel", timestamp: nowStr }]
+            }
+          }
+        });
+      });
+
+      if (operations.length === 0) {
+        toast.show("Không có dòng dữ liệu hợp lệ nào để nhập.", "warning");
+        return;
+      }
+
+      const confirmMsg = `Sẽ cấp phát / cập nhật ${operations.length} tủ đồ từ file. ` +
+        (skipped.length ? `Bỏ qua ${skipped.length} dòng (${skipped.slice(0, 3).join(", ")}${skipped.length > 3 ? "..." : ""}). ` : "") +
+        `Thao tác sẽ GHI ĐÈ thông tin người dùng hiện tại của các tủ trùng mã. Bạn có chắc chắn?`;
+      if (!(await confirm.askConfirm(confirmMsg, "Xác nhận nhập dữ liệu tủ đồ"))) {
+        return;
+      }
+
+      await dbService.commitBatch(operations);
+      toast.show(`Nhập thành công ${operations.length} tủ đồ!`, "success");
+    } catch (err) {
+      console.error("Lỗi nhập excel:", err);
+      toast.show("Nhập dữ liệu thất bại: " + err.message, "error");
+    } finally {
+      setIsImporting(false);
+    }
+  }
 
   // Nhận thông tin báo hỏng tủ
   async function handleReceiveDamage(lockerId) {
     try {
-      const docRef = doc(db, "lockers", lockerId);
-      await updateDoc(docRef, {
+      await dbService.updateDoc("lockers", lockerId, {
         "damageReport.status": "received",
         "damageReport.receivedAt": new Date().toISOString()
       });
@@ -491,20 +650,16 @@ export default function Locker({ user }) {
         const imageUrl = locker.damageReport.imageUrl;
         if (imageUrl) {
           try {
-            const [{ ref, deleteObject }, { storage }] = await Promise.all([
-              import("firebase/storage"),
-              import("../firebase")
-            ]);
-            await deleteObject(ref(storage, imageUrl));
-            console.log("Đã xóa ảnh hư hỏng khỏi Storage:", imageUrl);
+            const filename = imageUrl.split("/").pop();
+            await apiClient.delete(`/api/storage/${filename}`);
+            console.log("Đã xóa ảnh hư hỏng khỏi Storage:", filename);
           } catch (storageErr) {
             console.error("Lỗi khi xóa ảnh khỏi Storage:", storageErr);
           }
         }
 
-        const docRef = doc(db, "lockers", lockerId);
-        await updateDoc(docRef, {
-          damageReport: deleteField()
+        await dbService.updateDoc("lockers", lockerId, {
+          damageReport: { type: "deleteField" }
         });
 
         toast.show(`Đã hoàn thành sửa chữa tủ ${lockerId}.`, "success");
@@ -514,7 +669,6 @@ export default function Locker({ user }) {
       }
     }
   }
-
   // Khai báo state phụ cho các Modal trong nội bộ
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
@@ -972,6 +1126,41 @@ export default function Locker({ user }) {
                 >
                   📥 Xuất báo cáo Excel
                 </button>
+                {isEhsOrAdmin && (
+                  <>
+                    <input
+                      ref={importInputRef}
+                      type="file"
+                      accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                      style={{ display: "none" }}
+                      onChange={handleImportExcel}
+                    />
+                    <button
+                      onClick={() => importInputRef.current?.click()}
+                      disabled={isImporting}
+                      title="Nhập danh sách cấp phát tủ từ file Excel (dùng đúng định dạng file xuất ra)"
+                      style={{
+                        padding: "10px 16px",
+                        background: colors.primary,
+                        color: "#fff",
+                        border: "none",
+                        borderRadius: "10px",
+                        cursor: isImporting ? "wait" : "pointer",
+                        fontWeight: "600",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        boxShadow: "0 2px 6px rgba(16,65,74,0.2)",
+                        opacity: isImporting ? 0.7 : 1,
+                        transition: "opacity 0.2s"
+                      }}
+                      onMouseEnter={e => !isImporting && (e.currentTarget.style.opacity = 0.9)}
+                      onMouseLeave={e => !isImporting && (e.currentTarget.style.opacity = 1)}
+                    >
+                      {isImporting ? "⏳ Đang nhập..." : "📤 Nhập dữ liệu"}
+                    </button>
+                  </>
+                )}
               </div>
 
               {/* Bảng kết quả */}
@@ -1547,7 +1736,6 @@ function LockerAssignForm({ lockerId, lockersData, onSuccess }) {
 
     setIsSaving(true);
     try {
-      const docRef = doc(db, "lockers", lockerId);
       const nowStr = new Date().toISOString();
       const payload = {
         name: name.trim(),
@@ -1555,18 +1743,21 @@ function LockerAssignForm({ lockerId, lockersData, onSuccess }) {
         msnv: msnv.trim().toUpperCase(),
         phone: phone.trim(),
         assignedAt: nowStr,
-        status: "approved" // EHS cấp phát trực tiếp nên được approve luôn
+        status: "approved"
       };
 
-      await setDoc(docRef, {
+      await dbService.updateDoc("lockers", lockerId, {
         id: lockerId,
         currentUser: payload,
-        history: arrayUnion({
-          ...payload,
-          action: "assigned_by_ehs",
-          timestamp: nowStr
-        })
-      }, { merge: true });
+        history: {
+          type: "arrayUnion",
+          elements: [{
+            ...payload,
+            action: "assigned_by_ehs",
+            timestamp: nowStr
+          }]
+        }
+      });
 
       onSuccess();
     } catch (err) {
@@ -1636,10 +1827,7 @@ function LockerTransferModal({ lockerId, currentUser, vacantLockers, onClose, on
     setIsTransferring(true);
     try {
       const nowStr = new Date().toISOString();
-      const oldDocRef = doc(db, "lockers", lockerId);
-      const newDocRef = doc(db, "lockers", targetLockerId);
-      
-      const batch = writeBatch(db);
+      const operations = [];
 
       // 1. Cập nhật tủ mới (Ghi nhận thông tin người dùng và lịch sử nhận tủ, trạng thái đã phê duyệt)
       const payload = {
@@ -1647,27 +1835,41 @@ function LockerTransferModal({ lockerId, currentUser, vacantLockers, onClose, on
         assignedAt: nowStr,
         status: "approved"
       };
-      batch.set(newDocRef, {
-        id: targetLockerId,
-        currentUser: payload,
-        history: arrayUnion({
-          ...payload,
-          action: "transferred_from_" + lockerId,
-          timestamp: nowStr
-        })
-      }, { merge: true });
+      operations.push({
+        method: "PATCH",
+        path: `/api/db/lockers/${targetLockerId}`,
+        body: {
+          id: targetLockerId,
+          currentUser: payload,
+          history: {
+            type: "arrayUnion",
+            elements: [{
+              ...payload,
+              action: "transferred_from_" + lockerId,
+              timestamp: nowStr
+            }]
+          }
+        }
+      });
 
       // 2. Thu hồi tủ cũ (Clear người dùng hiện tại và ghi lịch sử bàn giao)
-      batch.set(oldDocRef, {
-        currentUser: null,
-        history: arrayUnion({
-          ...currentUser,
-          action: "transferred_to_" + targetLockerId,
-          timestamp: nowStr
-        })
-      }, { merge: true });
+      operations.push({
+        method: "PATCH",
+        path: `/api/db/lockers/${lockerId}`,
+        body: {
+          currentUser: null,
+          history: {
+            type: "arrayUnion",
+            elements: [{
+              ...currentUser,
+              action: "transferred_to_" + targetLockerId,
+              timestamp: nowStr
+            }]
+          }
+        }
+      });
 
-      await batch.commit();
+      await dbService.commitBatch(operations);
       onSuccess();
     } catch (err) {
       console.error("Lỗi đổi tủ:", err);

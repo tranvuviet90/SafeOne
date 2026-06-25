@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useI18n } from '../i18n/I18nProvider';
-import { db, functions } from '../firebase';
-import { collection, query, where, getDocs, orderBy, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
-import { httpsCallable } from 'firebase/functions';
+import dbService from '../services/dbService';
+import apiClient from '../services/apiClient';
 import { useToast, useConfirm } from './LightboxSwipeOnly';
 import { colors } from '../theme';
 import { ALL_ROLES } from '../constants/roles';
@@ -61,10 +60,7 @@ export default function UserManager({ user, isMobile }) {
   const triggerExtractMarkdown = async (docItem) => {
     pushToast("Đang trích xuất nội dung văn bản bằng AI...", "info");
     try {
-      const { getFunctions, httpsCallable } = await import("firebase/functions");
-      const functionsInstance = getFunctions(undefined, "asia-southeast1");
-      const extractMarkdown = httpsCallable(functionsInstance, "extractMarkdown");
-      await extractMarkdown({ docId: docItem.id, fileUrl: docItem.fileUrlVi || docItem.fileUrl || docItem.fileUrlEn });
+      await apiClient.post("/api/functions/extractMarkdown", { docId: docItem.id, fileUrl: docItem.fileUrlVi || docItem.fileUrl || docItem.fileUrlEn });
       pushToast("AI đã trích xuất tài liệu thành công!", "success");
       fetchAIConfig();
     } catch (err) {
@@ -76,8 +72,7 @@ export default function UserManager({ user, isMobile }) {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const listUsers = httpsCallable(functions, 'listUsers');
-      const result = await listUsers();
+      const result = await apiClient.post('/api/functions/listUsers');
       setUsers(result.data.users);
     } catch (err) {
       console.error(err);
@@ -90,12 +85,8 @@ export default function UserManager({ user, isMobile }) {
   const fetchRequests = async () => {
     setLoading(true);
     try {
-      const q = query(collection(db, 'role_requests'), where('status', '==', 'pending'));
-      const snap = await getDocs(q);
-      const reqs = [];
-      snap.forEach(doc => {
-        reqs.push({ id: doc.id, ...doc.data() });
-      });
+      const snap = await dbService.getDocs('role_requests');
+      const reqs = snap.filter(item => item.status === 'pending').map(item => ({ id: item.id || item.uid, ...item }));
       setRequests(reqs);
     } catch (err) {
       console.error(err);
@@ -108,10 +99,13 @@ export default function UserManager({ user, isMobile }) {
   const fetchAIConfig = async () => {
     setLoading(true);
     try {
-      const docRef = doc(db, 'settings', 'ai_config');
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        const data = docSnap.data();
+      let data = null;
+      try {
+        data = await dbService.getDoc('settings', 'ai_config');
+      } catch (e) {
+        console.log("No AI config doc yet");
+      }
+      if (data && data._exists !== false) {
         setAiProvider(data.provider || 'google');
         
         // Map old deprecated models to newer ones
@@ -142,11 +136,8 @@ export default function UserManager({ user, isMobile }) {
       }
 
       // Fetch active documents currently in use for RAG chatbot
-      const docsSnap = await getDocs(query(collection(db, 'documents')));
-      const docsList = [];
-      docsSnap.forEach(d => {
-        docsList.push({ id: d.id, ...d.data() });
-      });
+      const docsSnap = await dbService.getDocs('documents');
+      const docsList = docsSnap.map(d => ({ id: d.id || d.uid, ...d }));
       setAiDocuments(docsList);
     } catch (err) {
       console.error("Error fetching AI config:", err);
@@ -161,20 +152,24 @@ export default function UserManager({ user, isMobile }) {
     setIsSavingKey(true);
     setSaveStatus('Đang lưu...');
     try {
-      const docRef = doc(db, 'settings', 'ai_config');
-      const docSnap = await getDoc(docRef);
+      let docSnap = null;
+      try {
+        docSnap = await dbService.getDoc('settings', 'ai_config');
+      } catch (err) {
+        // Doesn't exist
+      }
       
       let finalKey = apiKey;
-      if (apiKey === 'MOCKED_SAVED_KEY' && docSnap.exists()) {
-        finalKey = docSnap.data().apiKey || '';
+      if (apiKey === 'MOCKED_SAVED_KEY' && docSnap && docSnap._exists !== false) {
+        finalKey = docSnap.apiKey || '';
       }
 
-      await setDoc(docRef, {
+      await dbService.updateDoc('settings', 'ai_config', {
         provider: aiProvider,
         model: aiModel,
         apiKey: finalKey,
         updatedAt: new Date()
-      }, { merge: true });
+      });
 
       setSaveStatus('Lưu thành công!');
       pushToast('Cấu hình API Key đã được cập nhật!', 'success');
@@ -199,11 +194,10 @@ export default function UserManager({ user, isMobile }) {
     setIsSavingKey(true);
     setSaveStatus('Đang lưu...');
     try {
-      const docRef = doc(db, 'settings', 'ai_config');
-      await setDoc(docRef, {
+      await dbService.updateDoc('settings', 'ai_config', {
         systemInstruction: systemInstruction,
         updatedAt: new Date()
-      }, { merge: true });
+      });
       setSaveStatus('Lưu chỉ dẫn thành công!');
       pushToast('Chỉ dẫn hệ thống đã được cập nhật!', 'success');
     } catch (err) {
@@ -252,11 +246,9 @@ export default function UserManager({ user, isMobile }) {
         };
 
         const updatedDocs = [...trainedDocs, newDoc];
-        const docRef = doc(db, 'settings', 'ai_config');
-        
-        await setDoc(docRef, {
+        await dbService.updateDoc('settings', 'ai_config', {
           trainedDocs: updatedDocs
-        }, { merge: true });
+        });
 
         setTrainedDocs(updatedDocs);
         pushToast('Nạp tài liệu huấn luyện thành công!', 'success');
@@ -285,11 +277,9 @@ export default function UserManager({ user, isMobile }) {
     
     try {
       const updatedDocs = trainedDocs.filter((_, idx) => idx !== indexToDelete);
-      const docRef = doc(db, 'settings', 'ai_config');
-      
-      await setDoc(docRef, {
+      await dbService.updateDoc('settings', 'ai_config', {
         trainedDocs: updatedDocs
-      }, { merge: true });
+      });
 
       setTrainedDocs(updatedDocs);
       pushToast('Đã xóa tài liệu khỏi bộ nhớ chatbot!', 'success');
@@ -319,8 +309,7 @@ export default function UserManager({ user, isMobile }) {
     
     const toastId = pushToast('Đang xử lý...', 'info');
     try {
-      const adminUserAction = httpsCallable(functions, 'adminUserAction');
-      await adminUserAction({ action, targetUid, data });
+      await apiClient.post('/api/functions/adminUserAction', { action, targetUid, data });
       pushToast('Thành công!', 'success');
       
       // Refresh data
@@ -847,8 +836,7 @@ export default function UserManager({ user, isMobile }) {
                           onChange={async (e) => {
                             const newStatus = e.target.checked;
                             try {
-                              const docRef = doc(db, 'documents', docItem.id);
-                              await updateDoc(docRef, { isAITrained: newStatus });
+                              await dbService.updateDoc('documents', docItem.id, { isAITrained: newStatus });
                               
                               // Cập nhật state local
                               setAiDocuments(prev => prev.map(d => d.id === docItem.id ? { ...d, isAITrained: newStatus } : d));

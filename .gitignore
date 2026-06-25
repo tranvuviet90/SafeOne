@@ -22,3 +22,14 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Environment / secrets — never commit real values (use the *.example templates)
+.env
+.env.*
+!.env.example
+
+# Generated frontend build output (produced by `npm run build`)
+backend/public/assets/
+
+# Runtime file uploads
+backend/uploads/
