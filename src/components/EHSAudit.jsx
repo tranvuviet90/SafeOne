@@ -1569,9 +1569,9 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
 
     const pointsMap = { Nhẹ: 2, Nặng: 4, "Nghiêm trọng": 6 };
     const nowStr = new Date().toISOString();
-    let newErrorData;
+    let newErrorObject;
     if (selectedGroup === "Lỗi Khác") {
-      newErrorData = {
+      newErrorObject = {
         department: dep.name,
         group: selectedGroup,
         code: `custom-${Date.now()}`,

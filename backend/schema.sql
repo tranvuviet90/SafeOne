@@ -108,4 +108,18 @@ CREATE TABLE IF NOT EXISTS msds_chemicals (
   last_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
--- Gieo hạt tài khoản Admin mặc định sẽ được thực hiện qua seed.js khi khởi động hệ thống.
+-- 10. Bảng lưu các đoạn (chunk) tài liệu đã huấn luyện + vector embedding (RAG)
+CREATE TABLE IF NOT EXISTS doc_chunks (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  doc_id VARCHAR(191) NOT NULL,       -- ID tài liệu nguồn (documents.id hoặc "trained:<id>")
+  doc_title VARCHAR(255) DEFAULT NULL,
+  doc_type VARCHAR(50) DEFAULT NULL,  -- msds, sop, quytrinh, bieumau... hoặc "global"
+  chunk_index INT NOT NULL,
+  content MEDIUMTEXT NOT NULL,
+  embedding JSON NOT NULL,            -- mảng float (vector embedding)
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_doc (doc_id)
+) ENGINE=InnoDB;
+
+-- Không gieo sẵn tài khoản admin. Khi bảng users trống, ứng dụng hiện form khởi tạo
+-- để người dùng tự tạo tài khoản admin đầu tiên (qua endpoint /api/auth/init-admin).

@@ -115,6 +115,31 @@ const getColorForAssignmentCount = (count) => {
   return "white";
 };
 
+// Đọc cấu trúc phân chia bộ đàm theo ca (đồng bộ với logic trong Bodam.jsx)
+const getBodamAssignedShifts = (assignedTo) => {
+  const shifts = { S1: null, S2: null, S3: null, HC: null, S8: null };
+  if (!assignedTo) return shifts;
+  if (Array.isArray(assignedTo)) {
+    const keys = ["HC", "S1", "S2", "S3", "S8"];
+    assignedTo.forEach((u, i) => {
+      if (i < keys.length && u) shifts[keys[i]] = { uid: u.uid, name: u.name };
+    });
+    return shifts;
+  }
+  const hasShiftKeys = ["S1", "S2", "S3", "HC", "S8"].some((k) => k in assignedTo);
+  if (hasShiftKeys) {
+    return {
+      S1: assignedTo.S1 || null,
+      S2: assignedTo.S2 || null,
+      S3: assignedTo.S3 || null,
+      HC: assignedTo.HC || null,
+      S8: assignedTo.S8 || null,
+    };
+  }
+  if (assignedTo.uid && assignedTo.name) shifts.HC = { uid: assignedTo.uid, name: assignedTo.name };
+  return shifts;
+};
+
 /* ====== Component ====== */
 function CaLamViec({ user, isMobile }) {
   const { t } = useI18n();
@@ -133,6 +158,9 @@ function CaLamViec({ user, isMobile }) {
 
   // Notes modal state
   const [noteModal, setNoteModal] = useState(null); // { item, shiftKey, task, noteText }
+
+  // Trạng thái phân chia bộ đàm (lấy từ tab Bộ đàm)
+  const [bodamStatus, setBodamStatus] = useState([]);
 
   const weekDates = useMemo(() => getWeekDates(selectedDate), [selectedDate]);
   const weekId = useMemo(
@@ -228,6 +256,44 @@ function CaLamViec({ user, isMobile }) {
     };
     fetchAllUsers();
   }, []);
+
+  // Fetch trạng thái bộ đàm để hiển thị bộ đàm được yêu cầu sử dụng theo ca
+  useEffect(() => {
+    const fetchBodam = async () => {
+      try {
+        const snap = await dbService.getDoc("bodam", "status");
+        setBodamStatus(snap && snap._exists !== false && Array.isArray(snap.status) ? snap.status : []);
+      } catch (e) {
+        console.error("Lỗi lấy trạng thái bộ đàm:", e);
+      }
+    };
+    fetchBodam();
+    const unsub = realtimeService.subscribeToPath("bodam/status", (data) => {
+      if (data && Array.isArray(data.status)) setBodamStatus(data.status);
+    });
+    const intervalId = setInterval(fetchBodam, 30000);
+    return () => {
+      unsub();
+      clearInterval(intervalId);
+    };
+  }, []);
+
+  // Map: ca trực -> danh sách bộ đàm mà người dùng hiện tại được chỉ định
+  const myBodamByShift = useMemo(() => {
+    const map = {};
+    if (!Array.isArray(bodamStatus) || !user?.uid) return map;
+    bodamStatus.forEach((item, idx) => {
+      if (!item) return;
+      const shifts = getBodamAssignedShifts(item.assignedTo);
+      Object.entries(shifts).forEach(([sk, u]) => {
+        if (u && u.uid === user.uid) {
+          if (!map[sk]) map[sk] = [];
+          map[sk].push(`Bộ đàm ${idx + 1}`);
+        }
+      });
+    });
+    return map;
+  }, [bodamStatus, user]);
 
   // 3. Fetch Shifts & Assignments
   const fetchAllData = async () => {
@@ -791,6 +857,33 @@ function CaLamViec({ user, isMobile }) {
           <h3 style={{ marginTop: 0, fontSize: isMobile ? 16 : 20, color: orange, display: "flex", alignItems: "center", gap: 8 }}>
             📋 Nhiệm vụ & Ghi chú của tôi tuần này
           </h3>
+
+          {/* Bộ đàm được yêu cầu sử dụng (lấy dữ liệu từ tab Bộ đàm) */}
+          <div style={{
+            background: "white", border: `1px solid ${orangeLight}`, borderRadius: 8,
+            padding: "10px 14px", marginBottom: 14
+          }}>
+            <div style={{ fontSize: 13, fontWeight: "bold", color: orange, marginBottom: 6 }}>
+              🎙️ Bộ đàm được yêu cầu sử dụng
+            </div>
+            {Object.keys(myBodamByShift).length > 0 ? (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {Object.entries(myBodamByShift).map(([sk, list]) => (
+                  <span key={sk} style={{
+                    background: "#e9f5f3", color: "#2c3e50", border: `1px solid ${orangeLight}`,
+                    padding: "4px 10px", borderRadius: 12, fontSize: 12, fontWeight: 600
+                  }}>
+                    {SHIFTS[sk] || sk}: {list.join(", ")}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <div style={{ fontSize: 12, color: "#95a5a6", fontStyle: "italic" }}>
+                Bạn chưa được chỉ định bộ đàm nào. (Phân chia tại tab Bộ đàm)
+              </div>
+            )}
+          </div>
+
           {myWeekAssignments.length > 0 ? (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 12 }}>
               {myWeekAssignments.map((assign, idx) => (
@@ -812,6 +905,16 @@ function CaLamViec({ user, isMobile }) {
                   <div style={{ fontSize: 15, fontWeight: "bold", color: "#2c3e50", marginBottom: 6 }}>
                     Nhiệm vụ: {assign.taskName}
                   </div>
+                  {myBodamByShift[assign.shiftKey]?.length > 0 && (
+                    <div style={{
+                      display: "flex", alignItems: "center", gap: 6, marginBottom: 6,
+                      fontSize: 12, fontWeight: "bold", color: orange,
+                      background: "#e9f5f3", border: `1px solid ${orangeLight}`,
+                      padding: "5px 8px", borderRadius: 6
+                    }}>
+                      🎙️ Bộ đàm: {myBodamByShift[assign.shiftKey].join(", ")}
+                    </div>
+                  )}
                   {assign.note ? (
                     <div style={{
                       background: "#fdf8e2", borderLeft: "3px solid #f39c12",

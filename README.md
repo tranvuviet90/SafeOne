@@ -52,7 +52,7 @@ node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
 | `CORS_ORIGIN` | (Production) danh sách origin cho phép, phân tách bằng dấu phẩy |
 
 ### 4. Khởi tạo cơ sở dữ liệu
-Lần đầu chạy backend, server tự động chạy `backend/schema.sql` nếu bảng `users` chưa tồn tại và **gieo tài khoản admin mặc định `admin / admin`**. → **Hãy đổi mật khẩu admin ngay sau khi đăng nhập lần đầu.**
+Lần đầu chạy backend, server tự động chạy `backend/schema.sql` nếu bảng `users` chưa tồn tại. **Không có tài khoản admin được gieo sẵn** — khi chưa có user nào, giao diện đăng nhập sẽ hiện form **Khởi Tạo Hệ Thống** để bạn tự tạo tài khoản admin đầu tiên bằng email thật.
 
 ### 5. Chạy ở chế độ phát triển (2 terminal)
 ```bash
@@ -100,4 +100,4 @@ pm2 start backend/server.js --name safeone
 ## 🇬🇧 English (summary)
 SafeOne is a factory EHS/operations management app. **Stack:** React 19 + Vite (frontend), Node.js + Express + MySQL + Socket.IO (backend), Gemini via `@google/generative-ai` (AI chatbot). It is fully decoupled from Firebase.
 
-**Quick start:** `npm install` (root) and `cd backend && npm install`; copy `.env.example`→`.env` and `backend/.env.example`→`backend/.env` (set `JWT_SECRET` + MySQL creds); run backend `cd backend && npm run dev` (port 5000) and frontend `npm run dev` (port 5173). First run auto-creates the schema and seeds `admin / admin` — change it immediately. For production: `npm run build` then `npm start`.
+**Quick start:** `npm install` (root) and `cd backend && npm install`; copy `.env.example`→`.env` and `backend/.env.example`→`backend/.env` (set `JWT_SECRET` + MySQL creds); run backend `cd backend && npm run dev` (port 5000) and frontend `npm run dev` (port 5173). First run auto-creates the schema; no admin is seeded — when there are no users, the login screen shows a setup form to create the first admin with a real email. For production: `npm run build` then `npm start`.

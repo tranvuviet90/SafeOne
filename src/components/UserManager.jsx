@@ -57,6 +57,47 @@ export default function UserManager({ user, isMobile }) {
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [aiDocuments, setAiDocuments] = useState([]);
 
+  // Password-recovery email content (admin-configurable). Placeholders: {name}, {link}
+  const DEFAULT_RECOVERY_SUBJECT = 'Đặt lại mật khẩu SafeOne';
+  const DEFAULT_RECOVERY_BODY = 'Xin chào {name},\n\nBạn (hoặc ai đó) đã yêu cầu đặt lại mật khẩu cho tài khoản SafeOne của bạn.\nNhấp vào liên kết sau để đặt lại mật khẩu (có hiệu lực trong 1 giờ):\n\n{link}\n\nNếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email.';
+  const [showRecoveryConfig, setShowRecoveryConfig] = useState(false);
+  const [recoverySubject, setRecoverySubject] = useState(DEFAULT_RECOVERY_SUBJECT);
+  const [recoveryBody, setRecoveryBody] = useState(DEFAULT_RECOVERY_BODY);
+  const [savingRecovery, setSavingRecovery] = useState(false);
+
+  const loadRecoveryConfig = async () => {
+    try {
+      const snap = await dbService.getDoc('settings', 'password_recovery');
+      if (snap && snap._exists !== false) {
+        setRecoverySubject(snap.emailSubject || DEFAULT_RECOVERY_SUBJECT);
+        setRecoveryBody(snap.emailBody || DEFAULT_RECOVERY_BODY);
+      }
+    } catch (e) {
+      // keep defaults on error
+    }
+  };
+
+  const handleSaveRecoveryConfig = async () => {
+    setSavingRecovery(true);
+    try {
+      await dbService.updateDoc('settings', 'password_recovery', {
+        emailSubject: recoverySubject,
+        emailBody: recoveryBody,
+        updatedAt: new Date().toISOString()
+      });
+      pushToast('Đã lưu nội dung khôi phục mật khẩu!', 'success');
+    } catch (err) {
+      console.error('Error saving recovery config:', err);
+      pushToast('Lưu nội dung khôi phục thất bại.', 'error');
+    } finally {
+      setSavingRecovery(false);
+    }
+  };
+
+  useEffect(() => {
+    loadRecoveryConfig();
+  }, []);
+
   const triggerExtractMarkdown = async (docItem) => {
     pushToast("Đang trích xuất nội dung văn bản bằng AI...", "info");
     try {
@@ -119,7 +160,8 @@ export default function UserManager({ user, isMobile }) {
         
         setSystemInstruction(data.systemInstruction || '');
         setTrainedDocs(data.trainedDocs || []);
-        if (data.apiKey) {
+        // Backend chỉ trả cờ hasApiKey (không trả key thật) để tránh lộ khóa.
+        if (data.hasApiKey) {
           setApiKey('MOCKED_SAVED_KEY');
           setHasSavedKey(true);
         } else {
@@ -152,28 +194,22 @@ export default function UserManager({ user, isMobile }) {
     setIsSavingKey(true);
     setSaveStatus('Đang lưu...');
     try {
-      let docSnap = null;
-      try {
-        docSnap = await dbService.getDoc('settings', 'ai_config');
-      } catch (err) {
-        // Doesn't exist
-      }
-      
-      let finalKey = apiKey;
-      if (apiKey === 'MOCKED_SAVED_KEY' && docSnap && docSnap._exists !== false) {
-        finalKey = docSnap.apiKey || '';
-      }
-
+      // Gửi thẳng giá trị apiKey trong state:
+      //  - 'MOCKED_SAVED_KEY' (sentinel): backend giữ nguyên key đang lưu, không ghi đè.
+      //  - chuỗi mới: đặt key mới.
+      //  - '' (rỗng): xóa key.
+      // Key thật không bao giờ được tải về client nên không cần đọc lại trước khi lưu.
       await dbService.updateDoc('settings', 'ai_config', {
         provider: aiProvider,
         model: aiModel,
-        apiKey: finalKey,
+        apiKey: apiKey,
         updatedAt: new Date()
       });
 
       setSaveStatus('Lưu thành công!');
       pushToast('Cấu hình API Key đã được cập nhật!', 'success');
-      if (finalKey) {
+      // Sau khi lưu: nếu vừa nhập key mới hoặc giữ key cũ (sentinel) thì coi như đã có key.
+      if (apiKey && apiKey.trim() !== '') {
         setApiKey('MOCKED_SAVED_KEY');
         setHasSavedKey(true);
       } else {
@@ -238,6 +274,7 @@ export default function UserManager({ user, isMobile }) {
         const content = event.target.result;
         
         const newDoc = {
+          id: 'td-' + Date.now() + Math.random().toString(36).substr(2, 6),
           name: file.name,
           size: file.size,
           type: file.type || 'text/plain',
@@ -252,7 +289,20 @@ export default function UserManager({ user, isMobile }) {
 
         setTrainedDocs(updatedDocs);
         pushToast('Nạp tài liệu huấn luyện thành công!', 'success');
-        setSaveStatus('Huấn luyện thành công!');
+        setSaveStatus('Đang tạo embedding...');
+
+        // Cắt + tạo embedding ở backend để chatbot chỉ nạp đoạn liên quan (tiết kiệm token)
+        try {
+          await apiClient.post('/api/functions/embedTrainingDoc', {
+            id: newDoc.id,
+            name: newDoc.name,
+            content: newDoc.content
+          });
+          setSaveStatus('Huấn luyện thành công!');
+        } catch (embErr) {
+          console.error('Lỗi tạo embedding tài liệu:', embErr);
+          pushToast('Đã lưu tài liệu nhưng tạo embedding thất bại. Hãy bấm "Đồng bộ embedding" để thử lại.', 'error');
+        }
       };
       
       reader.onerror = (err) => {
@@ -272,14 +322,42 @@ export default function UserManager({ user, isMobile }) {
     }
   };
 
+  const [isSyncingEmbed, setIsSyncingEmbed] = useState(false);
+  const handleSyncEmbeddings = async () => {
+    setIsSyncingEmbed(true);
+    setSaveStatus('Đang đồng bộ embedding cho dữ liệu cũ...');
+    try {
+      const res = await apiClient.post('/api/functions/backfillChunks', {});
+      const { processed = 0, chunks = 0 } = res.data || {};
+      pushToast(`Đồng bộ xong: ${processed} tài liệu, ${chunks} đoạn embedding.`, 'success');
+      setSaveStatus('Đồng bộ embedding thành công!');
+    } catch (err) {
+      console.error('Lỗi đồng bộ embedding:', err);
+      pushToast(err.response?.data?.error || 'Lỗi khi đồng bộ embedding.', 'error');
+      setSaveStatus('Lỗi đồng bộ embedding.');
+    } finally {
+      setIsSyncingEmbed(false);
+    }
+  };
+
   const handleDeleteDoc = async (indexToDelete) => {
     if (!(await askConfirm("Bạn có chắc chắn muốn xóa tài liệu huấn luyện này?", "Xác nhận xóa tài liệu"))) return;
     
     try {
+      const docToDelete = trainedDocs[indexToDelete];
       const updatedDocs = trainedDocs.filter((_, idx) => idx !== indexToDelete);
       await dbService.updateDoc('settings', 'ai_config', {
         trainedDocs: updatedDocs
       });
+
+      // Xóa luôn embedding tương ứng (nếu có id)
+      if (docToDelete?.id) {
+        try {
+          await apiClient.post('/api/functions/deleteTrainingDoc', { id: docToDelete.id });
+        } catch (embErr) {
+          console.error('Lỗi xóa embedding tài liệu:', embErr);
+        }
+      }
 
       setTrainedDocs(updatedDocs);
       pushToast('Đã xóa tài liệu khỏi bộ nhớ chatbot!', 'success');
@@ -427,6 +505,60 @@ export default function UserManager({ user, isMobile }) {
               />
             </div>
             <div style={{ fontSize: 14, color: '#666', fontWeight: 600 }}>Tổng: {filteredUsers.length} / {users.length} users</div>
+          </div>
+
+          {/* Password recovery email content settings */}
+          <div style={{ border: '1px solid #d0e2e0', borderRadius: 12, marginBottom: 16, background: '#f8fbfb', overflow: 'hidden' }}>
+            <button
+              onClick={() => setShowRecoveryConfig(v => !v)}
+              style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: 'transparent', border: 'none', cursor: 'pointer', fontWeight: 700, color: colors.primary, fontSize: 15 }}
+            >
+              <span>🔐 Cài đặt nội dung khôi phục mật khẩu</span>
+              <span>{showRecoveryConfig ? '▲' : '▼'}</span>
+            </button>
+            {showRecoveryConfig && (
+              <div style={{ padding: '0 16px 16px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <p style={{ margin: 0, fontSize: 13, color: '#5a6f72', lineHeight: 1.5 }}>
+                  Nội dung email gửi cho người dùng khi họ bấm "Quên mật khẩu". Dùng <code>{'{name}'}</code> để chèn tên người dùng và <code>{'{link}'}</code> để chèn liên kết đặt lại mật khẩu.
+                </p>
+                <div>
+                  <label style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 600, color: '#333' }}>Tiêu đề email</label>
+                  <input
+                    type="text"
+                    value={recoverySubject}
+                    onChange={e => setRecoverySubject(e.target.value)}
+                    style={{ width: '100%', padding: 10, borderRadius: 6, border: '1px solid #ccc', boxSizing: 'border-box', fontSize: 14 }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 600, color: '#333' }}>Nội dung email</label>
+                  <textarea
+                    value={recoveryBody}
+                    onChange={e => setRecoveryBody(e.target.value)}
+                    rows={8}
+                    style={{ width: '100%', padding: 10, borderRadius: 6, border: '1px solid #ccc', boxSizing: 'border-box', fontSize: 14, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.5 }}
+                  />
+                </div>
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center' }}>
+                  <button
+                    onClick={() => { setRecoverySubject(DEFAULT_RECOVERY_SUBJECT); setRecoveryBody(DEFAULT_RECOVERY_BODY); }}
+                    style={{ padding: '8px 14px', borderRadius: 6, border: '1px solid #ccc', background: 'white', color: '#555', cursor: 'pointer', fontWeight: 600 }}
+                  >
+                    Khôi phục mặc định
+                  </button>
+                  <button
+                    onClick={handleSaveRecoveryConfig}
+                    disabled={savingRecovery}
+                    style={{ padding: '8px 18px', borderRadius: 6, border: 'none', background: colors.primary, color: 'white', cursor: 'pointer', fontWeight: 700, opacity: savingRecovery ? 0.7 : 1 }}
+                  >
+                    {savingRecovery ? 'Đang lưu...' : 'Lưu cài đặt'}
+                  </button>
+                </div>
+                <p style={{ margin: 0, fontSize: 12, color: '#999', lineHeight: 1.5 }}>
+                  Lưu ý: cần cấu hình SMTP (SMTP_HOST, SMTP_USER...) trong file <code>backend/.env</code> để hệ thống gửi được email. Nếu chưa cấu hình, liên kết đặt lại sẽ được in ra console của server.
+                </p>
+              </div>
+            )}
           </div>
 
           {isMobile ? (
@@ -801,11 +933,24 @@ export default function UserManager({ user, isMobile }) {
 
           {/* Section: Manage Chatbot Documents */}
           <div>
-            <h4 style={{ margin: '0 0 8px 0', color: '#333', fontSize: 15, fontWeight: 700 }}>
-              2. Quản lý tài liệu huấn luyện AI hiện tại
-            </h4>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', margin: '0 0 8px 0' }}>
+              <h4 style={{ margin: 0, color: '#333', fontSize: 15, fontWeight: 700 }}>
+                2. Quản lý tài liệu huấn luyện AI hiện tại
+              </h4>
+              <button
+                type="button"
+                onClick={handleSyncEmbeddings}
+                disabled={isSyncingEmbed}
+                title="Tạo lại embedding cho các tài liệu đã huấn luyện trước đây nhưng chưa có embedding"
+                style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid ' + colors.primary, background: 'white', color: colors.primary, fontWeight: 600, fontSize: 13, cursor: isSyncingEmbed ? 'default' : 'pointer', opacity: isSyncingEmbed ? 0.6 : 1 }}
+              >
+                {isSyncingEmbed ? '⏳ Đang đồng bộ...' : '🔄 Đồng bộ embedding'}
+              </button>
+            </div>
             <p style={{ margin: '0 0 16px 0', fontSize: 13, color: '#555' }}>
               Bật/tắt trạng thái "Huấn luyện AI" cho các tài liệu (MSDS, SOP, Quy trình, Biểu mẫu) để Chatbot tự động nạp tri thức từ tài liệu đó. Để tải lên tài liệu mới, vui lòng vào tab <strong>Tài liệu</strong>.
+              <br />
+              <span style={{ color: '#888' }}>* Chatbot chỉ gửi vài đoạn liên quan nhất tới AI mỗi câu hỏi (RAG) để tiết kiệm token. Nếu tài liệu cũ trả lời thiếu, hãy bấm <strong>Đồng bộ embedding</strong>.</span>
             </p>
 
             {/* List of Documents */}
@@ -837,14 +982,20 @@ export default function UserManager({ user, isMobile }) {
                             const newStatus = e.target.checked;
                             try {
                               await dbService.updateDoc('documents', docItem.id, { isAITrained: newStatus });
-                              
+
                               // Cập nhật state local
                               setAiDocuments(prev => prev.map(d => d.id === docItem.id ? { ...d, isAITrained: newStatus } : d));
                               pushToast(`Đã ${newStatus ? 'bật' : 'tắt'} huấn luyện AI cho tài liệu`, 'success');
-                              
-                              // Tự động kích hoạt trích xuất Markdown nếu bật huấn luyện AI và chưa có markdownContent
-                              if (newStatus && !docItem.markdownContent) {
-                                triggerExtractMarkdown(docItem);
+
+                              // Đồng bộ embedding: tắt -> xóa chunk; bật -> tạo chunk từ markdown,
+                              // nếu chưa có markdown thì trích xuất (sẽ tự tạo chunk sau đó).
+                              try {
+                                const syncRes = await apiClient.post('/api/functions/syncDocChunks', { docId: docItem.id, enabled: newStatus });
+                                if (newStatus && syncRes.data?.needsExtract) {
+                                  triggerExtractMarkdown(docItem);
+                                }
+                              } catch (syncErr) {
+                                console.error('Lỗi đồng bộ embedding tài liệu:', syncErr);
                               }
                             } catch (err) {
                               console.error(err);

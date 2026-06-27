@@ -1990,11 +1990,11 @@ function ExportBaoComModal({ onClose }) {
   };
 
   async function readDay(dayId) {
-    const snap = await getDoc(doc(db, "meal_reports", dayId));
-    if (!snap.exists()) {
+    const snap = await dbService.getDoc("meal_reports", dayId);
+    if (!snap || snap._exists === false) {
       return { dayId, data: {} };
     }
-    const d = snap.data();
+    const d = snap;
     const pack = {};
     for (const shiftKey of ["HC", "S1", "S2", "S3", "S8"]) {
       const node = d[shiftKey] || {};

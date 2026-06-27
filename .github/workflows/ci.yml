@@ -37,7 +37,7 @@ jobs:
         run: |
           set -e
           node --check server.js
-          for f in routes/*.js middleware/*.js socket/*.js config/*.js seed.js clean_db.js; do
+          for f in routes/*.js middleware/*.js socket/*.js config/*.js clean_db.js; do
             echo "checking $f"
             node --check "$f"
           done

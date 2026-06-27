@@ -23,6 +23,7 @@ import Chatbot from "./components/Chatbot";
 import { colors } from "./theme";
 import { ToastProvider, ConfirmProvider, useToast } from "./components/LightboxSwipeOnly";
 import PublicLockerView from "./components/PublicLockerView";
+import ResetPassword from "./components/ResetPassword";
 
 import { useI18n } from "./i18n/I18nProvider";
 import { DEPARTMENT_NAMES, DEPARTMENT_ROLES, SHIFT_START_HOURS } from "./constants/roles";
@@ -96,6 +97,17 @@ function ToastBridge() {
 export default function App() {
   const params = new URLSearchParams(window.location.search);
   const lockerId = params.get("locker");
+  const resetToken = params.get("reset");
+
+  if (resetToken) {
+    return (
+      <ToastProvider>
+        <ConfirmProvider>
+          <ResetPassword token={resetToken} />
+        </ConfirmProvider>
+      </ToastProvider>
+    );
+  }
 
   if (lockerId) {
     return (

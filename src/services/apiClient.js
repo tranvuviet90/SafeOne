@@ -14,6 +14,17 @@ apiClient.interceptors.request.use(
     if (token) {
       config.headers["Authorization"] = `Bearer ${token}`;
     }
+    // For multipart uploads the browser must set Content-Type itself so the
+    // multipart boundary is included. A manual "multipart/form-data" (or the
+    // default application/json) drops the boundary and makes multer reject the
+    // request with 400 "Boundary not found". Strip it so axios/browser handle it.
+    if (typeof FormData !== "undefined" && config.data instanceof FormData) {
+      if (config.headers && typeof config.headers.delete === "function") {
+        config.headers.delete("Content-Type");
+      } else if (config.headers) {
+        delete config.headers["Content-Type"];
+      }
+    }
     return config;
   },
   (error) => Promise.reject(error)

@@ -798,9 +798,7 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
     if (autoCorrect && note.trim()) {
       setIsCorrecting(true);
       try {
-        const data = await callSpellCheckService(note.trim(), CLOUD_FUNCTION_URL);
-        console.log("Kết quả trả về từ AI Service:", data);
-        const corrected = (data && data.response || "").trim();
+        const corrected = (await callSpellCheckService(note.trim()) || "").trim();
         if (corrected && corrected.toLowerCase() !== note.trim().toLowerCase()) {
           setCorrectedNote(corrected);
           setShowCorrectModal(true);

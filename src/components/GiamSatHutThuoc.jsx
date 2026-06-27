@@ -10,6 +10,8 @@ const orange = colors.primary;
 const orangeLight = colors.primaryLight;
 const dark = colors.textPrimary;
 
+const SHIFT_OPTIONS = ["S1", "S2", "S3", "S8"];
+
 // ====================== CÁC BIỂU TƯỢNG MỚI ======================
 function RedXIcon({ size = 14 }) {
   return (
@@ -40,6 +42,7 @@ function GiamSatHutThuoc({ user }) {
   const { t } = useI18n();
   const { askConfirm } = useConfirm();
   const [selected, setSelected] = useState([]);
+  const [shift, setShift] = useState('');
   const [note, setNote] = useState('');
   const [files, setFiles] = useState([]);
   const [fileNames, setFileNames] = useState([]);
@@ -145,6 +148,7 @@ function GiamSatHutThuoc({ user }) {
 
   async function handleSave() {
     if (selected.length === 0) { alert("Vui lòng chọn người đi kiểm tra."); return; }
+    if (!shift) { alert("Vui lòng chọn ca làm việc."); return; }
     let uploadedUrls = [];
     if (files.length > 0) {
       try {
@@ -165,15 +169,17 @@ function GiamSatHutThuoc({ user }) {
     }
     const newEntry = {
       users: selected,
+      shift,
       note,
       images: uploadedUrls,
       by: user.name,
       userId: user.uid,
-      createdAt: { type: "serverTimestamp" }
+      createdAt: new Date().toISOString()
     };
     await dbService.createDoc("hutthuoc_history", newEntry);
     fetchHistory();
     setSelected([]);
+    setShift('');
     setNote('');
     setFiles([]);
     setFileNames([]);
@@ -269,6 +275,18 @@ function GiamSatHutThuoc({ user }) {
           )}
         </div>
 
+        <div style={{ marginBottom: 12, maxWidth: 220 }}>
+          <div style={{ fontSize: 15, color: dark, marginBottom: 4 }}>Ca làm việc: <span style={{ color: '#d9534f' }}>*</span></div>
+          <select
+            value={shift}
+            onChange={e => setShift(e.target.value)}
+            style={{ width: '100%', padding: "8px 12px", borderRadius: 8, border: `1.2px solid ${orangeLight}`, color: dark, background: "#fff", fontSize: 15 }}
+          >
+            <option value="">-- Chọn ca --</option>
+            {SHIFT_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </div>
+
         <div style={{ fontSize: 15, color: dark, marginBottom: 4 }}>Ghi chú:</div>
         <div style={{ display: 'flex', gap: 10, alignItems: "center", flexWrap: 'wrap' }}>
           <input
@@ -312,6 +330,7 @@ function GiamSatHutThuoc({ user }) {
                 ) : null}
               </div>
             </div>
+            {l.shift && <div style={{marginTop: 6}}><b>Ca:</b> {l.shift}</div>}
             {!!l.users?.length && <div style={{marginTop: 6}}>Đi cùng: {l.users.join(", ")}</div>}
             {l.note && <div style={{marginTop: 6, whiteSpace: 'pre-wrap', wordBreak: 'break-word'}}>{l.note}</div>}
             {!!l.images?.length && (

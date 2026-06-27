@@ -58,6 +58,29 @@ const SENSITIVE_COLUMNS = {
   users: ["password_hash"]
 };
 
+// Sensitive fields inside generic (firestore_mock) JSON docs that must never be
+// sent to clients. Keyed by "collection/id". The raw value is removed and replaced
+// by a boolean "has<Field>" flag so the UI can still show whether a value exists.
+const SENSITIVE_GENERIC_FIELDS = {
+  "settings/ai_config": ["apiKey"]
+};
+
+// Trả về bản sao đã loại bỏ trường nhạy cảm cho tài liệu generic (vd: API key).
+function redactGenericDoc(collection, id, data) {
+  if (!data || typeof data !== "object") return data;
+  const fields = SENSITIVE_GENERIC_FIELDS[`${collection}/${id}`];
+  if (!fields) return data;
+  const out = { ...data };
+  fields.forEach(f => {
+    if (f in out) {
+      const had = !!(out[f] && String(out[f]).trim());
+      delete out[f];
+      out[`has${f.charAt(0).toUpperCase() + f.slice(1)}`] = had; // vd: hasApiKey
+    }
+  });
+  return out;
+}
+
 // Per-collection write policy. Collections NOT listed keep the legacy behavior
 // (any authenticated user may read/write) so existing modules keep working.
 const COLLECTION_POLICY = {
@@ -206,7 +229,7 @@ async function triggerBroadcasts(collection, id) {
     const list = rows.map(r => {
       try {
         const parsed = typeof r.data === "string" ? JSON.parse(r.data) : r.data;
-        return { id: r.id, ...parsed };
+        return redactGenericDoc(collection, r.id, { id: r.id, ...parsed });
       } catch (e) {
         return { id: r.id };
       }
@@ -220,7 +243,7 @@ async function triggerBroadcasts(collection, id) {
     if (docRow.length > 0) {
       try {
         const parsed = typeof docRow[0].data === "string" ? JSON.parse(docRow[0].data) : docRow[0].data;
-        broadcastChange(`${collection}/${id}`, { id, ...parsed });
+        broadcastChange(`${collection}/${id}`, redactGenericDoc(collection, id, { id, ...parsed }));
       } catch (e) {}
     } else {
       broadcastChange(`${collection}/${id}`, null);
@@ -287,7 +310,7 @@ router.get("/:collection", authenticateToken, async (req, res) => {
       const result = rows.map(r => {
         try {
           const parsed = typeof r.data === "string" ? JSON.parse(r.data) : r.data;
-          return { id: r.id, ...parsed };
+          return redactGenericDoc(collection, r.id, { id: r.id, ...parsed });
         } catch (e) {
           return { id: r.id };
         }
@@ -336,7 +359,7 @@ router.get("/:collection/:id", authenticateToken, async (req, res) => {
         return res.status(200).json({ _exists: false });
       }
       const parsed = typeof rows[0].data === "string" ? JSON.parse(rows[0].data) : rows[0].data;
-      return res.status(200).json({ id, ...parsed });
+      return res.status(200).json(redactGenericDoc(collection, id, { id, ...parsed }));
     } catch (error) {
       console.error(`Get generic document ${collection}/${id} error:`, error);
       return res.status(500).json({ error: "Lỗi cơ sở dữ liệu" });
@@ -381,6 +404,12 @@ router.get("/:collection/:id", authenticateToken, async (req, res) => {
   }
 });
 
+// IMPORTANT: register the batch route BEFORE the generic "/:collection" routes.
+// Express matches in definition order, so if "/:collection" comes first it would
+// capture POST /api/db/batch as collection="batch" and the batch would never run.
+// (batchHandler is a hoisted function declaration defined further below.)
+router.post("/batch", authenticateToken, batchHandler);
+
 // 3. POST or PATCH single document
 router.post("/:collection/:id", authenticateToken, async (req, res) => {
   await updateDocumentHandler(req, res);
@@ -398,7 +427,11 @@ async function updateDocumentHandler(req, res) {
   if (!policyCheck.ok) {
     return res.status(policyCheck.status).json({ error: policyCheck.error });
   }
-  if (cfg) {
+  // meal_reports is written Firestore-style with dotted field paths
+  // (e.g. "S1.confirmedByCanteen", "S1.overtimeFulfilled.Dept.mi"). Those keys are
+  // parsed into a JSON structure below, never used as raw SQL identifiers, so the
+  // identifier guard must not run for it (it would reject every dotted key with 400).
+  if (cfg && cfg.table !== "meal_reports") {
     const bad = unsafeColumns(Object.keys(payload));
     if (bad.length) {
       return res.status(400).json({ error: `Tên trường không hợp lệ: ${bad.join(", ")}` });
@@ -421,6 +454,12 @@ async function updateDocumentHandler(req, res) {
         }
       }
 
+      // Bảo vệ API key: nếu client gửi sentinel "MOCKED_SAVED_KEY" nghĩa là "không đổi",
+      // thì giữ nguyên key đang lưu (không ghi đè). Key thật không bao giờ rời server.
+      if (collection === "settings" && id === "ai_config" && payload.apiKey === "MOCKED_SAVED_KEY") {
+        delete payload.apiKey;
+      }
+
       for (const key of Object.keys(payload)) {
         updateNestedField(currentData, key, payload[key]);
       }
@@ -439,7 +478,7 @@ async function updateDocumentHandler(req, res) {
         );
       }
 
-      const formatted = { id, ...currentData };
+      const formatted = redactGenericDoc(collection, id, { id, ...currentData });
       await triggerBroadcasts(collection, id);
       return res.status(200).json(formatted);
     } catch (error) {
@@ -451,42 +490,109 @@ async function updateDocumentHandler(req, res) {
   try {
     if (cfg.table === "meal_reports") {
       const shifts = ["HC", "S1", "S2", "S3", "S8"];
-      for (const shift of shifts) {
-        if (payload[shift]) {
-          const shiftData = payload[shift];
-          const [existing] = await pool.query(
-            "SELECT * FROM meal_reports WHERE date_key = ? AND shift_key = ?",
-            [id, shift]
-          );
-          const rowExists = existing.length > 0;
-          const curRow = rowExists ? existing[0] : {};
 
-          const dbPayload = {
-            summary: JSON.stringify(processFieldUpdate(JSON.parse(curRow.summary || "null"), shiftData.summary)),
-            confirmed_summary: JSON.stringify(processFieldUpdate(JSON.parse(curRow.confirmed_summary || "null"), shiftData.confirmedSummary)),
-            confirmed_by_admin: shiftData.confirmedByAdmin !== undefined ? shiftData.confirmedByAdmin : curRow.confirmed_by_admin,
-            confirmed_at_admin: shiftData.confirmedAtAdmin !== undefined ? shiftData.confirmedAtAdmin : curRow.confirmed_at_admin,
-            confirmed_by_canteen: shiftData.confirmedByCanteen !== undefined ? shiftData.confirmedByCanteen : curRow.confirmed_by_canteen,
-            confirmed_at_canteen: shiftData.confirmedAtCanteen !== undefined ? shiftData.confirmedAtCanteen : curRow.confirmed_at_canteen,
-            reports: JSON.stringify(processFieldUpdate(JSON.parse(curRow.reports || "null"), shiftData.reports)),
-            overtime_fulfilled: JSON.stringify(processFieldUpdate(JSON.parse(curRow.overtime_fulfilled || "null"), shiftData.overtimeFulfilled)),
-            last_report_at: shiftData.lastReportAt !== undefined ? shiftData.lastReportAt : curRow.last_report_at,
-            history: JSON.stringify(processFieldUpdate(JSON.parse(curRow.history || "[]"), payload.history)),
-            last_history_at: payload.lastHistoryAt !== undefined ? payload.lastHistoryAt : curRow.last_history_at
-          };
+      // The frontend writes meal_reports the way Firestore does: a top-level
+      // "history"/"lastHistoryAt" plus per-shift updates expressed either as a
+      // structured object ({ S1: {...} }) OR as dotted field paths of arbitrary
+      // depth ({ "S1.confirmedByCanteen": x, "S1.overtimeFulfilled.Dept.mi": 5 }).
+      // We rebuild each affected shift's JSON state, apply the updates with
+      // Firestore semantics (serverTimestamp / arrayUnion / deleteField via
+      // updateNestedField), then write the whole shift row back.
+      const [rows] = await pool.query("SELECT * FROM meal_reports WHERE date_key = ?", [id]);
+      const curMap = {};
+      rows.forEach(r => { curMap[r.shift_key] = r; });
 
-          if (rowExists) {
-            const setClauses = Object.keys(dbPayload).map(k => `${k} = ?`).join(", ");
-            const values = [...Object.values(dbPayload), id, shift];
-            await pool.query(`UPDATE meal_reports SET ${setClauses} WHERE date_key = ? AND shift_key = ?`, values);
-          } else {
-            const columns = ["date_key", "shift_key", ...Object.keys(dbPayload)].join(", ");
-            const placeholders = ["?", "?", ...Object.keys(dbPayload).map(() => "?")].join(", ");
-            const values = [id, shift, ...Object.values(dbPayload)];
-            await pool.query(`INSERT INTO meal_reports (${columns}) VALUES (${placeholders})`, values);
+      const rowToShiftObj = (r) => r ? {
+        summary: JSON.parse(r.summary || "null"),
+        confirmedSummary: JSON.parse(r.confirmed_summary || "null"),
+        confirmedByAdmin: r.confirmed_by_admin,
+        confirmedAtAdmin: r.confirmed_at_admin,
+        confirmedByCanteen: r.confirmed_by_canteen,
+        confirmedAtCanteen: r.confirmed_at_canteen,
+        reports: JSON.parse(r.reports || "null"),
+        overtimeFulfilled: JSON.parse(r.overtime_fulfilled || "null"),
+        lastReportAt: r.last_report_at
+      } : {};
+
+      let historyVal = rows.length ? JSON.parse(rows[0].history || "[]") : [];
+      let lastHistoryAtVal = rows.length ? rows[0].last_history_at : null;
+      let historyTouched = false;
+
+      const shiftObjs = {};
+      const touchedShifts = new Set();
+
+      for (const key of Object.keys(payload)) {
+        if (key === "history") {
+          historyVal = processFieldUpdate(historyVal, payload.history);
+          historyTouched = true;
+          continue;
+        }
+        if (key === "lastHistoryAt") {
+          lastHistoryAtVal = processFieldUpdate(lastHistoryAtVal, payload.lastHistoryAt);
+          historyTouched = true;
+          continue;
+        }
+        const dot = key.indexOf(".");
+        const shift = dot === -1 ? key : key.slice(0, dot);
+        if (!shifts.includes(shift)) continue; // ignore stray top-level keys
+        if (!shiftObjs[shift]) shiftObjs[shift] = rowToShiftObj(curMap[shift]);
+        touchedShifts.add(shift);
+        if (dot === -1) {
+          // Structured form: value is the full shift object; apply field by field.
+          const val = payload[key];
+          if (val && typeof val === "object") {
+            for (const f of Object.keys(val)) updateNestedField(shiftObjs[shift], f, val[f]);
           }
+        } else {
+          updateNestedField(shiftObjs[shift], key.slice(dot + 1), payload[key]);
         }
       }
+
+      const upsertShift = async (shift, obj) => {
+        await pool.query(
+          `INSERT INTO meal_reports (
+            date_key, shift_key, summary, confirmed_summary, confirmed_by_admin, confirmed_at_admin,
+            confirmed_by_canteen, confirmed_at_canteen, reports, overtime_fulfilled, last_report_at, history, last_history_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON DUPLICATE KEY UPDATE
+            summary = VALUES(summary), confirmed_summary = VALUES(confirmed_summary),
+            confirmed_by_admin = VALUES(confirmed_by_admin), confirmed_at_admin = VALUES(confirmed_at_admin),
+            confirmed_by_canteen = VALUES(confirmed_by_canteen), confirmed_at_canteen = VALUES(confirmed_at_canteen),
+            reports = VALUES(reports), overtime_fulfilled = VALUES(overtime_fulfilled),
+            last_report_at = VALUES(last_report_at), history = VALUES(history), last_history_at = VALUES(last_history_at)`,
+          [
+            id, shift,
+            JSON.stringify(obj.summary ?? null),
+            JSON.stringify(obj.confirmedSummary ?? null),
+            obj.confirmedByAdmin ?? null,
+            obj.confirmedAtAdmin ?? null,
+            obj.confirmedByCanteen ?? null,
+            obj.confirmedAtCanteen ?? null,
+            JSON.stringify(obj.reports ?? null),
+            JSON.stringify(obj.overtimeFulfilled ?? null),
+            obj.lastReportAt ?? null,
+            JSON.stringify(historyVal),
+            lastHistoryAtVal
+          ]
+        );
+      };
+
+      for (const shift of touchedShifts) {
+        await upsertShift(shift, shiftObjs[shift]);
+      }
+
+      // history is denormalized onto every shift row for this date; keep the
+      // rows we didn't otherwise touch in sync so any of them reads back correctly.
+      if (historyTouched) {
+        for (const r of rows) {
+          if (touchedShifts.has(r.shift_key)) continue;
+          await pool.query(
+            "UPDATE meal_reports SET history = ?, last_history_at = ? WHERE date_key = ? AND shift_key = ?",
+            [JSON.stringify(historyVal), lastHistoryAtVal, id, r.shift_key]
+          );
+        }
+      }
+
       await triggerBroadcasts(collection, id);
       return res.status(200).json({ success: true });
     }
@@ -558,7 +664,7 @@ router.post("/:collection", authenticateToken, async (req, res) => {
         [collection, id, serializedData]
       );
       await triggerBroadcasts(collection, id);
-      return res.status(200).json({ id, ...payload });
+      return res.status(200).json(redactGenericDoc(collection, id, { id, ...payload }));
     } catch (error) {
       console.error(`Add generic document to ${collection} error:`, error);
       return res.status(500).json({ error: "Lỗi cơ sở dữ liệu" });
@@ -612,6 +718,10 @@ router.delete("/:collection/:id", authenticateToken, async (req, res) => {
         "DELETE FROM firestore_mock WHERE collection = ? AND id = ?",
         [collection, id]
       );
+      // Dọn các chunk embedding của tài liệu đã xóa để KB không còn nội dung cũ
+      if (collection === "documents") {
+        await pool.query("DELETE FROM doc_chunks WHERE doc_id = ?", [id]);
+      }
     } else {
       await pool.query(`DELETE FROM ${cfg.table} WHERE ${cfg.key} = ?`, [id]);
     }
@@ -625,7 +735,9 @@ router.delete("/:collection/:id", authenticateToken, async (req, res) => {
 });
 
 // 6. POST commit batch operations (using Transaction)
-router.post("/batch", authenticateToken, async (req, res) => {
+// Registered earlier via `router.post("/batch", ...)` (function hoisting) so it
+// is not shadowed by the generic "/:collection" route.
+async function batchHandler(req, res) {
   const { operations } = req.body;
   if (!Array.isArray(operations)) {
     return res.status(400).json({ error: "Thiếu danh sách thao tác batch" });
@@ -787,6 +899,6 @@ router.post("/batch", authenticateToken, async (req, res) => {
   } finally {
     connection.release();
   }
-});
+}
 
 export default router;

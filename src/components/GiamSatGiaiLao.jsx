@@ -5,12 +5,14 @@ import imageCompression from 'browser-image-compression';
 import { colors } from "../theme";
 import LightboxSwipeOnly, { useConfirm } from "./LightboxSwipeOnly";
 import { useI18n } from "../i18n/I18nProvider";
-import { getWeekNumber } from "../utils/string";
 import realtimeService from "../services/realtimeService";
 
 const orange = colors.primary;
 const orangeLight = colors.primaryLight;
 const dark = colors.textPrimary;
+
+const SHIFT_OPTIONS = ["S1", "S2", "S3", "S8", "HC"];
+const TIMES_OPTIONS = ["Đầu ca", "Lần 1", "Lần 2", "Lần 3", "Lần 4", "Cuối ca"];
 
 // ====================== CÁC BIỂU TƯỢNG MỚI ======================
 function RedXIcon({ size = 14 }) {
@@ -54,6 +56,8 @@ function GiamSatGiaiLao({ user }) {
   const { askConfirm } = useConfirm();
   const [chat, setChat] = useState([]);
   const [text, setText] = useState('');
+  const [shift, setShift] = useState('');
+  const [times, setTimes] = useState('');
   const [files, setFiles] = useState([]);
   const [fileNames, setFileNames] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -135,9 +139,15 @@ function GiamSatGiaiLao({ user }) {
   const handleImageChange = async (e) => {
     if (!e.target.files?.length) { setFiles([]); setFileNames([]); return; }
     const arr = Array.from(e.target.files);
-    const opt = { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true };
+    // Nén và chuẩn hoá mọi ảnh về JPEG (.jpg) để dung lượng nhỏ, tránh lỗi upload
+    // với ảnh .png lớn (ERR_CONNECTION_ABORTED) và đảm bảo đuôi tệp được chấp nhận.
+    const opt = { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true, fileType: "image/jpeg" };
     try {
-      const processed = await Promise.all(arr.map(f => f.size > opt.maxSizeMB * 1024 * 1024 ? imageCompression(f, opt) : f));
+      const processed = await Promise.all(arr.map(async (f) => {
+        const compressed = await imageCompression(f, opt);
+        const baseName = (f.name || "image").replace(/\.[^.]+$/, "");
+        return new File([compressed], `${baseName}.jpg`, { type: "image/jpeg" });
+      }));
       setFiles(processed); setFileNames(processed.map(f => f.name));
     } catch (error) { console.error("Lỗi nén ảnh:", error); setFiles([]); setFileNames([]); if (fileRef.current) fileRef.current.value = ""; }
   };
@@ -145,6 +155,8 @@ function GiamSatGiaiLao({ user }) {
   const handleSend = async (e) => {
     e.preventDefault();
     if (!text.trim() && files.length === 0) return;
+    if (!shift) { alert("Vui lòng chọn ca làm việc."); return; }
+    if (!times) { alert("Vui lòng chọn lần ghi nhận."); return; }
     setIsUploading(true);
     let uploaded = [];
     if (files.length) {
@@ -159,14 +171,16 @@ function GiamSatGiaiLao({ user }) {
         }));
       } catch (e) { console.error(e); alert("Tải ảnh thất bại!"); setIsUploading(false); return; }
     }
-    await dbService.createDoc("gialaokv", { 
-      user: user.name, 
+    await dbService.createDoc("gialaokv", {
+      user: user.name,
       userId: user.uid,
-      text, 
-      images: uploaded, 
-      timestamp: new Date().toISOString() 
+      text,
+      shift,
+      times,
+      images: uploaded,
+      timestamp: new Date().toISOString()
     });
-    setText(""); setFiles([]); setFileNames([]); if (fileRef.current) fileRef.current.value = ""; setIsUploading(false);
+    setText(""); setShift(""); setTimes(""); setFiles([]); setFileNames([]); if (fileRef.current) fileRef.current.value = ""; setIsUploading(false);
     fetchChat();
   };
 
@@ -216,7 +230,23 @@ function GiamSatGiaiLao({ user }) {
       <h2 style={{ fontWeight: 700, marginBottom: 16, color: orange, flexShrink: 0 }}>{t("break.title")}</h2>
       
       <form onSubmit={handleSend} style={{ display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0, marginBottom: 16 }}>
-        <textarea 
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <div style={{ flex: '1 1 140px' }}>
+            <div style={{ fontSize: 13, color: dark, marginBottom: 4 }}>Ca <span style={{ color: '#d9534f' }}>*</span></div>
+            <select value={shift} onChange={e => setShift(e.target.value)} style={{ width: '100%', padding: "7px 12px", borderRadius: 6, border: `1.2px solid ${orangeLight}`, color: dark, background: "#fff" }}>
+              <option value="">-- Chọn ca --</option>
+              {SHIFT_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <div style={{ flex: '1 1 140px' }}>
+            <div style={{ fontSize: 13, color: dark, marginBottom: 4 }}>Lần <span style={{ color: '#d9534f' }}>*</span></div>
+            <select value={times} onChange={e => setTimes(e.target.value)} style={{ width: '100%', padding: "7px 12px", borderRadius: 6, border: `1.2px solid ${orangeLight}`, color: dark, background: "#fff" }}>
+              <option value="">-- Chọn lần --</option>
+              {TIMES_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+        </div>
+        <textarea
           value={text} onChange={e => setText(e.target.value)} placeholder={t("chat.placeholder")}
           rows={2} style={{ width: '100%', padding: "7px 12px", borderRadius: 6, boxSizing: 'border-box', border: `1.2px solid ${orangeLight}`, color: dark, background: "#fff" }}
         />
@@ -256,6 +286,12 @@ function GiamSatGiaiLao({ user }) {
                     ) : null}
                   </div>
                 </div>
+                {(msg.shift || msg.times) && (
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '4px 0' }}>
+                    {msg.shift && <span style={{ background: orangeLight, color: dark, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10 }}>Ca: {msg.shift}</span>}
+                    {msg.times && <span style={{ background: orangeLight, color: dark, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10 }}>{msg.times}</span>}
+                  </div>
+                )}
                 {msg.text && <p style={{ margin: '4px 0', color: dark, whiteSpace: 'pre-wrap' }}>{msg.text}</p>}
                 {!!msg.images?.length && (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>

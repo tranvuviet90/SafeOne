@@ -1,6 +1,8 @@
 import express from "express";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
+import nodemailer from "nodemailer";
 import pool from "../config/db.js";
 import { authenticateToken } from "../middleware/auth.js";
 import { rateLimit } from "../middleware/rateLimit.js";
@@ -9,6 +11,24 @@ const router = express.Router();
 
 // Throttle credential-guessing on the login endpoint.
 const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10 });
+
+// Lazily build a single SMTP transporter from environment configuration.
+// Returns null when SMTP is not configured (dev fallback logs the reset link).
+let mailTransporter = null;
+function getTransporter() {
+  if (mailTransporter) return mailTransporter;
+  const host = process.env.SMTP_HOST;
+  if (!host) return null;
+  mailTransporter = nodemailer.createTransport({
+    host,
+    port: Number(process.env.SMTP_PORT) || 587,
+    secure: String(process.env.SMTP_SECURE) === "true",
+    auth: process.env.SMTP_USER
+      ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
+      : undefined
+  });
+  return mailTransporter;
+}
 
 // 1. check-init
 router.get("/check-init", async (req, res) => {
@@ -158,6 +178,123 @@ router.post("/update-password", authenticateToken, async (req, res) => {
   } catch (error) {
     console.error("Update password error:", error);
     res.status(500).json({ error: "Lỗi hệ thống" });
+  }
+});
+
+// 7. forgot-password (public) — emails a one-time reset link.
+// Always responds with a generic success message so the endpoint can't be used
+// to enumerate which emails have accounts.
+router.post("/forgot-password", loginLimiter, async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ error: "Vui lòng nhập email" });
+  }
+
+  const genericMsg = "Nếu email tồn tại trong hệ thống, một liên kết đặt lại mật khẩu đã được gửi đến hộp thư của bạn.";
+
+  try {
+    const [rows] = await pool.query(
+      "SELECT uid, name, email, disabled FROM users WHERE email = ?",
+      [email]
+    );
+    // Silently succeed for unknown/disabled accounts (no enumeration).
+    if (rows.length === 0 || rows[0].disabled) {
+      return res.status(200).json({ success: true, message: genericMsg });
+    }
+
+    const u = rows[0];
+    const token = crypto.randomBytes(32).toString("hex");
+    const expiresAt = Date.now() + 60 * 60 * 1000; // valid for 1 hour
+
+    await pool.query(
+      "INSERT INTO password_resets (token, uid, email, expires_at, used) VALUES (?, ?, ?, ?, 0)",
+      [token, u.uid, u.email, expiresAt]
+    );
+
+    const baseUrl = (process.env.APP_BASE_URL || `${req.protocol}://${req.get("host")}`).replace(/\/$/, "");
+    const link = `${baseUrl}/?reset=${token}`;
+
+    // Admin-configurable email content (settings/password_recovery), with defaults.
+    let subject = "Đặt lại mật khẩu SafeOne";
+    let body = "Xin chào {name},\n\nBạn (hoặc ai đó) đã yêu cầu đặt lại mật khẩu cho tài khoản SafeOne của bạn.\nNhấp vào liên kết sau để đặt lại mật khẩu (có hiệu lực trong 1 giờ):\n\n{link}\n\nNếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email.";
+    try {
+      const [srows] = await pool.query(
+        "SELECT data FROM firestore_mock WHERE collection = 'settings' AND id = 'password_recovery'"
+      );
+      if (srows.length > 0) {
+        const data = typeof srows[0].data === "string" ? JSON.parse(srows[0].data) : srows[0].data;
+        if (data?.emailSubject) subject = data.emailSubject;
+        if (data?.emailBody) body = data.emailBody;
+      }
+    } catch (e) {
+      // fall back to defaults on any parse/query error
+    }
+
+    const text = body.replace(/\{name\}/g, u.name || u.email).replace(/\{link\}/g, link);
+    const html = `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.6;color:#222">${
+      text
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        .replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1">$1</a>')
+        .replace(/\n/g, "<br>")
+    }</div>`;
+
+    const tx = getTransporter();
+    let devLink;
+    if (tx) {
+      await tx.sendMail({
+        from: process.env.SMTP_FROM || process.env.SMTP_USER,
+        to: u.email,
+        subject,
+        text,
+        html
+      });
+    } else {
+      // No SMTP configured — log the link AND return it so local testing works
+      // without an email server. This branch only runs when SMTP is unset (dev).
+      console.log(`[forgot-password] SMTP chưa cấu hình. Link đặt lại cho ${u.email}: ${link}`);
+      devLink = link;
+    }
+
+    const payload = { success: true, message: genericMsg };
+    if (devLink) payload.devLink = devLink;
+    return res.status(200).json(payload);
+  } catch (error) {
+    console.error("Forgot password error:", error);
+    return res.status(500).json({ error: "Lỗi gửi yêu cầu đặt lại mật khẩu" });
+  }
+});
+
+// 8. reset-password (public) — consumes a one-time token and sets a new password.
+router.post("/reset-password", async (req, res) => {
+  const { token, newPassword } = req.body;
+  if (!token || !newPassword) {
+    return res.status(400).json({ error: "Thiếu token hoặc mật khẩu mới" });
+  }
+  if (String(newPassword).length < 6) {
+    return res.status(400).json({ error: "Mật khẩu phải có ít nhất 6 ký tự" });
+  }
+
+  try {
+    const [rows] = await pool.query("SELECT * FROM password_resets WHERE token = ?", [token]);
+    if (rows.length === 0) {
+      return res.status(400).json({ error: "Liên kết không hợp lệ" });
+    }
+    const reset = rows[0];
+    if (reset.used) {
+      return res.status(400).json({ error: "Liên kết đã được sử dụng" });
+    }
+    if (Number(reset.expires_at) < Date.now()) {
+      return res.status(400).json({ error: "Liên kết đã hết hạn. Vui lòng yêu cầu lại." });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await pool.query("UPDATE users SET password_hash = ? WHERE uid = ?", [passwordHash, reset.uid]);
+    await pool.query("UPDATE password_resets SET used = 1 WHERE token = ?", [token]);
+
+    return res.status(200).json({ success: true });
+  } catch (error) {
+    console.error("Reset password error:", error);
+    return res.status(500).json({ error: "Lỗi đặt lại mật khẩu" });
   }
 });
 

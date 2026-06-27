@@ -814,12 +814,14 @@ export default function Locker({ user }) {
         >
           📋 Danh sách & Tra cứu
         </button>
-        <button 
-          onClick={() => setCurrentViewTab("print")} 
-          style={{ padding: "8px 16px", background: currentViewTab === "print" ? colors.primary : "transparent", border: "none", borderRadius: 8, color: currentViewTab === "print" ? "#fff" : "var(--lk-text-secondary)", fontWeight: "bold", cursor: "pointer", fontSize: "14px" }}
-        >
-          🖨️ In mã QR hàng loạt
-        </button>
+        {isEhsOrAdmin && (
+          <button
+            onClick={() => setCurrentViewTab("print")}
+            style={{ padding: "8px 16px", background: currentViewTab === "print" ? colors.primary : "transparent", border: "none", borderRadius: 8, color: currentViewTab === "print" ? "#fff" : "var(--lk-text-secondary)", fontWeight: "bold", cursor: "pointer", fontSize: "14px" }}
+          >
+            🖨️ In mã QR hàng loạt
+          </button>
+        )}
         {isEhsOrAdmin && (
           <button 
             onClick={() => setCurrentViewTab("config")} 
@@ -952,12 +954,12 @@ export default function Locker({ user }) {
                                   const targetKey = `${activeZone}_${gIdx}`;
 
                                   try {
-                                    await setDoc(doc(db, "lockers", "settings"), {
+                                    await dbService.updateDoc("lockers", "settings", {
                                       blockOrder: {
                                         ...(globalSettings.blockOrder || {}),
                                         [targetKey]: newOrder
                                       }
-                                    }, { merge: true });
+                                    });
                                     toast.show(`Đã di chuyển ${sourceBlockName} thành công.`, "success");
                                   } catch (err) {
                                     console.error("Lỗi khi lưu vị trí block:", err);
@@ -1245,22 +1247,26 @@ export default function Locker({ user }) {
                             {item.phone ? (isEhsOrAdmin ? item.phone : maskPhoneNumber(item.phone)) : "-"}
                           </td>
                           <td style={{ padding: "12px 16px", textAlign: "center" }}>
-                            <div style={{ display: "flex", gap: "8px", justifyContent: "center" }}>
-                              <button 
-                                onClick={() => setSelectedLockerId(item.id)}
-                                style={{ padding: "4px 10px", background: colors.primary, color: "#fff", border: "none", borderRadius: "6px", cursor: "pointer", fontSize: "12px", fontWeight: "700" }}
-                              >
-                                ⚙️ Chi tiết
-                              </button>
-                              {item.name && (
-                                <button 
-                                  onClick={() => handleReleaseLocker(item.id)}
-                                  style={{ padding: "4px 10px", background: "rgba(229, 62, 62, 0.12)", color: "#fc8181", border: "1px solid rgba(229, 62, 62, 0.3)", borderRadius: "6px", cursor: "pointer", fontSize: "12px", fontWeight: "700" }}
+                            {isEhsOrAdmin ? (
+                              <div style={{ display: "flex", gap: "8px", justifyContent: "center" }}>
+                                <button
+                                  onClick={() => setSelectedLockerId(item.id)}
+                                  style={{ padding: "4px 10px", background: colors.primary, color: "#fff", border: "none", borderRadius: "6px", cursor: "pointer", fontSize: "12px", fontWeight: "700" }}
                                 >
-                                  {item.status === "pending" ? "Từ chối" : "Thu hồi"}
+                                  ⚙️ Chi tiết
                                 </button>
-                              )}
-                            </div>
+                                {item.name && (
+                                  <button
+                                    onClick={() => handleReleaseLocker(item.id)}
+                                    style={{ padding: "4px 10px", background: "rgba(229, 62, 62, 0.12)", color: "#fc8181", border: "1px solid rgba(229, 62, 62, 0.3)", borderRadius: "6px", cursor: "pointer", fontSize: "12px", fontWeight: "700" }}
+                                  >
+                                    {item.status === "pending" ? "Từ chối" : "Thu hồi"}
+                                  </button>
+                                )}
+                              </div>
+                            ) : (
+                              <span style={{ color: "var(--lk-text-muted)" }}>—</span>
+                            )}
                           </td>
                         </tr>
                       ));
@@ -1272,7 +1278,7 @@ export default function Locker({ user }) {
           )}
 
           {/* TAB 3: IN MÃ QR HÀNG LOẠT */}
-          {currentViewTab === "print" && (
+          {currentViewTab === "print" && isEhsOrAdmin && (
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: 16 }}>
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -1517,6 +1523,7 @@ export default function Locker({ user }) {
                     </div>
 
                     {/* Actions */}
+                    {isEhsOrAdmin && (
                     <div style={{ display: "flex", gap: "12px", marginTop: "24px" }}>
                       {isPending ? (
                         <>
@@ -1550,19 +1557,28 @@ export default function Locker({ user }) {
                         </>
                       )}
                     </div>
+                    )}
                   </div>
                 ) : (
                   // VACANT STATE UI (REGISTRATION FORM)
                   <div>
-                    <div style={{ fontSize: "13px", fontWeight: "700", color: "var(--lk-text-secondary)", marginBottom: "8px" }}>TỦ ĐỒ ĐANG TRỐNG - CẤP PHÁT CHO NHÂN VIÊN:</div>
-                    <LockerAssignForm 
-                      lockerId={id} 
-                      lockersData={lockersData}
-                      onSuccess={() => {
-                        toast.show(`Cấp tủ ${id} thành công!`, "success");
-                        setSelectedLockerId(null);
-                      }} 
-                    />
+                    {isEhsOrAdmin ? (
+                      <>
+                        <div style={{ fontSize: "13px", fontWeight: "700", color: "var(--lk-text-secondary)", marginBottom: "8px" }}>TỦ ĐỒ ĐANG TRỐNG - CẤP PHÁT CHO NHÂN VIÊN:</div>
+                        <LockerAssignForm
+                          lockerId={id}
+                          lockersData={lockersData}
+                          onSuccess={() => {
+                            toast.show(`Cấp tủ ${id} thành công!`, "success");
+                            setSelectedLockerId(null);
+                          }}
+                        />
+                      </>
+                    ) : (
+                      <div style={{ fontSize: "14px", fontWeight: "700", color: "var(--lk-text-muted)", textAlign: "center", padding: "20px 0" }}>
+                        Tủ đồ đang trống.
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -1608,6 +1624,7 @@ export default function Locker({ user }) {
                       </div>
 
                       {/* Nút hành động cho EHS */}
+                      {isEhsOrAdmin && (
                       <div style={{ display: "flex", gap: "10px", marginTop: "12px", borderTop: "1px solid var(--lk-card-border)", paddingTop: "10px" }}>
                         {rep.status === "reported" && (
                           <button
@@ -1644,6 +1661,7 @@ export default function Locker({ user }) {
                           Xác nhận hoàn thành
                         </button>
                       </div>
+                      )}
                     </div>
                   );
                 })()}

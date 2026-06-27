@@ -11,6 +11,20 @@ CREATE TABLE IF NOT EXISTS firestore_mock (
   PRIMARY KEY (collection, id)
 ) ENGINE=InnoDB;
 
+-- 1b. Bảng lưu các đoạn (chunk) tài liệu đã huấn luyện + vector embedding
+-- Dùng cho RAG ngữ nghĩa: mỗi lần hỏi chỉ gửi vài chunk liên quan thay vì cả file.
+CREATE TABLE IF NOT EXISTS doc_chunks (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  doc_id VARCHAR(191) NOT NULL,       -- ID tài liệu nguồn (documents.id hoặc "trained:<id>")
+  doc_title VARCHAR(255) DEFAULT NULL,
+  doc_type VARCHAR(50) DEFAULT NULL,  -- msds, sop, quytrinh, bieumau... hoặc "global" cho tài liệu chung
+  chunk_index INT NOT NULL,
+  content MEDIUMTEXT NOT NULL,
+  embedding JSON NOT NULL,            -- mảng float (vector embedding)
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_doc (doc_id)
+) ENGINE=InnoDB;
+
 -- 2. Bảng Người dùng (Tích hợp Auth + User Profile)
 CREATE TABLE IF NOT EXISTS users (
   uid VARCHAR(128) PRIMARY KEY,
@@ -116,7 +130,3 @@ CREATE TABLE IF NOT EXISTS msds_chemicals (
   quantity INT DEFAULT 0,
   last_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
-
--- 11. Gieo hạt tài khoản Admin mặc định ban đầu
-INSERT IGNORE INTO users (uid, email, password_hash, name, role) 
-VALUES ('admin-uid-default', 'admin', 'admin', 'Default Admin', 'admin');

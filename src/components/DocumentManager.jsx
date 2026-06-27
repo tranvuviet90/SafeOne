@@ -78,8 +78,8 @@ export default function DocumentManager({ user, isMobile }) {
   const { pushToast } = useToast();
   const { askConfirm } = useConfirm();
 
-  // Active sub-tab state: 'msds' | 'sop' | 'quytrinh' | 'bieumau'
-  const [activeSubTab, setActiveSubTab] = useState("msds");
+  // Active sub-tab state: 'license' | 'sop' | 'quytrinh' | 'bieumau' | 'msds'
+  const [activeSubTab, setActiveSubTab] = useState("license");
   const [documents, setDocuments] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
@@ -551,11 +551,11 @@ export default function DocumentManager({ user, isMobile }) {
         paddingBottom: 2
       }} className="no-scrollbar">
         {[
-          { key: "msds", label: "MSDS" },
+          { key: "license", label: t("menu.license") || "Chứng nhận vận hành" },
           { key: "sop", label: "SOP" },
           { key: "quytrinh", label: "Quy trình" },
           { key: "bieumau", label: "Biểu mẫu" },
-          { key: "license", label: t("menu.license") || "Chứng nhận vận hành" }
+          { key: "msds", label: "MSDS" }
         ].map((tab) => {
           const isActive = activeSubTab === tab.key;
           return (

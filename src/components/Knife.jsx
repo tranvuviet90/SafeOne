@@ -173,6 +173,8 @@ export default function Knife({ user, isMobile }) {
     const totalEvals = registrations.length;
     const agreeCount = registrations.filter(r => r.agreement === "Đồng ý").length;
     const agreeRate = totalEvals > 0 ? Math.round((agreeCount / totalEvals) * 100) : 0;
+    // Số đăng ký đang chờ EHS duyệt (chưa có quyết định đồng ý / không đồng ý)
+    const pendingCount = registrations.filter(r => !r.agreement || r.agreement === "Chờ duyệt").length;
 
     return {
       totalKnives,
@@ -180,7 +182,8 @@ export default function Knife({ user, isMobile }) {
       knivesByDept,
       totalEvals,
       agreeCount,
-      agreeRate
+      agreeRate,
+      pendingCount
     };
   }, [knives, registrations]);
 
@@ -810,8 +813,12 @@ export default function Knife({ user, isMobile }) {
             <div style={{ fontSize: "11px", color: "var(--kf-text-secondary)", fontWeight: "600" }}>TỔNG DAO ĐÃ ĐĂNG KÝ</div>
             <div style={{ fontSize: "18px", fontWeight: "800", color: "var(--kf-text-primary)" }}>{stats.totalKnives}</div>
           </div>
+          <div style={{ background: "var(--kf-badge-pending-bg)", border: "1px solid var(--kf-card-border)", padding: "8px 16px", borderRadius: 12, textAlign: "center" }}>
+            <div style={{ fontSize: "11px", color: "var(--kf-badge-pending-text)", fontWeight: "600" }}>CHỜ XÁC NHẬN</div>
+            <div style={{ fontSize: "18px", fontWeight: "800", color: "var(--kf-badge-pending-text)" }}>{stats.pendingCount}</div>
+          </div>
           <div style={{ background: "var(--kf-badge-agree-bg)", border: "1px solid var(--kf-card-border)", padding: "8px 16px", borderRadius: 12, textAlign: "center" }}>
-            <div style={{ fontSize: "11px", color: "var(--kf-badge-agree-text)", fontWeight: "600" }}>ĐỒNG Ý DÙNG DAO MARTOR</div>
+            <div style={{ fontSize: "11px", color: "var(--kf-badge-agree-text)", fontWeight: "600" }}>ĐỒNG Ý DÙNG DAO</div>
             <div style={{ fontSize: "18px", fontWeight: "800", color: "var(--kf-badge-agree-text)" }}>{stats.agreeCount} / {stats.totalEvals} ({stats.agreeRate}%)</div>
           </div>
         </div>
@@ -837,12 +844,14 @@ export default function Knife({ user, isMobile }) {
         >
           📝 Form đăng ký & Đánh giá
         </button>
-        <button 
-          onClick={() => setActiveTab("excel")} 
-          style={{ padding: "8px 16px", background: activeTab === "excel" ? colors.primary : "transparent", border: "none", borderRadius: 8, color: activeTab === "excel" ? "#fff" : "var(--kf-text-secondary)", fontWeight: "bold", cursor: "pointer", fontSize: "14px", whiteSpace: "nowrap" }}
-        >
-          📤 Xuất/Nhập tệp Excel
-        </button>
+        {isEhsOrAdmin && (
+          <button
+            onClick={() => setActiveTab("excel")}
+            style={{ padding: "8px 16px", background: activeTab === "excel" ? colors.primary : "transparent", border: "none", borderRadius: 8, color: activeTab === "excel" ? "#fff" : "var(--kf-text-secondary)", fontWeight: "bold", cursor: "pointer", fontSize: "14px", whiteSpace: "nowrap" }}
+          >
+            📤 Xuất/Nhập tệp Excel
+          </button>
+        )}
       </div>
 
       {loading ? (
@@ -1161,8 +1170,8 @@ export default function Knife({ user, isMobile }) {
             </div>
           )}
 
-          {/* TAB 4: NHẬP/XUẤT EXCEL */}
-          {activeTab === "excel" && (
+          {/* TAB 4: NHẬP/XUẤT EXCEL — chỉ admin & ehs */}
+          {activeTab === "excel" && isEhsOrAdmin && (
             <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
               <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 20 }}>
                 {/* Panel 1: Import */}

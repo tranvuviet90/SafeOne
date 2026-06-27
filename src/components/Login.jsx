@@ -11,6 +11,13 @@ function Login({ setUser }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // States for the "forgot password" modal
+  const [showForgot, setShowForgot] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotMsg, setForgotMsg] = useState('');
+  const [forgotDevLink, setForgotDevLink] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+
   // States for system initialization form
   const [showInitForm, setShowInitForm] = useState(false);
   const [initName, setInitName] = useState('');
@@ -62,6 +69,27 @@ function Login({ setUser }) {
       setError(errorMsg);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleForgot = async (e) => {
+    e.preventDefault();
+    setForgotMsg('');
+    setForgotDevLink('');
+    if (!forgotEmail.trim()) {
+      setForgotMsg('Vui lòng nhập email.');
+      return;
+    }
+    setForgotLoading(true);
+    try {
+      const res = await apiClient.post('/api/auth/forgot-password', { email: forgotEmail.trim() });
+      setForgotMsg(res.data?.message || 'Nếu email tồn tại, liên kết đặt lại mật khẩu đã được gửi.');
+      // In dev (no SMTP configured) the backend returns the link directly so it can be tested.
+      if (res.data?.devLink) setForgotDevLink(res.data.devLink);
+    } catch (err) {
+      setForgotMsg(err.response?.data?.error || 'Gửi yêu cầu thất bại. Vui lòng thử lại.');
+    } finally {
+      setForgotLoading(false);
     }
   };
 
@@ -146,7 +174,7 @@ function Login({ setUser }) {
         {error && <p style={{ color:'red', marginBottom:'20px' }}>{error}</p>}
         <div style={{ marginBottom:'20px', textAlign:'left' }}>
           <label style={{ display:'block', marginBottom:'8px', color:'#333', fontWeight:'600' }}>{t('login.email')}</label>
-          <input type="text" value={email} onChange={e => setEmail(e.target.value)} style={{ width:'100%', padding:'12px 15px', borderRadius:'8px', border:'1px solid #ddd', fontSize:'16px', boxSizing:'border-box' }} />
+          <input type="email" value={email} onChange={e => setEmail(e.target.value)} required style={{ width:'100%', padding:'12px 15px', borderRadius:'8px', border:'1px solid #ddd', fontSize:'16px', boxSizing:'border-box' }} />
         </div>
         <div style={{ marginBottom:'20px', textAlign:'left' }}>
           <label style={{ display:'block', marginBottom:'8px', color:'#333', fontWeight:'600' }}>{t('login.password')}</label>
@@ -158,7 +186,7 @@ function Login({ setUser }) {
             {t('login.remember')}
           </label>
           <a href="#" style={{ color:'#466E73', textDecoration:'none', fontWeight:'600' }}
-            onClick={e => { e.preventDefault(); alert(t('login.forgot.dev')); }}>
+            onClick={e => { e.preventDefault(); setForgotEmail(email); setForgotMsg(''); setShowForgot(true); }}>
             {t('login.forgot')}
           </a>
         </div>
@@ -166,6 +194,40 @@ function Login({ setUser }) {
           {loading ? t('login.logging') : t('login.button')}
         </button>
       </form>
+
+      {showForgot && (
+        <div style={{ position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.5)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999, padding:'16px' }}>
+          <form onSubmit={handleForgot} style={{ background:'white', padding:'28px 30px', borderRadius:'14px', boxShadow:'0 10px 30px rgba(0,0,0,0.2)', width:'100%', maxWidth:'420px', boxSizing:'border-box' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'14px' }}>
+              <h3 style={{ margin:0, color:'#222', fontWeight:'700', fontSize:'20px' }}>{t('login.forgot')}</h3>
+              <button type="button" onClick={() => setShowForgot(false)} style={{ background:'none', border:'none', fontSize:'20px', cursor:'pointer', color:'#888' }}>✕</button>
+            </div>
+            <p style={{ color:'#555', fontSize:'14px', marginBottom:'16px', lineHeight:1.5 }}>
+              Nhập email tài khoản của bạn. Chúng tôi sẽ gửi liên kết đặt lại mật khẩu đến hộp thư của bạn.
+            </p>
+            <input
+              type="email"
+              value={forgotEmail}
+              onChange={e => setForgotEmail(e.target.value)}
+              placeholder="email@domain.com"
+              required
+              style={{ width:'100%', padding:'12px 15px', borderRadius:'8px', border:'1px solid #ddd', fontSize:'15px', boxSizing:'border-box', marginBottom:'12px' }}
+            />
+            {forgotMsg && (
+              <p style={{ color:'#466E73', fontSize:'13px', marginBottom:'12px', background:'#eef6f5', padding:'10px', borderRadius:'8px' }}>{forgotMsg}</p>
+            )}
+            {forgotDevLink && (
+              <p style={{ fontSize:'12px', marginBottom:'12px', background:'#fff7e6', padding:'10px', borderRadius:'8px', color:'#8a6d3b', wordBreak:'break-all' }}>
+                ⚙️ Chế độ dev (chưa cấu hình SMTP) — nhấp để đặt lại mật khẩu:<br />
+                <a href={forgotDevLink} style={{ color:'#466E73', fontWeight:600 }}>{forgotDevLink}</a>
+              </p>
+            )}
+            <button type="submit" disabled={forgotLoading} style={{ width:'100%', padding:'13px', borderRadius:'8px', border:'none', background:'#466E73', color:'white', fontSize:'16px', fontWeight:'700', cursor:'pointer', opacity: forgotLoading ? 0.7 : 1 }}>
+              {forgotLoading ? 'Đang gửi...' : 'Gửi liên kết đặt lại'}
+            </button>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

@@ -5,7 +5,7 @@ import { useConfirm } from "./LightboxSwipeOnly";
 import realtimeService from "../services/realtimeService";
 
 const DEFAULT_COUNT = 15;
-const MIN_COUNT = 15;
+const MIN_COUNT = 1;
 const orange = "#466E73";
 const orangeLight = "#A9D9D4";
 const dark = "#222";

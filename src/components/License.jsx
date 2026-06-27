@@ -79,7 +79,12 @@ const writeBatch = (db) => {
       });
     },
     async commit() {
-      await dbService.commitBatch(operations);
+      // Send in chunks so large imports never exceed the request body limit
+      // (was causing 413 Payload Too Large when committing hundreds of records at once).
+      const CHUNK_SIZE = 100;
+      for (let i = 0; i < operations.length; i += CHUNK_SIZE) {
+        await dbService.commitBatch(operations.slice(i, i + CHUNK_SIZE));
+      }
     }
   };
 };
@@ -89,7 +94,7 @@ import {
   FaSearch, FaPlus, FaFileExcel, FaDownload, FaUpload, 
   FaEdit, FaTrash, FaCheck, FaTimes, FaCamera, FaImage 
 } from "react-icons/fa";
-import { useConfirm } from "./LightboxSwipeOnly";
+import { useToast, useConfirm } from "./LightboxSwipeOnly";
 import imageCompression from "browser-image-compression";
 import * as XLSX from "xlsx";
 
@@ -229,6 +234,7 @@ const DEFAULT_POSITIONS = [
 export default function License({ user, isMobile }) {
   const { t } = useI18n();
   const { askConfirm } = useConfirm();
+  const { pushToast } = useToast();
 
   const [records, setRecords] = useState([]);
   const [chartData, setChartData] = useState([]);
@@ -255,6 +261,7 @@ export default function License({ user, isMobile }) {
     status: "Đủ điều kiện",
     reason: "",
     targetDate: "",
+    trainerName: "",
     trainingItems: {}
   });
 
@@ -267,6 +274,12 @@ export default function License({ user, isMobile }) {
   const isAdmin = userRolesList.some(r => r === "admin" || r === "ehs");
   const isPrivileged = userRolesList.some(r => r === "admin" || r === "ehs" || r === "manager");
   const isEvaluator = userRolesList.some(r => r === "admin" || r === "ehs");
+  // EHS Committee / Trainer (and admin/ehs) may push a trainee straight to evaluation
+  // without waiting out the full 7-day training window.
+  const canManageTraining = userRolesList.some(r => ["admin", "ehs", "ehs committee", "ehscommittee", "trainer"].includes(r));
+
+  // Quick-access management panel: 'training' (Đang đào tạo) | 'eval' (Chờ đánh giá) | null
+  const [trainingPanel, setTrainingPanel] = useState(null);
 
   // State for Question Bank Modal
   const [showQuestionsModal, setShowQuestionsModal] = useState(false);
@@ -274,15 +287,19 @@ export default function License({ user, isMobile }) {
   const [questionsList, setQuestionsList] = useState([]);
   const [loadingQuestions, setLoadingQuestions] = useState(false);
 
-  // State for Evaluation Quiz Wizard
+  // State for Evaluation Quiz Wizard.
+  // Each selected training skill is evaluated with its own question set, one after
+  // another (e.g. finish "Máy Sheet", then move on to "Máy Shear"...).
   const [showEvalWizard, setShowEvalWizard] = useState(false);
   const [evalCandidate, setEvalCandidate] = useState(null);
-  const [wizardQuestions, setWizardQuestions] = useState([]);
+  const [evalSkills, setEvalSkills] = useState([]); // [{ name, questions: [...] }]
+  const [currentSkillIndex, setCurrentSkillIndex] = useState(0);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [answersMap, setAnswersMap] = useState({});
+  const [answersMap, setAnswersMap] = useState({}); // key `${skillIdx}_${qIdx}` -> "Đạt" | "Không đạt"
   const [evalComment, setEvalComment] = useState("");
   const [trainerName, setTrainerName] = useState("");
-  const [workingShift, setWorkingShift] = useState("");
+  const [trainingPosition, setTrainingPosition] = useState("");
+  const [loadingEval, setLoadingEval] = useState(false);
 
   const addDays = (dateStr, days) => {
     if (!dateStr) return "";
@@ -341,6 +358,9 @@ export default function License({ user, isMobile }) {
 
   const allPositions = useMemo(() => {
     const set = new Set(DEFAULT_POSITIONS);
+    // Include every machine/skill so admins can author a question bank per skill
+    // (the evaluation wizard loads questions keyed by skill name).
+    Object.values(TRAINING_ITEMS).flat().forEach(item => set.add(item));
     records.forEach(r => {
       if (r.position) set.add(r.position.trim());
       if (r.role) set.add(r.role.trim());
@@ -379,6 +399,31 @@ export default function License({ user, isMobile }) {
         reEval
       };
     });
+  }, [records]);
+
+  // Only show departments that actually have certification records, so a fresh
+  // database renders an empty tab instead of all departments at a fake 100%.
+  const visibleStats = useMemo(
+    () => computedStats.filter(c => c.code !== "QC" && c.totalStaff > 0),
+    [computedStats]
+  );
+
+  // Chart only shows the 6 most recent periods so the monthly evaluation bar
+  // chart stays readable as history grows. chartData is already sorted ascending.
+  const displayedChartData = useMemo(() => chartData.slice(-6), [chartData]);
+
+  // Top summary counts (distinct employees by MSNV), mirroring the locker tab cards.
+  const summaryStats = useMemo(() => {
+    const certified = new Set();
+    const inTraining = new Set();
+    const waitingEval = new Set();
+    records.forEach(r => {
+      if (!r.msnv) return;
+      if (r.status === "Đủ điều kiện") certified.add(r.msnv);
+      if (r.status === "Thiếu chứng nhận" && r.reason === "ĐANG ĐÀO TẠO") inTraining.add(r.msnv);
+      if (r.status === "Thiếu chứng nhận" && r.reason === "CHỜ ĐÁNH GIÁ") waitingEval.add(r.msnv);
+    });
+    return { certified: certified.size, inTraining: inTraining.size, waitingEval: waitingEval.size };
   }, [records]);
 
   // Filters logic
@@ -511,6 +556,7 @@ export default function License({ user, isMobile }) {
         status: record.status || "Đủ điều kiện",
         reason: record.reason || "",
         targetDate: record.targetDate || "",
+        trainerName: record.trainerName || "",
         trainingItems: record.trainingItems || {}
       });
     } else {
@@ -532,6 +578,7 @@ export default function License({ user, isMobile }) {
         status: initialStatus,
         reason: initialReason,
         targetDate: initialTargetDate,
+        trainerName: "",
         trainingItems: {}
       });
     }
@@ -590,65 +637,98 @@ export default function License({ user, isMobile }) {
         questions: questionsList,
         updatedAt: new Date().toISOString()
       });
-      alert("Đã lưu bộ câu hỏi cho vị trí: " + selectedPosition);
+      pushToast("Đã lưu bộ câu hỏi cho: " + selectedPosition, "success");
       setShowQuestionsModal(false);
     } catch (err) {
       console.error(err);
-      alert("Lưu thất bại: " + err.message);
+      pushToast("Lưu thất bại: " + err.message, "error");
     }
   };
 
-  // EHS Quiz Wizard
-  const startEvaluation = async (candidate) => {
-    setEvalCandidate(candidate);
-    setCurrentQuestionIndex(0);
-    setAnswersMap({});
-    setEvalComment("");
-    setTrainerName(user.name || "");
-    setWorkingShift(candidate.role || "");
-    setShowEvalWizard(true);
-
-    const pos = candidate.position || candidate.role || "Vị trí chung";
-    const docRef = doc(db, "operation_certification_questions", pos);
+  // Load the question bank for a single skill/position (falls back to defaults).
+  const loadQuestionsFor = async (key) => {
     try {
-      const snap = await getDoc(docRef);
+      const snap = await getDoc(doc(db, "operation_certification_questions", key));
       if (snap.exists() && snap.data().questions?.length > 0) {
-        setWizardQuestions(snap.data().questions);
-      } else {
-        setWizardQuestions(DEFAULT_QUESTIONS);
+        return snap.data().questions;
       }
     } catch (e) {
       console.error("Lỗi tải câu hỏi đánh giá:", e);
-      setWizardQuestions(DEFAULT_QUESTIONS);
+    }
+    return DEFAULT_QUESTIONS;
+  };
+
+  // EHS Quiz Wizard. Builds one question set per skill that still needs evaluating.
+  const startEvaluation = async (candidate) => {
+    setEvalCandidate(candidate);
+    setCurrentSkillIndex(0);
+    setCurrentQuestionIndex(0);
+    setAnswersMap({});
+    setEvalComment("");
+    setTrainerName(candidate.trainerName || user.name || "");
+    setTrainingPosition(candidate.position || candidate.role || "");
+    setEvalSkills([]);
+    setShowEvalWizard(true);
+    setLoadingEval(true);
+
+    // Re-evaluate only the previously-failed skills if present; otherwise every
+    // selected training skill. Fall back to the position when no skills are set.
+    const selectedItems = Object.keys(candidate.trainingItems || {}).filter(k => candidate.trainingItems[k]);
+    let skillKeys = (Array.isArray(candidate.failedItems) && candidate.failedItems.length > 0)
+      ? candidate.failedItems
+      : selectedItems;
+    if (skillKeys.length === 0) {
+      skillKeys = [candidate.position || candidate.role || "Vị trí chung"];
+    }
+
+    try {
+      const skills = [];
+      for (const key of skillKeys) {
+        const questions = await loadQuestionsFor(key);
+        skills.push({ name: key, questions });
+      }
+      setEvalSkills(skills);
+    } finally {
+      setLoadingEval(false);
     }
   };
 
   const handleCompleteEvaluation = async () => {
-    let overallPassed = true;
-    wizardQuestions.forEach((q, idx) => {
-      if (answersMap[idx] !== "Đạt") {
-        overallPassed = false;
-      }
+    // Per-skill pass/fail: a skill passes only if every one of its questions is "Đạt".
+    const passedItems = [];
+    const failedItems = [];
+    const evalScores = [];
+    evalSkills.forEach((skill, sIdx) => {
+      let skillPassed = true;
+      skill.questions.forEach((q, qIdx) => {
+        const result = answersMap[`${sIdx}_${qIdx}`] || "Không đạt";
+        if (result !== "Đạt") skillPassed = false;
+        evalScores.push({ skill: skill.name, question: q.question, result });
+      });
+      if (skillPassed) passedItems.push(skill.name);
+      else failedItems.push(skill.name);
     });
 
+    const overallPassed = failedItems.length === 0;
     const todayStr = new Date().toISOString().slice(0, 10);
-    const updatedStatus = overallPassed ? "Đủ điều kiện" : "Thiếu chứng nhận";
-    const updatedReason = overallPassed ? "" : "CHƯA ĐÀO TẠO";
-    
+
     const candidateId = `${evalCandidate.deptCode}_${evalCandidate.msnv}`;
-    
+
     const updatedRecord = {
       ...evalCandidate,
-      status: updatedStatus,
-      reason: updatedReason,
+      // Passed everything -> certified. Otherwise the failed skills go back to training.
+      status: overallPassed ? "Đủ điều kiện" : "Thiếu chứng nhận",
+      reason: overallPassed ? "" : "ĐANG ĐÀO TẠO",
+      evalFailed: !overallPassed,
+      failedItems: overallPassed ? [] : failedItems,
+      passedItems,
       evalDate: todayStr,
       evalComment: evalComment || "Đã hoàn thành đánh giá.",
-      trainerName: trainerName || user.name || "",
-      workingShift: workingShift || evalCandidate.role || "",
-      evalScores: wizardQuestions.map((q, idx) => ({
-        question: q.question,
-        result: answersMap[idx] || "Không đạt"
-      })),
+      trainerName: trainerName || evalCandidate.trainerName || user.name || "",
+      trainingPosition: trainingPosition || evalCandidate.position || evalCandidate.role || "",
+      evalScores,
+      // Reset the 7-day training-timeout notification cycle (evalDate is "today"
+      // again, so it won't fire until a fresh 7 days pass).
       evalRequestedNotifSent: false,
       reEvalRequestedNotifSent: false,
       updatedBy: user.name || user.email,
@@ -657,169 +737,97 @@ export default function License({ user, isMobile }) {
 
     try {
       await setDoc(doc(db, "operation_certifications", candidateId), updatedRecord);
-      alert(`Đánh giá hoàn tất! Kết quả: ${overallPassed ? "ĐẠT" : "KHÔNG ĐẠT"}`);
-      
-      if (window.confirm("Bạn có muốn xuất và tải biểu mẫu đánh giá (.doc) về máy ngay bây giờ không?")) {
+      if (overallPassed) {
+        pushToast("Đánh giá hoàn tất! Kết quả: ĐẠT toàn bộ.", "success");
+      } else {
+        pushToast(`Đánh giá hoàn tất. ${failedItems.length} kỹ năng không đạt đã trả về "Đang đào tạo".`, "warning");
+      }
+
+      if (window.confirm("Bạn có muốn xuất và tải biểu mẫu đánh giá (.docx) về máy ngay bây giờ không?")) {
         exportWordDoc(updatedRecord);
       }
-      
+
       setShowEvalWizard(false);
     } catch (e) {
       console.error(e);
-      alert("Lưu kết quả đánh giá thất bại.");
+      pushToast("Lưu kết quả đánh giá thất bại.", "error");
     }
   };
 
+  // Fill the official .docx evaluation form (ADL/F/EHS/022-3) with this record's
+  // data and download it. The template at /templates/022-3 Danh gia CNVH.docx ships
+  // with {{token}} placeholders pre-inserted into single runs (see word/document.xml),
+  // so we just unzip, substitute, and re-zip — far more robust than byte-patching the
+  // legacy binary .doc, which broke whenever the layout shifted by a character.
   const exportWordDoc = async (record) => {
     try {
-      const response = await fetch("/templates/022-3 - Huấn luyện vận hành & đánh giá kết quả.doc", { cache: "no-store" });
-      if (!response.ok) throw new Error("Không thể tải tệp mẫu .doc");
-      
+      const response = await fetch("/templates/022-3 Danh gia CNVH.docx", { cache: "no-store" });
+      if (!response.ok) throw new Error("Không thể tải tệp mẫu .docx");
       const arrayBuffer = await response.arrayBuffer();
-      const buf = new Uint8Array(arrayBuffer);
+
+      const JSZip = (await import("jszip")).default;
+      const zip = await JSZip.loadAsync(arrayBuffer);
+      const docXmlFile = zip.file("word/document.xml");
+      if (!docXmlFile) throw new Error("Tệp mẫu .docx không hợp lệ (thiếu document.xml)");
+      let xml = await docXmlFile.async("string");
 
       const deptName = record.department || record.deptCode || "";
       const dateRaw = record.evalDate || new Date().toISOString().slice(0, 10);
       const parts = dateRaw.split("-");
       const dateStr = parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : dateRaw;
-
-      const empName = record.name || "";
-      const msnv = record.msnv || "";
-      const position = record.position || record.role || "";
-      const shift = record.workingShift || record.role || "";
-      const workingPosition = record.position || "";
-      const trainer = record.trainerName || "";
       const passed = record.status === "Đủ điều kiện";
 
-      const q1 = record.evalScores?.[0]?.question || "Sử dụng đúng các bảo hộ lao động yêu cầu.";
-      const q2 = record.evalScores?.[1]?.question || "Thực hiện kiểm tra ngoại quan, các bất thường của máy...";
-      const q3 = record.evalScores?.[2]?.question || "Kỹ năng thao tác máy theo đúng hướng dẫn trên SOP.";
-      const q4 = record.evalScores?.[3]?.question || "Kỹ năng xử lý tình huống khi bất ngờ xảy ra sự cố...";
-      const q5 = record.evalScores?.[4]?.question || "Biết cách xử lý sự cố, liên lạc khẩn cấp...";
+      // Wingdings checkbox glyphs (Private-Use chars) matching the boxes already in
+      // the template: U+F0FE = checked, U+F0A8 = empty.
+      const CHECKED = String.fromCharCode(0xF0FE);
+      const EMPTY = String.fromCharCode(0xF0A8);
 
-      const commentText = record.evalComment || "Đã hoàn thành đánh giá.";
+      const escapeXml = (s) => String(s ?? "")
+        .replace(/\s+/g, " ").trim()
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;").replace(/'/g, "&apos;");
 
-      const deptTarget = "BỘ PHẬN (DEPARTMENT): _____________________\r\u0007\u0007\t\t\t\t\t\t\t\t\rNgày (Date):    ";
-      const deptPart = ("BỘ PHẬN (DEPARTMENT): " + deptName);
-      const datePart = ("Ngày (Date): " + dateStr);
-      const deptRepl = (deptPart.padEnd(43, " ") + "\r\u0007\u0007\t\t\t\t\t\t\t\t\r" + datePart).slice(0, deptTarget.length).padEnd(deptTarget.length, " ");
+      const values = {
+        dept: " " + escapeXml(deptName),
+        date: " " + escapeXml(dateStr),
+        employee: " " + escapeXml(record.name || ""),
+        msnv: " " + escapeXml(record.msnv || ""),
+        position: " " + escapeXml(record.position || record.role || ""),
+        shift: " " + escapeXml(record.workingShift || record.role || ""),
+        workpos: " " + escapeXml(record.trainingPosition || record.position || ""),
+        trainer: " " + escapeXml(record.trainerName || ""),
+        comment: escapeXml(record.evalComment || "Đã hoàn thành đánh giá."),
+        // rp/rf are raw checkbox glyphs (plain chars, not XML-escaped).
+        rp: passed ? CHECKED : EMPTY,
+        rf: passed ? EMPTY : CHECKED
+      };
 
-      const empTarget = "Nhân viên (Employee):" + " ".repeat(68) + "MSNV (Employee Code):" + " ".repeat(3);
-      const empPart = ("Nhân viên (Employee): " + empName);
-      const msnvPart = ("MSNV (Employee Code): " + msnv);
-      const empRepl = (empPart.padEnd(80, " ") + msnvPart).slice(0, empTarget.length).padEnd(empTarget.length, " ");
+      xml = xml.replace(/\{\{(\w+)\}\}/g, (m, key) =>
+        Object.prototype.hasOwnProperty.call(values, key) ? values[key] : "");
 
-      const posTarget = "Chức vụ (Position):" + " ".repeat(73) + "Ca làm việc (Working shift): \r";
-      const posPart = ("Chức vụ (Position): " + position);
-      const shiftPart = ("Ca làm việc (Working shift): " + shift);
-      const posRepl = (posPart.padEnd(92, " ") + shiftPart).slice(0, posTarget.length - 1).padEnd(posTarget.length - 1, " ") + "\r";
-
-      const wposTarget = "Vị trí làm việc (working position):" + " ".repeat(50) + "Người hướng dẫn (Trainer): \u0007\u0007  \r";
-      const wposPart = ("Vị trí làm việc (working position): " + workingPosition);
-      const trainerPart = ("Người hướng dẫn (Trainer): " + trainer);
-      const wposRepl = (wposPart.padEnd(85, " ") + trainerPart).slice(0, wposTarget.length - 5).padEnd(wposTarget.length - 5, " ") + "\u0007\u0007  \r";
-
-      const resultTarget = "\r\nKết quả\r\r\uF0A8Đạt (Passed)\r\uF0A8Không đạt (Failed)";
-      const resultRepl = passed 
-        ? "\r\nKết quả\r\r\uF0FEĐạt (Passed)\r\uF0A8Không đạt (Failed)"
-        : "\r\nKết quả\r\r\uF0A8Đạt (Passed)\r\uF0FEKhông đạt (Failed)";
-      
-      const resultTarget2 = "\rKết quả\r\r\uF0A8Đạt (Passed)\r\uF0A8Không đạt (Failed)";
-      const resultRepl2 = passed 
-        ? "\rKết quả\r\r\uF0FEĐạt (Passed)\r\uF0A8Không đạt (Failed)"
-        : "\rKết quả\r\r\uF0A8Đạt (Passed)\r\uF0FEKhông đạt (Failed)";
-
-      const q1Target = "Sử dụng đúng các bảo hộ lao động yêu cầu.";
-      const q1Repl = q1.slice(0, q1Target.length).padEnd(q1Target.length, " ");
-
-      const q2Target = "Thực hiện kiểm tra ngoại quan, các bất thường của máy, nguồn điện, nguồn nhiệt, khí nén, dừng khẩn cấp, dây nối đất, sensor, cover, khóa Interlock (nếu có).";
-      const q2Repl = q2.slice(0, q2Target.length).padEnd(q2Target.length, " ");
-
-      const q3Target = "Kỹ năng thao tác máy theo đúng hướng dẫn trên SOP.";
-      const q3Repl = q3.slice(0, q3Target.length).padEnd(q3Target.length, " ");
-
-      const q4Target = "Kỹ năng xử lý tình huống khi bất ngờ xảy ra sự cố máy móc trong lúc vận hành.";
-      const q4Repl = q4.slice(0, q4Target.length).padEnd(q4Target.length, " ");
-
-      const q5Target = "Biết cách xử lý sự cố, liên lạc khẩn cấp khi không thông báo trực tiếp được với quản lý bộ phận.";
-      const q5Repl = q5.slice(0, q5Target.length).padEnd(q5Target.length, " ");
-
-      function stringToBytes(s) {
-        const arr = new Uint8Array(s.length * 2);
-        for (let i = 0; i < s.length; i++) {
-          const code = s.charCodeAt(i);
-          arr[i * 2] = code & 0xff;
-          arr[i * 2 + 1] = (code >> 8) & 0xff;
-        }
-        return arr;
-      }
-
-      function performReplace(targetStr, replStr) {
-        const targetB = stringToBytes(targetStr);
-        const replB = stringToBytes(replStr);
-        if (targetB.length !== replB.length) return 0;
-        
-        let count = 0;
-        for (let i = 0; i <= buf.length - targetB.length; i++) {
-          let match = true;
-          for (let j = 0; j < targetB.length; j++) {
-            if (buf[i + j] !== targetB[j]) {
-              match = false;
-              break;
-            }
-          }
-          if (match) {
-            buf.set(replB, i);
-            count++;
-            i += targetB.length - 1;
-          }
-        }
-        return count;
-      }
-
-      performReplace(deptTarget, deptRepl);
-      performReplace(empTarget, empRepl);
-      performReplace(posTarget, posRepl);
-      performReplace(wposTarget, wposRepl);
-      performReplace(resultTarget, resultRepl);
-      performReplace(resultTarget2, resultRepl2);
-      performReplace(q1Target, q1Repl);
-      performReplace(q2Target, q2Repl);
-      performReplace(q3Target, q3Repl);
-      performReplace(q4Target, q4Repl);
-      performReplace(q5Target, q5Repl);
-
-      let utf16Str = '';
-      for (let i = 0; i < buf.length - 1; i += 2) {
-        utf16Str += String.fromCharCode(buf[i] | (buf[i + 1] << 8));
-      }
-      
-      const commentMarker = "Nhận xét của người đánh giá trực tiếp (Evaluator’s Comments):";
-      const markerIdx = utf16Str.indexOf(commentMarker);
-      if (markerIdx !== -1) {
-        const dynamicCommentsTarget = utf16Str.slice(markerIdx + commentMarker.length, markerIdx + commentMarker.length + 103);
-        const line1 = commentText.slice(0, 50);
-        const line2 = commentText.slice(50, 100);
-        const commentsRepl = ("\r" + line1.padEnd(50, " ") + "\r" + line2.padEnd(50, " ") + "\r").slice(0, 103);
-        performReplace(dynamicCommentsTarget, commentsRepl);
-      }
+      zip.file("word/document.xml", xml);
+      const blob = await zip.generateAsync({
+        type: "blob",
+        mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      });
 
       const { saveAs } = await import("file-saver");
-      const fileBlob = new Blob([buf], { type: "application/msword" });
-      saveAs(fileBlob, `022-3_Danh_gia_CNVH_${msnv}_${empName.replace(/\s+/g, "_")}.doc`);
+      const safeName = (record.name || "").replace(/\s+/g, "_");
+      saveAs(blob, `022-3_Danh_gia_CNVH_${record.msnv || ""}_${safeName}.docx`);
     } catch (e) {
       console.error(e);
-      alert("Xuất biểu mẫu Word thất bại: " + e.message);
+      pushToast("Xuất biểu mẫu Word thất bại: " + e.message, "error");
     }
   };
 
-  // Change department in Modal -> Reset equipment list
+  // Change department in Modal. Keep already-ticked training items so the user can
+  // accumulate skills across several departments in one go (the checklist below
+  // just swaps to the new department's items; selections persist by item name).
   const handleModalDeptChange = (e) => {
     const code = e.target.value;
     setModalForm(prev => ({
       ...prev,
-      deptCode: code,
-      trainingItems: {}
+      deptCode: code
     }));
   };
 
@@ -866,7 +874,7 @@ export default function License({ user, isMobile }) {
     } catch (err) {
       console.error(err);
       setCompressing(false);
-      alert("Tải ảnh thất bại.");
+      pushToast("Tải ảnh thất bại.", "error");
       setUploadProgress(0);
     }
   };
@@ -886,7 +894,7 @@ export default function License({ user, isMobile }) {
   const handleSave = async (e) => {
     e.preventDefault();
     if (!modalForm.msnv || !modalForm.name) {
-      alert("Vui lòng điền mã nhân viên và họ tên!");
+      pushToast("Vui lòng điền mã nhân viên và họ tên!", "warning");
       return;
     }
 
@@ -900,11 +908,37 @@ export default function License({ user, isMobile }) {
 
     try {
       await setDoc(doc(db, "operation_certifications", docId), newRecord);
-      alert(t("license.alert.saveSuccess"));
+      pushToast(t("license.alert.saveSuccess"), "success");
       setShowModal(false);
     } catch (err) {
       console.error("Lỗi lưu:", err);
-      alert("Lưu dữ liệu thất bại.");
+      pushToast("Lưu dữ liệu thất bại.", "error");
+    }
+  };
+
+  // Manually move a trainee from "ĐANG ĐÀO TẠO" to "CHỜ ĐÁNH GIÁ" without waiting
+  // the full 7 days. Allowed for EHS Committee / Trainer (and admin/ehs).
+  const moveToWaitingEval = async (record) => {
+    if (!canManageTraining) return;
+    if (!(await askConfirm(
+      `Chuyển nhân viên ${record.name} (${record.msnv}) sang trạng thái "Chờ đánh giá"?`,
+      "Xác nhận chuyển trạng thái"
+    ))) return;
+
+    try {
+      const docId = `${record.deptCode}_${record.msnv}`;
+      await setDoc(doc(db, "operation_certifications", docId), {
+        ...record,
+        status: "Thiếu chứng nhận",
+        reason: "CHỜ ĐÁNH GIÁ",
+        evalRequestedNotifSent: true, // skip the automatic 7-day timeout notification
+        updatedBy: user.name || user.email,
+        updatedAt: new Date().toISOString()
+      });
+      pushToast(`Đã chuyển ${record.name} sang "Chờ đánh giá".`, "success");
+    } catch (err) {
+      console.error("Lỗi chuyển trạng thái:", err);
+      pushToast("Chuyển trạng thái thất bại.", "error");
     }
   };
 
@@ -926,10 +960,10 @@ export default function License({ user, isMobile }) {
       }
       const docId = `${record.deptCode}_${record.msnv}`;
       await deleteDoc(doc(null, "operation_certifications", docId));
-      alert("Đã xóa chứng nhận thành công!");
+      pushToast("Đã xóa chứng nhận thành công!", "success");
     } catch (err) {
       console.error(err);
-      alert("Xóa thất bại.");
+      pushToast("Xóa thất bại.", "error");
     }
   };
 
@@ -1089,10 +1123,10 @@ export default function License({ user, isMobile }) {
         }
 
         await batch.commit();
-        alert(t("license.alert.importSuccess").replace("{count}", count));
+        pushToast(t("license.alert.importSuccess").replace("{count}", count), "success");
       } catch (err) {
         console.error(err);
-        alert(t("license.alert.importError").replace("{error}", err.message));
+        pushToast(t("license.alert.importError").replace("{error}", err.message), "error");
       }
     };
     reader.readAsArrayBuffer(file);
@@ -1221,7 +1255,7 @@ export default function License({ user, isMobile }) {
       saveAs(fileBlob, `Bao_cao_CNVH_Update_${new Date().toISOString().slice(0, 10)}.xlsx`);
     } catch (e) {
       console.error(e);
-      alert("Xuất excel thất bại: " + e.message);
+      pushToast("Xuất excel thất bại: " + e.message, "error");
     }
   };
 
@@ -1444,7 +1478,7 @@ export default function License({ user, isMobile }) {
           display: block;
           background: rgba(255, 255, 255, 0.02);
           width: 100%;
-          max-width: 900px;
+          max-width: 100%;
           height: auto;
         }
         .license-stats-table {
@@ -1506,7 +1540,7 @@ export default function License({ user, isMobile }) {
             min-width: 0 !important;
           }
           .license-chart-svg {
-            min-width: 600px;
+            min-width: 0;
           }
           .license-table th,
           .license-table td {
@@ -1548,6 +1582,16 @@ export default function License({ user, isMobile }) {
           <button className="license-btn license-btn-primary" onClick={() => openModal()}>
             <FaPlus /> {t("license.btn.add")}
           </button>
+          {(canManageTraining || isPrivileged) && (
+            <>
+              <button className="license-btn license-btn-outline" onClick={() => setTrainingPanel("training")}>
+                🎓 Đang đào tạo ({summaryStats.inTraining})
+              </button>
+              <button className="license-btn license-btn-outline" onClick={() => setTrainingPanel("eval")}>
+                ⏳ Chờ đánh giá ({summaryStats.waitingEval})
+              </button>
+            </>
+          )}
           {isAdmin && (
             <>
               <button className="license-btn license-btn-outline" onClick={openQuestionBankModal}>
@@ -1572,6 +1616,22 @@ export default function License({ user, isMobile }) {
         </div>
       ) : (
         <>
+          {/* Top summary cards (distinct employees) */}
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+            <div style={{ flex: "1 1 160px", background: "rgba(72, 187, 120, 0.12)", border: "1px solid rgba(72, 187, 120, 0.2)", padding: "12px 16px", borderRadius: 12, textAlign: "center" }}>
+              <div style={{ fontSize: "11px", color: "rgba(72, 187, 120, 0.9)", fontWeight: "600" }}>ĐÃ CÓ CNVH</div>
+              <div style={{ fontSize: "22px", fontWeight: "800", color: "#38a169" }}>{summaryStats.certified}</div>
+            </div>
+            <div style={{ flex: "1 1 160px", background: "rgba(237, 137, 54, 0.12)", border: "1px solid rgba(237, 137, 54, 0.2)", padding: "12px 16px", borderRadius: 12, textAlign: "center" }}>
+              <div style={{ fontSize: "11px", color: "var(--cn-text-secondary)", fontWeight: "600" }}>ĐANG ĐÀO TẠO</div>
+              <div style={{ fontSize: "22px", fontWeight: "800", color: colors.warning }}>{summaryStats.inTraining}</div>
+            </div>
+            <div style={{ flex: "1 1 160px", background: "rgba(70, 110, 115, 0.10)", border: "1px solid rgba(70, 110, 115, 0.2)", padding: "12px 16px", borderRadius: 12, textAlign: "center" }}>
+              <div style={{ fontSize: "11px", color: "var(--cn-text-secondary)", fontWeight: "600" }}>CHỜ ĐÁNH GIÁ</div>
+              <div style={{ fontSize: "22px", fontWeight: "800", color: colors.primary }}>{summaryStats.waitingEval}</div>
+            </div>
+          </div>
+
           {/* Dashboard stats & Chart */}
           <div className="license-grid-dashboard">
             {/* SVG Stacked Bar Chart */}
@@ -1580,7 +1640,7 @@ export default function License({ user, isMobile }) {
                 {t("license.chart.title")}
               </h3>
               
-              {chartData.length > 0 ? (
+              {displayedChartData.length > 0 ? (
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: "100%" }}>
                   <svg width="100%" height={SVG_H} viewBox={`0 0 ${SVG_W} ${SVG_H}`} className="license-chart-svg">
                     {/* Y-axis gridlines & labels */}
@@ -1607,10 +1667,14 @@ export default function License({ user, isMobile }) {
                     })}
 
                     {/* Bars */}
-                    {chartData.map((d, idx) => {
-                      const slotW = CHART_W / chartData.length;
+                    {displayedChartData.map((d, idx) => {
+                      const slotW = CHART_W / displayedChartData.length;
                       const xCenter = PAD_L + (idx + 0.5) * slotW;
-                      const barW = 22;
+                      // Bars fill ~62% of each slot (capped so 1-2 month views don't
+                      // get absurdly wide). Because the SVG scales to 100% of the card
+                      // via viewBox, a slot-relative width makes the bars "fatten up"
+                      // and stretch together with the page instead of staying skinny.
+                      const barW = Math.min(slotW * 0.62, 120);
                       const x0 = xCenter - barW / 2;
 
                       // Stack heights
@@ -1726,20 +1790,28 @@ export default function License({ user, isMobile }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {computedStats.filter(c => c.code !== "QC").map(c => (
-                    <tr key={c.code}>
-                      <td style={{ fontWeight: 600, color: "var(--cn-text-primary)" }}>{c.name}</td>
-                      <td style={{ textAlign: "center" }}>{c.totalItems}</td>
-                      <td style={{ textAlign: "center" }}>{c.totalStaff}</td>
-                      <td style={{ textAlign: "center", fontWeight: 700, color: colors.secondary }}>{c.qualified}</td>
-                      <td style={{ textAlign: "center", fontWeight: 700, color: c.lacking > 0 ? colors.error : "inherit" }}>{c.lacking}</td>
-                      <td style={{ textAlign: "center" }}>
-                        <span className={`license-badge ${c.complianceRate === 100 ? "qualified" : "lacking"}`}>
-                          {c.complianceRate}%
-                        </span>
+                  {visibleStats.length > 0 ? (
+                    visibleStats.map(c => (
+                      <tr key={c.code}>
+                        <td style={{ fontWeight: 600, color: "var(--cn-text-primary)" }}>{c.name}</td>
+                        <td style={{ textAlign: "center" }}>{c.totalItems}</td>
+                        <td style={{ textAlign: "center" }}>{c.totalStaff}</td>
+                        <td style={{ textAlign: "center", fontWeight: 700, color: colors.secondary }}>{c.qualified}</td>
+                        <td style={{ textAlign: "center", fontWeight: 700, color: c.lacking > 0 ? colors.error : "inherit" }}>{c.lacking}</td>
+                        <td style={{ textAlign: "center" }}>
+                          <span className={`license-badge ${c.complianceRate === 100 ? "qualified" : "lacking"}`}>
+                            {c.complianceRate}%
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={6} style={{ textAlign: "center", padding: "24px 10px", color: "var(--cn-text-secondary)" }}>
+                        Chưa có dữ liệu chứng nhận.
                       </td>
                     </tr>
-                  ))}
+                  )}
                 </tbody>
               </table>
 
@@ -1756,16 +1828,24 @@ export default function License({ user, isMobile }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {computedStats.filter(c => c.code !== "QC").map(c => (
-                    <tr key={c.code}>
-                      <td style={{ fontWeight: 600, color: "var(--cn-text-primary)" }}>{c.name}</td>
-                      <td style={{ textAlign: "center", color: c.notTrained > 0 ? colors.error : "inherit" }}>{c.notTrained}</td>
-                      <td style={{ textAlign: "center", color: c.inTraining > 0 ? colors.warning : "inherit" }}>{c.inTraining}</td>
-                      <td style={{ textAlign: "center", color: c.waitingEval > 0 ? colors.warning : "inherit" }}>{c.waitingEval}</td>
-                      <td style={{ textAlign: "center", color: c.waitingCard > 0 ? colors.warning : "inherit" }}>{c.waitingCard}</td>
-                      <td style={{ textAlign: "center", color: c.reEval > 0 ? colors.error : "inherit" }}>{c.reEval}</td>
+                  {visibleStats.length > 0 ? (
+                    visibleStats.map(c => (
+                      <tr key={c.code}>
+                        <td style={{ fontWeight: 600, color: "var(--cn-text-primary)" }}>{c.name}</td>
+                        <td style={{ textAlign: "center", color: c.notTrained > 0 ? colors.error : "inherit" }}>{c.notTrained}</td>
+                        <td style={{ textAlign: "center", color: c.inTraining > 0 ? colors.warning : "inherit" }}>{c.inTraining}</td>
+                        <td style={{ textAlign: "center", color: c.waitingEval > 0 ? colors.warning : "inherit" }}>{c.waitingEval}</td>
+                        <td style={{ textAlign: "center", color: c.waitingCard > 0 ? colors.warning : "inherit" }}>{c.waitingCard}</td>
+                        <td style={{ textAlign: "center", color: c.reEval > 0 ? colors.error : "inherit" }}>{c.reEval}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={6} style={{ textAlign: "center", padding: "24px 10px", color: "var(--cn-text-secondary)" }}>
+                        Chưa có dữ liệu chứng nhận.
+                      </td>
                     </tr>
-                  ))}
+                  )}
                 </tbody>
               </table>
             </div>
@@ -2034,6 +2114,18 @@ export default function License({ user, isMobile }) {
                 </div>
               </div>
 
+              {/* Trainer */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                <label style={{ fontSize: "12px", fontWeight: "600", color: "var(--cn-text-secondary)" }}>Người hướng dẫn (Trainer)</label>
+                <input
+                  type="text"
+                  className="license-input"
+                  value={modalForm.trainerName}
+                  onChange={e => setModalForm(prev => ({ ...prev, trainerName: e.target.value }))}
+                  placeholder="Tên người hướng dẫn đào tạo..."
+                />
+              </div>
+
               {/* Status & Date fields */}
               <div className="license-modal-grid-3">
                 <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
@@ -2151,6 +2243,30 @@ export default function License({ user, isMobile }) {
                     </label>
                   ))}
                 </div>
+
+                {/* Selected skills across all departments */}
+                {Object.keys(modalForm.trainingItems).filter(k => modalForm.trainingItems[k]).length > 0 && (
+                  <div style={{ marginTop: "12px", fontSize: "12px", color: "var(--cn-text-primary)" }}>
+                    <strong>Đào tạo kỹ năng:</strong>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "6px" }}>
+                      {Object.keys(modalForm.trainingItems).filter(k => modalForm.trainingItems[k]).map(k => (
+                        <span
+                          key={k}
+                          style={{ display: "inline-flex", alignItems: "center", gap: "6px", background: colors.primary, color: "white", padding: "3px 10px", borderRadius: "16px", fontSize: "11px", fontWeight: 600 }}
+                        >
+                          {k}
+                          <span
+                            onClick={() => toggleTrainingItem(k)}
+                            title="Bỏ chọn"
+                            style={{ cursor: "pointer", fontWeight: 800 }}
+                          >
+                            ✕
+                          </span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Action Buttons */}
@@ -2340,88 +2456,113 @@ export default function License({ user, isMobile }) {
               </button>
             </div>
 
-            {wizardQuestions.length === 0 ? (
+            {loadingEval ? (
               <div style={{ padding: "40px 0", textAlign: "center", color: "var(--cn-text-secondary)" }}>
-                Không tìm thấy câu hỏi đánh giá cho vị trí này.
+                Đang tải bộ câu hỏi đánh giá...
               </div>
-            ) : (
+            ) : evalSkills.length === 0 ? (
+              <div style={{ padding: "40px 0", textAlign: "center", color: "var(--cn-text-secondary)" }}>
+                Không tìm thấy kỹ năng/câu hỏi đánh giá cho nhân viên này.
+              </div>
+            ) : (() => {
+              // Flatten (skill, question) pairs to drive sequential navigation across skills.
+              const flat = [];
+              evalSkills.forEach((s, sIdx) => s.questions.forEach((q, qIdx) => flat.push({ sIdx, qIdx })));
+              const totalQ = flat.length;
+              const flatIndex = flat.findIndex(f => f.sIdx === currentSkillIndex && f.qIdx === currentQuestionIndex);
+              const safeFlatIndex = flatIndex < 0 ? 0 : flatIndex;
+              const isLast = safeFlatIndex === totalQ - 1;
+              const isFirst = safeFlatIndex === 0;
+              const currentSkill = evalSkills[currentSkillIndex];
+              const currentQuestion = currentSkill?.questions[currentQuestionIndex];
+              const answerKey = `${currentSkillIndex}_${currentQuestionIndex}`;
+              const allAnswered = flat.every(f => answersMap[`${f.sIdx}_${f.qIdx}`]);
+
+              const goPrev = () => {
+                if (currentQuestionIndex > 0) {
+                  setCurrentQuestionIndex(currentQuestionIndex - 1);
+                } else if (currentSkillIndex > 0) {
+                  const prevSkill = currentSkillIndex - 1;
+                  setCurrentSkillIndex(prevSkill);
+                  setCurrentQuestionIndex(evalSkills[prevSkill].questions.length - 1);
+                }
+              };
+              const goNext = () => {
+                if (currentQuestionIndex < currentSkill.questions.length - 1) {
+                  setCurrentQuestionIndex(currentQuestionIndex + 1);
+                } else if (currentSkillIndex < evalSkills.length - 1) {
+                  setCurrentSkillIndex(currentSkillIndex + 1);
+                  setCurrentQuestionIndex(0);
+                }
+              };
+
+              return (
               <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
-                {/* Progress Bar */}
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
-                  <span style={{ fontSize: "12px", fontWeight: "600", color: "var(--cn-text-secondary)" }}>
-                    Câu hỏi {currentQuestionIndex + 1} / {wizardQuestions.length}
+                {/* Skill + progress */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px", flexWrap: "wrap", gap: "6px" }}>
+                  <span className="license-badge neutral" style={{ fontSize: "12px" }}>
+                    Kỹ năng {currentSkillIndex + 1}/{evalSkills.length}: {currentSkill?.name}
                   </span>
                   <span style={{ fontSize: "12px", fontWeight: "700", color: colors.primary }}>
-                    Tiến trình: {Math.round(((currentQuestionIndex) / wizardQuestions.length) * 100)}%
+                    Câu {safeFlatIndex + 1} / {totalQ}
                   </span>
                 </div>
                 <div style={{ height: "6px", width: "100%", background: "var(--cn-border)", borderRadius: "3px", marginBottom: "20px", overflow: "hidden" }}>
-                  <div style={{ height: "100%", width: `${((currentQuestionIndex + 1) / wizardQuestions.length) * 100}%`, background: colors.primary, transition: "width 0.3s ease" }}></div>
+                  <div style={{ height: "100%", width: `${((safeFlatIndex + 1) / totalQ) * 100}%`, background: colors.primary, transition: "width 0.3s ease" }}></div>
                 </div>
 
                 {/* Current Question */}
                 <div className="quiz-question-box">
                   <h4 style={{ margin: "0 0 10px 0", fontSize: "14px", fontWeight: "700", color: "var(--cn-text-primary)" }}>
-                    {wizardQuestions[currentQuestionIndex]?.question}
+                    {currentQuestion?.question}
                   </h4>
-                  {wizardQuestions[currentQuestionIndex]?.hint && (
+                  {currentQuestion?.hint && (
                     <div className="quiz-hint-box">
                       <strong>💡 Hướng dẫn đáp án:</strong><br />
-                      {wizardQuestions[currentQuestionIndex].hint}
+                      {currentQuestion.hint}
                     </div>
                   )}
                 </div>
 
                 {/* Options / Selection */}
                 <div className="quiz-options-group">
-                  <button 
-                    type="button" 
-                    className={`quiz-option-btn ${answersMap[currentQuestionIndex] === "Đạt" ? "selected-passed" : ""}`}
-                    onClick={() => setAnswersMap(prev => ({ ...prev, [currentQuestionIndex]: "Đạt" }))}
+                  <button
+                    type="button"
+                    className={`quiz-option-btn ${answersMap[answerKey] === "Đạt" ? "selected-passed" : ""}`}
+                    onClick={() => setAnswersMap(prev => ({ ...prev, [answerKey]: "Đạt" }))}
                   >
                     <FaCheck /> ĐẠT
                   </button>
-                  <button 
-                    type="button" 
-                    className={`quiz-option-btn ${answersMap[currentQuestionIndex] === "Không đạt" ? "selected-failed" : ""}`}
-                    onClick={() => setAnswersMap(prev => ({ ...prev, [currentQuestionIndex]: "Không đạt" }))}
+                  <button
+                    type="button"
+                    className={`quiz-option-btn ${answersMap[answerKey] === "Không đạt" ? "selected-failed" : ""}`}
+                    onClick={() => setAnswersMap(prev => ({ ...prev, [answerKey]: "Không đạt" }))}
                   >
                     <FaTimes /> KHÔNG ĐẠT
                   </button>
                 </div>
 
-                {/* Navigation Buttons for Wizard */}
+                {/* Navigation */}
                 <div style={{ display: "flex", justifyContent: "space-between", marginTop: "24px", borderTop: "1px solid var(--cn-border)", paddingTop: "16px" }}>
-                  <button 
-                    type="button" 
-                    className="license-btn license-btn-outline" 
-                    disabled={currentQuestionIndex === 0}
-                    onClick={() => setCurrentQuestionIndex(prev => prev - 1)}
-                  >
+                  <button type="button" className="license-btn license-btn-outline" disabled={isFirst} onClick={goPrev}>
                     Quay lại
                   </button>
-                  
-                  {currentQuestionIndex < wizardQuestions.length - 1 ? (
-                    <button 
-                      type="button" 
-                      className="license-btn license-btn-primary" 
-                      disabled={!answersMap[currentQuestionIndex]}
-                      onClick={() => setCurrentQuestionIndex(prev => prev + 1)}
-                    >
-                      Câu tiếp theo
+                  {!isLast ? (
+                    <button type="button" className="license-btn license-btn-primary" disabled={!answersMap[answerKey]} onClick={goNext}>
+                      {currentQuestionIndex === currentSkill.questions.length - 1 ? "Kỹ năng tiếp theo →" : "Câu tiếp theo"}
                     </button>
                   ) : (
                     <span style={{ color: "var(--cn-text-secondary)", fontSize: "12px", display: "flex", alignItems: "center" }}>
-                      Đã đi tới câu cuối cùng
+                      Đã tới câu cuối cùng
                     </span>
                   )}
                 </div>
 
-                {/* Metadata & Comments (Only shown on the final question or as a persistent sidebar/section) */}
-                {currentQuestionIndex === wizardQuestions.length - 1 && (
+                {/* Summary of all results, then evaluator's comment (final question only) */}
+                {isLast && (
                   <div style={{ marginTop: "20px", background: "var(--cn-card-hover)", padding: "16px", borderRadius: "12px", border: "1px solid var(--cn-border)", display: "flex", flexDirection: "column", gap: "12px" }}>
                     <h4 style={{ margin: 0, fontSize: "13px", fontWeight: "700", color: "var(--cn-text-primary)" }}>Thông tin bổ sung & Nhận xét</h4>
-                    
+
                     <div className="license-modal-grid-2" style={{ gap: "12px" }}>
                       <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                         <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--cn-text-secondary)" }}>Người hướng dẫn (Trainer):</label>
@@ -2434,15 +2575,36 @@ export default function License({ user, isMobile }) {
                         />
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                        <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--cn-text-secondary)" }}>Ca làm việc (Working Shift):</label>
+                        <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--cn-text-secondary)" }}>Đào tạo cho vị trí:</label>
                         <input
                           type="text"
                           className="license-input"
-                          value={workingShift}
-                          onChange={e => setWorkingShift(e.target.value)}
-                          placeholder="Ca làm việc (A/B/C...)..."
+                          value={trainingPosition}
+                          onChange={e => setTrainingPosition(e.target.value)}
+                          placeholder="Vị trí được đào tạo..."
                         />
                       </div>
+                    </div>
+
+                    {/* Per-skill question results listed before the comment */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                      <label style={{ fontSize: "11px", fontWeight: "700", color: "var(--cn-text-secondary)" }}>Tổng hợp kết quả đánh giá:</label>
+                      {evalSkills.map((s, sIdx) => (
+                        <div key={sIdx} style={{ border: "1px solid var(--cn-border)", borderRadius: "8px", padding: "8px 10px" }}>
+                          <div style={{ fontSize: "12px", fontWeight: "700", color: "var(--cn-text-primary)", marginBottom: "4px" }}>{s.name}</div>
+                          {s.questions.map((q, qIdx) => {
+                            const r = answersMap[`${sIdx}_${qIdx}`];
+                            return (
+                              <div key={qIdx} style={{ display: "flex", justifyContent: "space-between", gap: "10px", fontSize: "12px", padding: "2px 0" }}>
+                                <span style={{ color: "var(--cn-text-secondary)" }}>{qIdx + 1}. {q.question}</span>
+                                <span style={{ fontWeight: 700, whiteSpace: "nowrap", color: r === "Đạt" ? colors.secondary : (r === "Không đạt" ? colors.error : "var(--cn-text-secondary)") }}>
+                                  {r || "—"}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ))}
                     </div>
 
                     <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
@@ -2456,11 +2618,11 @@ export default function License({ user, isMobile }) {
                       />
                     </div>
 
-                    <button 
-                      type="button" 
-                      className="license-btn license-btn-primary" 
+                    <button
+                      type="button"
+                      className="license-btn license-btn-primary"
                       style={{ width: "100%", marginTop: "8px", background: colors.secondary }}
-                      disabled={Object.keys(answersMap).length < wizardQuestions.length}
+                      disabled={!allAnswered}
                       onClick={handleCompleteEvaluation}
                     >
                       🏁 Hoàn thành Đánh giá
@@ -2468,7 +2630,134 @@ export default function License({ user, isMobile }) {
                   </div>
                 )}
               </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* Training / Evaluation management panel */}
+      {trainingPanel && (
+        <div style={{
+          position: "fixed",
+          top: 0, left: 0, right: 0, bottom: 0,
+          background: "var(--cn-modal-overlay)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 1000,
+          padding: "16px"
+        }}>
+          <div style={{
+            background: "var(--cn-modal-bg)",
+            border: "1px solid var(--cn-border)",
+            borderRadius: "16px",
+            width: "100%",
+            maxWidth: "760px",
+            maxHeight: "90vh",
+            overflowY: "auto",
+            padding: "24px",
+            display: "flex",
+            flexDirection: "column",
+            gap: "16px",
+            boxShadow: "0 10px 30px rgba(0,0,0,0.15)"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--cn-border)", paddingBottom: "12px" }}>
+              <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 700, color: "var(--cn-text-primary)" }}>
+                {trainingPanel === "training" ? "🎓 Nhân viên đang đào tạo" : "⏳ Nhân viên chờ đánh giá"}
+              </h3>
+              <button
+                onClick={() => setTrainingPanel(null)}
+                style={{ background: "none", border: "none", fontSize: "18px", cursor: "pointer", color: "var(--cn-text-secondary)" }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {trainingPanel === "training" && canManageTraining && (
+              <div style={{ fontSize: "12px", color: "var(--cn-text-secondary)" }}>
+                Thời gian đào tạo tối đa 7 ngày sẽ tự động chuyển sang "Chờ đánh giá". Bạn có thể chuyển sớm bằng nút bên dưới.
+              </div>
             )}
+
+            {(() => {
+              const list = records.filter(r =>
+                r.status === "Thiếu chứng nhận" &&
+                r.reason === (trainingPanel === "training" ? "ĐANG ĐÀO TẠO" : "CHỜ ĐÁNH GIÁ")
+              );
+              if (list.length === 0) {
+                return (
+                  <div style={{ padding: "30px 0", textAlign: "center", color: "var(--cn-text-secondary)" }}>
+                    Không có nhân viên nào trong danh sách này.
+                  </div>
+                );
+              }
+              const todayMs = new Date(new Date().toISOString().slice(0, 10)).getTime();
+              return (
+                <div style={{ overflowX: "auto" }}>
+                  <table className="license-table" style={{ minWidth: "640px" }}>
+                    <thead>
+                      <tr>
+                        <th>{t("license.table.msnv")}</th>
+                        <th>{t("license.table.name")}</th>
+                        <th>{t("license.table.dept")}</th>
+                        <th>{trainingPanel === "training" ? "Ngày bắt đầu" : t("license.table.evalDate")}</th>
+                        {trainingPanel === "training" && <th style={{ textAlign: "center" }}>Số ngày</th>}
+                        <th style={{ textAlign: "center" }}>{trainingPanel === "training" ? "Trạng thái" : "Thao tác"}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {list.map(r => {
+                        const days = r.evalDate
+                          ? Math.floor((todayMs - new Date(r.evalDate).getTime()) / (1000 * 60 * 60 * 24))
+                          : null;
+                        return (
+                          <tr key={r.id}>
+                            <td style={{ fontWeight: "bold" }}>{r.msnv}</td>
+                            <td style={{ fontWeight: 600, color: "var(--cn-text-primary)" }}>{r.name}</td>
+                            <td>{r.department || r.deptCode}</td>
+                            <td>{r.evalDate || "—"}</td>
+                            {trainingPanel === "training" && (
+                              <td style={{ textAlign: "center", fontWeight: 700, color: days !== null && days >= 7 ? colors.error : "inherit" }}>
+                                {days !== null ? `${days} ngày` : "—"}
+                              </td>
+                            )}
+                            <td style={{ textAlign: "center" }}>
+                              {trainingPanel === "training" ? (
+                                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
+                                  {r.evalFailed && (
+                                    <span style={{ color: colors.error, fontWeight: 700, fontSize: "11px" }}>Đánh giá không đạt</span>
+                                  )}
+                                  {canManageTraining ? (
+                                    <button
+                                      onClick={() => moveToWaitingEval(r)}
+                                      className="license-btn license-btn-primary"
+                                      style={{ padding: "4px 10px", fontSize: "11px", borderRadius: "6px" }}
+                                    >
+                                      Chờ đánh giá
+                                    </button>
+                                  ) : <span style={{ color: "var(--cn-text-secondary)", fontSize: "12px" }}>Chờ đánh giá</span>}
+                                </div>
+                              ) : (
+                                isEvaluator ? (
+                                  <button
+                                    onClick={() => { setTrainingPanel(null); startEvaluation(r); }}
+                                    className="license-btn license-btn-primary"
+                                    style={{ padding: "4px 10px", fontSize: "11px", borderRadius: "6px" }}
+                                  >
+                                    Đánh giá
+                                  </button>
+                                ) : <span style={{ color: "var(--cn-text-secondary)", fontSize: "12px" }}>—</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}

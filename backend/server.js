@@ -10,7 +10,6 @@ import dotenv from "dotenv";
 // Import modules
 import pool from "./config/db.js";
 import { initSocket } from "./socket/index.js";
-import { seedDefaultAdmin } from "./seed.js";
 
 // Import Routers
 import authRouter from "./routes/auth.js";
@@ -38,8 +37,10 @@ initSocket(server);
 const allowedOrigins = (process.env.CORS_ORIGIN || "")
   .split(",").map(s => s.trim()).filter(Boolean);
 app.use(cors(allowedOrigins.length ? { origin: allowedOrigins } : {}));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Raise the body-size limit well above the 100kb default so bulk Excel imports
+// (the /api/db/batch endpoint) don't get rejected with 413 Payload Too Large.
+app.use(express.json({ limit: "25mb" }));
+app.use(express.urlencoded({ extended: true, limit: "25mb" }));
 
 // Serve uploaded files statically at /uploads
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
@@ -94,6 +95,22 @@ async function initializeDatabaseSchema() {
       console.error("⚠️ Không thể kiểm tra hoặc thêm cột 'related_id' vào bảng 'notifications':", e.message);
     }
 
+    // Ensure password_resets table exists (one-time tokens for "forgot password").
+    try {
+      await connection.query(`
+        CREATE TABLE IF NOT EXISTS password_resets (
+          token VARCHAR(255) NOT NULL PRIMARY KEY,
+          uid VARCHAR(255) NOT NULL,
+          email VARCHAR(255) NOT NULL,
+          expires_at BIGINT NOT NULL,
+          used TINYINT(1) NOT NULL DEFAULT 0,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+    } catch (e) {
+      console.error("⚠️ Không thể tạo bảng 'password_resets':", e.message);
+    }
+
     // Check if users table exists
     const [tables] = await connection.query("SHOW TABLES LIKE 'users'");
     if (tables.length === 0) {
@@ -144,7 +161,4 @@ server.listen(PORT, async () => {
   
   // Verify database schema configurations
   await initializeDatabaseSchema();
-
-  // Auto-seed default admin account if users table is empty
-  await seedDefaultAdmin();
 });
