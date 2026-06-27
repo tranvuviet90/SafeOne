@@ -9,7 +9,7 @@ import "react-datepicker/dist/react-datepicker.css";
 import { colors } from "../theme";
 import { useI18n } from "../i18n/I18nProvider";
 import LightboxSwipeOnly, { useConfirm } from "./LightboxSwipeOnly";
-import { callAIService, callSpellCheckService } from "../utils/aiAdapter";
+import { callSpellCheckService } from "../utils/aiAdapter";
 import realtimeService from "../services/realtimeService";
 
 /* ====================== BIỂU TƯỢNG (ICON) ====================== */
@@ -45,7 +45,6 @@ const errorGroups = [
   { group: "Lỗi Khác", items: [] },
 ];
 
-const serverTimestamp = () => new Date().toISOString();
 const Timestamp = {
   fromDate(date) {
     return date.toISOString();
@@ -717,6 +716,7 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
       unsub();
       clearInterval(interval);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchLogs ổn định, chạy lại theo dep
   }, [dep]);
 
   useEffect(() => {
@@ -739,6 +739,7 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
       }
     };
     run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ tạo lại thumbnail khi allScores đổi
   }, [allScores]);
   
   const handleSelectDepartment = (index) => {
@@ -1453,6 +1454,7 @@ function CommentModal({ isOpen, onClose, eventId, user, error }) {
     fetchComments().finally(() => setLoadingComments(false));
     const interval = setInterval(fetchComments, 10000);
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chạy lại khi mở/đổi sự kiện
   }, [isOpen, eventId]);
 
   useEffect(() => {

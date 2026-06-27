@@ -6,7 +6,7 @@ import { useToast, useConfirm } from './LightboxSwipeOnly';
 import { colors } from '../theme';
 import { ALL_ROLES } from '../constants/roles';
 
-export default function UserManager({ user, isMobile }) {
+export default function UserManager({ isMobile }) {
   const { t } = useI18n();
   const { pushToast } = useToast();
   const { askConfirm } = useConfirm();
@@ -54,7 +54,7 @@ export default function UserManager({ user, isMobile }) {
   // Trained documents for Chatbot
   const [trainedDocs, setTrainedDocs] = useState([]);
   const [viewingDoc, setViewingDoc] = useState(null);
-  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [, setUploadingDoc] = useState(false);
   const [aiDocuments, setAiDocuments] = useState([]);
 
   // Password-recovery email content (admin-configurable). Placeholders: {name}, {link}
@@ -245,6 +245,7 @@ export default function UserManager({ user, isMobile }) {
     }
   };
 
+  // eslint-disable-next-line no-unused-vars -- giữ cho UI nạp tài liệu huấn luyện AI (hiện chưa nối)
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -340,6 +341,7 @@ export default function UserManager({ user, isMobile }) {
     }
   };
 
+  // eslint-disable-next-line no-unused-vars -- giữ cho UI xóa tài liệu huấn luyện AI (hiện chưa nối)
   const handleDeleteDoc = async (indexToDelete) => {
     if (!(await askConfirm("Bạn có chắc chắn muốn xóa tài liệu huấn luyện này?", "Xác nhận xóa tài liệu"))) return;
     
@@ -380,12 +382,13 @@ export default function UserManager({ user, isMobile }) {
     if (activeTab === 'users') fetchUsers();
     else if (activeTab === 'requests') fetchRequests();
     else if (activeTab === 'apikey' || activeTab === 'train') fetchAIConfig();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- tải lại theo tab đang chọn
   }, [activeTab]);
 
   const handleAdminAction = async (action, targetUid, data = {}) => {
     if (action === 'delete' && !(await askConfirm(t('manager.confirm.delete'), "Xác nhận xóa người dùng"))) return;
     
-    const toastId = pushToast('Đang xử lý...', 'info');
+    pushToast('Đang xử lý...', 'info');
     try {
       await apiClient.post('/api/functions/adminUserAction', { action, targetUid, data });
       pushToast('Thành công!', 'success');

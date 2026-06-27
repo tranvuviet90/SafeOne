@@ -30,7 +30,6 @@ const dbService = {
 };
 import { colors } from "../theme";
 import { useConfirm, useToast } from "./LightboxSwipeOnly";
-import { useI18n } from "../i18n/I18nProvider";
 
 const DEPARTMENTS = [
   "Cutting", "Rolling", "Finishing", "Dipping", "Graphics", "QC", "Warehouse",
@@ -173,7 +172,6 @@ const LOCKER_LAYOUTS = {
 };
 
 export default function Locker({ user }) {
-  const { t } = useI18n();
   const toast = useToast();
   const confirm = useConfirm();
 
@@ -224,6 +222,7 @@ export default function Locker({ user }) {
     return () => {
       globalRefreshCallback = null;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ chạy một lần khi mount
   }, []);
 
   // Load tủ đồ thời gian thực qua REST API
@@ -238,6 +237,7 @@ export default function Locker({ user }) {
       unsub();
       clearInterval(interval);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ chạy một lần khi mount
   }, []);
 
   // Ánh xạ dữ liệu cài đặt
@@ -670,9 +670,7 @@ export default function Locker({ user }) {
     }
   }
   // Khai báo state phụ cho các Modal trong nội bộ
-  const [showAssignModal, setShowAssignModal] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
-  const [showQRModal, setShowQRModal] = useState(false);
 
   // Helper tìm tủ trống
   const vacantLockers = React.useMemo(() => {
@@ -898,7 +896,7 @@ export default function Locker({ user }) {
                       
                       {/* flexWrap: "wrap" giúp tự động fit trang */}
                       <div style={{ display: "flex", gap: "20px", flexWrap: "wrap" }}>
-                        {getSortedBlocks(group, gIdx).map((block, bIdx) => {
+                        {getSortedBlocks(group, gIdx).map((block) => {
                           const cols = block.cols || 3;
                           // Tạo danh sách tủ của block này
                           const blockLockers = [];

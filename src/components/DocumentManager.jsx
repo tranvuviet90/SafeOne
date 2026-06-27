@@ -35,20 +35,6 @@ const dbService = {
 const db = null;
 const doc = (_db, col, id) => ({ collection: col, id });
 const collection = (_db, col) => ({ collection: col });
-const getDoc = async (docRef) => {
-  try {
-    const data = await dbService.getDoc(docRef.collection, docRef.id);
-    return {
-      exists() { return data && data._exists !== false; },
-      data() { return data; }
-    };
-  } catch (err) {
-    return {
-      exists() { return false; },
-      data() { return null; }
-    };
-  }
-};
 const addDoc = async (collectionRef, data) => {
   return await dbService.createDoc(collectionRef.collection, data);
 };
@@ -153,6 +139,7 @@ export default function DocumentManager({ user, isMobile }) {
       unsub();
       clearInterval(interval);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- pushToast ổn định, không cần làm dependency
   }, [canView, activeSubTab, canViewMSDS]);
 
   // Filter documents in memory

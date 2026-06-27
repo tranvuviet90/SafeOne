@@ -29,7 +29,6 @@ const dbService = {
   }
 };
 import imageCompression from "browser-image-compression";
-import { colors } from "../theme";
 import { useToast } from "./LightboxSwipeOnly";
 
 const DEPARTMENTS = [
@@ -206,6 +205,7 @@ export default function PublicLockerView({ lockerId: initialLockerId }) {
   useEffect(() => {
     fetchLockerData();
     fetchGlobalSettings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- tải lại khi đổi tủ
   }, [currentLockerId]);
 
   // Kiểm tra thời gian thực khi nhập MSNV để xem có dùng tủ khác không
@@ -218,6 +218,7 @@ export default function PublicLockerView({ lockerId: initialLockerId }) {
     } else {
       setOtherLockers([]);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chạy lại khi MSNV đổi
   }, [msnv]);
 
   const fetchLockers = async () => {
@@ -459,7 +460,7 @@ export default function PublicLockerView({ lockerId: initialLockerId }) {
         let oldData = null;
         try {
           oldData = await dbService.getDoc("lockers", oldId);
-        } catch (e) {}
+        } catch { /* ignore missing locker */ }
         if (oldData && oldData._exists !== false) {
           const oldUser = oldData.currentUser;
           if (oldUser) {

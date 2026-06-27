@@ -134,7 +134,7 @@ router.get("/me", authenticateToken, async (req, res) => {
         meal_dept: user.meal_dept
       }
     });
-  } catch (error) {
+  } catch {
     res.status(500).json({ error: "Lỗi hệ thống" });
   }
 });
@@ -226,7 +226,7 @@ router.post("/forgot-password", loginLimiter, async (req, res) => {
         if (data?.emailSubject) subject = data.emailSubject;
         if (data?.emailBody) body = data.emailBody;
       }
-    } catch (e) {
+    } catch {
       // fall back to defaults on any parse/query error
     }
 

@@ -26,7 +26,12 @@ export default defineConfig([
     },
     rules: {
       // Cleanup-only rules: keep visible but don't fail CI.
-      'no-unused-vars': ['warn', { varsIgnorePattern: '^[A-Z_]' }],
+      'no-unused-vars': ['warn', {
+        varsIgnorePattern: '^[A-Z_]',
+        argsIgnorePattern: '^_',
+        destructuredArrayIgnorePattern: '^_',
+        caughtErrors: 'none',
+      }],
       'no-empty': 'warn',
       'react-refresh/only-export-components': 'warn',
     },
@@ -56,7 +61,12 @@ export default defineConfig([
       parserOptions: { sourceType: 'commonjs' },
     },
     rules: {
-      'no-unused-vars': ['warn', { varsIgnorePattern: '^[A-Z_]' }],
+      'no-unused-vars': ['warn', {
+        varsIgnorePattern: '^[A-Z_]',
+        argsIgnorePattern: '^_',
+        destructuredArrayIgnorePattern: '^_',
+        caughtErrors: 'none',
+      }],
       'no-empty': 'warn',
     },
   },

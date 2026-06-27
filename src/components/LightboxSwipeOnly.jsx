@@ -24,11 +24,13 @@ const TOAST_STYLES = {
 };
 const getToastStyle = (type) => TOAST_STYLES[type] || TOAST_STYLES.info;
 
+// eslint-disable-next-line react-refresh/only-export-components -- hook colocate với provider
 export function useToast() {
   const ctx = useContext(ToastCtx);
   return useMemo(() => ({
     pushToast: ctx.pushToast,
     show: (msg, type = "info", ttlMs = 4000) => ctx.pushToast(msg, type, ttlMs)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ phụ thuộc pushToast
   }), [ctx.pushToast]);
 }
 
@@ -139,6 +141,7 @@ export function ToastProvider({ children }) {
 
 const ConfirmCtx = createContext({ askConfirm: () => Promise.resolve(false) });
 
+// eslint-disable-next-line react-refresh/only-export-components -- hook colocate với provider
 export function useConfirm() {
   return useContext(ConfirmCtx);
 }
@@ -386,6 +389,7 @@ export default function LightboxSwipeOnly({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- handlers tạo mới mỗi render, chỉ rebind theo các deps này
   }, [open, total, localIndex, scale]);
 
   // Tải trước (preload) các ảnh xung quanh
@@ -485,7 +489,7 @@ export default function LightboxSwipeOnly({
     isDragging.current = false;
     try {
       e.currentTarget.releasePointerCapture(e.pointerId);
-    } catch (err) {}
+    } catch { /* ignore */ }
 
     if (scale > 1) {
       return;

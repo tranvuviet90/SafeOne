@@ -239,6 +239,7 @@ function CaLamViec({ user, isMobile }) {
       unsubTasks();
       clearInterval(intervalId);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ chạy lại khi quyền xem bảng đổi
   }, [canPlanBoard]);
 
   // 2. Fetch Users list
@@ -363,7 +364,8 @@ function CaLamViec({ user, isMobile }) {
       unsubAssignments();
       clearInterval(intervalId);
     };
-  }, [weekId, tasks]); 
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chạy lại theo tuần/tasks, fetchAllData ổn định
+  }, [weekId, tasks]);
 
   // Helpers for managing task columns (Admin/EHS)
   const handleAddTask = async () => {

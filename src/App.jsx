@@ -413,28 +413,11 @@ function MainApp() {
     }
   };
 
-  const [mountedTabs, setMountedTabs] = useState(new Set());
-  useEffect(() => {
-    // SỬA LỖI: Không ghi nhận tab 0 vào lúc app đang loading để chống Ghost Mount
-    if (loading || !user) return; 
-
-    setMountedTabs(prev => {
-      if (prev.has(tab)) return prev; // không đổi → không re-render thừa
-      const next = new Set(prev);
-      next.add(tab);
-      return next;
-    });
-  }, [tab, loading, user]); // Cập nhật dependency
-
   if (loading) return <div className="loading-container"><p>{t("common.loading")}</p></div>;
   if (!user) return <Login setUser={setUser} />;
 
-  // Lazy mount + keep-alive: chỉ mount tab khi user lần đầu vào.
-  // Sau đó ẩn/hiện bằng CSS display — KHÔNG unmount.
-  // mountedTabs là state để trigger re-render khi tab mới được thêm vào.
-
+  // Keep-alive: mọi tab luôn được render, chỉ ẩn/hiện bằng CSS display để giữ trạng thái.
   const tabStyle = (i) => ({ display: tab === i ? "block" : "none", width: "100%" });
-  const shouldMount = (i) => mountedTabs.has(i);
 
   return (
     <ToastProvider>

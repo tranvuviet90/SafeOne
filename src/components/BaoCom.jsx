@@ -33,9 +33,6 @@ import { colors } from '../theme';
 import { useToast, useConfirm } from './LightboxSwipeOnly';
 import { useI18n } from '../i18n/I18nProvider';
 
-// Tránh re-render vô tận trong React dependency arrays
-const noopPushToast = () => {};
-
 /* =========================
  * HẰNG SỐ & HỖ TRỢ CHUNG
  * ========================= */
@@ -51,10 +48,6 @@ import { formatDateToId } from '../utils/string';
 
 const DEPARTMENTS = DEPARTMENT_ROLES;
 const dateKey = formatDateToId;
-const fmtVN = (d) => {
-  const dt = (d instanceof Date) ? d : new Date(d);
-  return dt.toLocaleDateString('vi-VN', { day:'2-digit', month:'2-digit', year:'numeric' });
-};
 const tsSec = (ts) => (ts && typeof ts.seconds === 'number') ? ts.seconds : 0;
 const fmtTime = (t) => {
   if (!t) return '';
@@ -1984,11 +1977,6 @@ function ExportBaoComModal({ onClose }) {
   const [selectedMonth, setSelectedMonth] = useState(new Date());
   const [isGen, setIsGen] = useState(false);
 
-  const toId = (d) => {
-    if (!(d instanceof Date)) d = new Date(d);
-    return dateKey(d);
-  };
-
   async function readDay(dayId) {
     const snap = await dbService.getDoc("meal_reports", dayId);
     if (!snap || snap._exists === false) {
@@ -2024,7 +2012,7 @@ function ExportBaoComModal({ onClose }) {
       const reps = node.reports || {};
       const fulfilled = node.overtimeFulfilled || {};
 
-      Object.entries(reps).forEach(([deptKey, r]) => {
+      Object.entries(reps).forEach(([deptKey]) => {
         const ful = fulfilled[deptKey] || {};
         // Chỉ tính nếu bộ phận đã bấm xác nhận nhận đủ (deptAck có giá trị)
         if (ful.deptAck) {
@@ -2173,7 +2161,6 @@ function ExportBaoComModal({ onClose }) {
 /* --- BaoCom: Component chính --- */
 export default function BaoCom({ user, isMobile }) {
   const { t } = useI18n();
-  const { pushToast } = useToast();
 
   const [reportData, setReportData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -2189,7 +2176,6 @@ export default function BaoCom({ user, isMobile }) {
   const [nonAdminMainTab, setNonAdminMainTab] = useState(isCanteenForState ? 'canteen' : 'dept');
 
   const selectedDateKey = dateKey(selectedDate);
-  const prevStatusRef = useRef({});
 
   const userRoles = user?.role ? (Array.isArray(user.role) ? user.role : [String(user.role)]).flatMap(r => String(r).split(',')).map(r => r.trim().toLowerCase()).filter(Boolean) : [];
   const rawRoles = user?.role ? (Array.isArray(user.role) ? user.role : [String(user.role)]).flatMap(r => String(r).split(',')).map(r => r.trim()).filter(Boolean) : [];
@@ -2232,6 +2218,7 @@ export default function BaoCom({ user, isMobile }) {
     return () => {
       globalRefreshCallback = null;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chạy lại theo ngày được chọn, fetchMealReport ổn định
   }, [selectedDateKey]);
 
   // Lắng nghe dữ liệu báo cáo của ngày được chọn (real-time qua polling)
@@ -2248,6 +2235,7 @@ export default function BaoCom({ user, isMobile }) {
       unsub();
       clearInterval(interval);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chạy lại theo ngày được chọn, fetchMealReport ổn định
   }, [selectedDateKey]);
 
   // Chọn nội dung giao diện hiển thị tùy theo vai trò người dùng

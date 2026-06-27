@@ -33,8 +33,7 @@ const dbService = {
 // The adapter shims ignore this handle (the REST layer needs no db handle),
 // but legacy call sites still pass `db` as the first arg, so define it once here.
 const db = null;
-const doc = (db, col, id) => ({ collection: col, id });
-const collection = (db, col) => ({ collection: col });
+const doc = (_db, col, id) => ({ collection: col, id });
 const getDoc = async (docRef) => {
   try {
     const data = await dbService.getDoc(docRef.collection, docRef.id);
@@ -55,7 +54,7 @@ const setDoc = async (docRef, data) => {
 const deleteDoc = async (docRef) => {
   return await dbService.deleteDoc(docRef.collection, docRef.id);
 };
-const writeBatch = (db) => {
+const writeBatch = () => {
   const operations = [];
   return {
     set(docRef, data) {
@@ -231,7 +230,7 @@ const DEFAULT_POSITIONS = [
   "Vị trí chung"
 ];
 
-export default function License({ user, isMobile }) {
+export default function License({ user }) {
   const { t } = useI18n();
   const { askConfirm } = useConfirm();
   const { pushToast } = useToast();
@@ -270,7 +269,9 @@ export default function License({ user, isMobile }) {
   const [compressing, setCompressing] = useState(false);
   const [tempFileUrl, setTempFileUrl] = useState("");
 
-  const userRolesList = user?.role ? (Array.isArray(user.role) ? user.role.map(r => String(r).toLowerCase()) : String(user.role).split(",").map(r => r.trim().toLowerCase())) : [];
+  const userRolesList = useMemo(() => (
+    user?.role ? (Array.isArray(user.role) ? user.role.map(r => String(r).toLowerCase()) : String(user.role).split(",").map(r => r.trim().toLowerCase())) : []
+  ), [user]);
   const isAdmin = userRolesList.some(r => r === "admin" || r === "ehs");
   const isPrivileged = userRolesList.some(r => r === "admin" || r === "ehs" || r === "manager");
   const isEvaluator = userRolesList.some(r => r === "admin" || r === "ehs");

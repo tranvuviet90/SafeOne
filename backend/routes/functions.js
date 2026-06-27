@@ -1,7 +1,6 @@
 import express from "express";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
 import pool from "../config/db.js";
 import { authenticateToken, requireAdmin } from "../middleware/auth.js";
 
@@ -279,7 +278,7 @@ router.post("/askAI", authenticateToken, async (req, res) => {
           configuredModel = cfg.model;
         }
       }
-    } catch (e) { /* dùng mặc định */ }
+    } catch { /* dùng mặc định */ }
 
     // Map model cũ đã ngừng hỗ trợ sang model mới
     if (configuredModel === "gemini-2.0-flash" || configuredModel === "gemini-1.5-flash") {
@@ -339,7 +338,7 @@ router.post("/askAI", authenticateToken, async (req, res) => {
             const d = typeof drows[0].data === "string" ? JSON.parse(drows[0].data) : drows[0].data;
             resolvedFileUrl = d.fileUrlVi || d.fileUrl || d.fileUrlEn || "";
           }
-        } catch (e) { /* bỏ qua nếu không tra được link */ }
+        } catch { /* bỏ qua nếu không tra được link */ }
       }
     }
 
@@ -562,7 +561,7 @@ router.post("/backfillChunks", authenticateToken, requireAdmin, async (req, res)
     );
     for (const r of docRows) {
       let d;
-      try { d = typeof r.data === "string" ? JSON.parse(r.data) : r.data; } catch (e) { continue; }
+      try { d = typeof r.data === "string" ? JSON.parse(r.data) : r.data; } catch { continue; }
       if (d && d.isAITrained === true && d.markdownContent && !existingIds.has(r.id)) {
         try {
           const n = await storeDocChunks(r.id, d.title || d.fileName || "", d.type || "", d.markdownContent, apiKey);

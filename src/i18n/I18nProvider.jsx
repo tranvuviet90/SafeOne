@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useMemo, useState, useEffect } from "react";
+import React, { createContext, useContext, useCallback, useMemo, useState, useEffect } from "react";
 import { DICTS } from "./dictionaries.js";
 
 const I18nContext = createContext({
@@ -14,15 +14,15 @@ export const I18nProvider = ({ children }) => {
   });
 
   // đổi ngôn ngữ + lưu + set <html lang="">
-  const setLang = (next) => {
+  const setLang = useCallback((next) => {
     setLangState(next);
     try {
       localStorage.setItem("app_lang", next);
-    } catch {}
+    } catch { /* ignore storage errors */ }
     if (typeof document !== "undefined") {
       document.documentElement.setAttribute("lang", next);
     }
-  };
+  }, []);
 
   useEffect(() => {
     // đảm bảo attribute khi load lần đầu
@@ -45,4 +45,5 @@ export const I18nProvider = ({ children }) => {
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 };
 
+// eslint-disable-next-line react-refresh/only-export-components -- hook colocate với provider
 export const useI18n = () => useContext(I18nContext);

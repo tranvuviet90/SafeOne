@@ -316,7 +316,6 @@ export default function NotificationBell({ user, setActiveTab }) {
   
   // Tích hợp 2 lớp khiên: Cuốn sổ lưu ID và Thẻ báo cáo initialLoad
   const seenIdsRef = useRef(new Set());
-  const initialLoadRole = useRef(true);
   const initialLoadUser = useRef(true);
 
   // === Xin quyền hiển thị Web Notification ngay khi user đăng nhập / vào trang ===
@@ -857,7 +856,7 @@ export default function NotificationBell({ user, setActiveTab }) {
                 try {
                   const saved = localStorage.getItem(`notif_settings_${user?.uid}`);
                   setSettings(saved ? JSON.parse(saved) : {});
-                } catch {}
+                } catch { /* ignore */ }
                 setShowSettings(false);
               }}
               style={{ padding: "8px 16px", borderRadius: 8, border: "1.5px solid #ccc", background: "#eee", fontWeight: 600, cursor: "pointer" }}

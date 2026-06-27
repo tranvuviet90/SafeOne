@@ -159,7 +159,7 @@ function formatRow(table, row) {
       if (formatted[col] !== undefined) {
         try {
           formatted[col] = typeof formatted[col] === "string" ? JSON.parse(formatted[col]) : formatted[col];
-        } catch (e) {
+        } catch {
           formatted[col] = null;
         }
       }
@@ -230,7 +230,7 @@ async function triggerBroadcasts(collection, id) {
       try {
         const parsed = typeof r.data === "string" ? JSON.parse(r.data) : r.data;
         return redactGenericDoc(collection, r.id, { id: r.id, ...parsed });
-      } catch (e) {
+      } catch {
         return { id: r.id };
       }
     });
@@ -244,7 +244,7 @@ async function triggerBroadcasts(collection, id) {
       try {
         const parsed = typeof docRow[0].data === "string" ? JSON.parse(docRow[0].data) : docRow[0].data;
         broadcastChange(`${collection}/${id}`, redactGenericDoc(collection, id, { id, ...parsed }));
-      } catch (e) {}
+      } catch { /* ignore parse error */ }
     } else {
       broadcastChange(`${collection}/${id}`, null);
     }
@@ -311,7 +311,7 @@ router.get("/:collection", authenticateToken, async (req, res) => {
         try {
           const parsed = typeof r.data === "string" ? JSON.parse(r.data) : r.data;
           return redactGenericDoc(collection, r.id, { id: r.id, ...parsed });
-        } catch (e) {
+        } catch {
           return { id: r.id };
         }
       });
@@ -449,7 +449,7 @@ async function updateDocumentHandler(req, res) {
       if (rowExists) {
         try {
           currentData = typeof existing[0].data === "string" ? JSON.parse(existing[0].data) : existing[0].data;
-        } catch (e) {
+        } catch {
           currentData = {};
         }
       }
@@ -607,7 +607,7 @@ async function updateDocumentHandler(req, res) {
       if (isJsonCol(cfg.table, key)) {
         try {
           curVal = typeof curVal === "string" ? JSON.parse(curVal) : curVal;
-        } catch (e) {}
+        } catch { /* ignore parse error */ }
       }
       const processed = processFieldUpdate(curVal, payload[key]);
       dbPayload[key] = isJsonCol(cfg.table, key) ? JSON.stringify(processed) : processed;
@@ -807,7 +807,7 @@ async function batchHandler(req, res) {
           if (rowExists) {
             try {
               currentData = typeof existing[0].data === "string" ? JSON.parse(existing[0].data) : existing[0].data;
-            } catch (e) {}
+            } catch { /* ignore parse error */ }
           }
           for (const key of Object.keys(mappedBody)) {
             updateNestedField(currentData, key, mappedBody[key]);
@@ -844,7 +844,7 @@ async function batchHandler(req, res) {
           if (isJsonCol(cfg.table, key)) {
             try {
               curVal = typeof curVal === "string" ? JSON.parse(curVal) : curVal;
-            } catch (e) {}
+            } catch { /* ignore parse error */ }
           }
           const processed = processFieldUpdate(curVal, mappedBody[key]);
           dbPayload[key] = isJsonCol(cfg.table, key) ? JSON.stringify(processed) : processed;

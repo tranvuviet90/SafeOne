@@ -1,8 +1,7 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import dbService from "../services/dbService";
 import { colors } from "../theme";
 import { useConfirm, useToast } from "./LightboxSwipeOnly";
-import { useI18n } from "../i18n/I18nProvider";
 import { 
   FaSearch, FaPlus, FaFileExcel, FaDownload, FaUpload, 
   FaEdit, FaTrash, FaCheck, FaTimes 
@@ -44,7 +43,6 @@ const KNIFE_TYPES = [
 ];
 
 export default function Knife({ user, isMobile }) {
-  const { t } = useI18n();
   const toast = useToast();
   const confirm = useConfirm();
 
@@ -140,6 +138,7 @@ export default function Knife({ user, isMobile }) {
       clearInterval(intervalKnives);
       clearInterval(intervalRegs);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ chạy một lần khi mount
   }, []);
 
   // Compute stats
