@@ -30,8 +30,11 @@ const dbService = {
 };
 
 // REST API adapter (legacy doc/writeBatch shims)
-const doc = (db, col, id) => ({ collection: col, id });
-const collection = (db, col) => ({ collection: col });
+// `db` is a no-op handle kept only so legacy Firebase-style call sites
+// (doc(db, ...), collection(db, ...)) still type-check; the shims ignore it.
+const db = null;
+const doc = (_db, col, id) => ({ collection: col, id });
+const collection = (_db, col) => ({ collection: col });
 const getDoc = async (docRef) => {
   try {
     const data = await dbService.getDoc(docRef.collection, docRef.id);

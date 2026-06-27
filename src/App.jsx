@@ -119,6 +119,12 @@ export default function App() {
     );
   }
 
+  return <MainApp />;
+}
+
+// Main authenticated app. Split out from App() so every hook below runs
+// unconditionally — the param-based routing in App() may return early.
+function MainApp() {
   const [tab, setTab] = useState(0);
   const [ehsActiveSubTab, setEhsActiveSubTab] = useState("calamviec");
 

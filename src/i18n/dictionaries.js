@@ -101,38 +101,11 @@ export const DICTS = {
     "shift.HC": "Ca HC",
     "shift.S8": "Ca 8",
     "shift.Off": "Off",
-    "page.shifts.title": "Phân ca & Công việc EHS Committee",
-    "shifts.myWeek": "Ca làm việc của tôi (Tuần {week})",
-    "shifts.selectShift": "-- Chọn ca --",
-    "shifts.availableStaff": "Ca làm việc (Nhân sự có sẵn)",
-    "board.titleForDay": "Bảng phân công ngày: {date}",
-    "nav.prevWeek": "« Tuần trước",
-    "nav.nextWeek": "Tuần sau »",
-    "nav.weekRange": "Tuần {week} ({from} - {to})",
-    "nav.backToCurrentWeek": "Quay về tuần hiện tại",
-    "loading.shifts": "Đang tải dữ liệu ca làm việc.",
-    "errors.updateShift": "Không thể cập nhật ca làm việc. Vui lòng kiểm tra quyền truy cập của bạn.",
-
-    // Reports
-    "report.export.cap": "Xuất CAP",
+    // Shift/Calamviec, Reports và Improvement được định nghĩa một lần ở mục
+    // Calamviec/TuGemba phía dưới; ở đây chỉ giữ các key riêng của mục này.
     "report.export.score": "Xuất BẢNG CHẤM ĐIỂM",
-    "report.export.range": "Chọn khoảng ngày",
-    "report.export.department": "Chọn bộ phận (chỉ cho CAP)",
     "report.export": "Xuất báo cáo",
-    "report.processing": "Đang xử lý...",
     "report.noData": "Không có dữ liệu trong khoảng thời gian / bộ phận đã chọn.",
-
-    // Improvement form
-    "improve.title": "Cập nhật Cải thiện & Khắc phục",
-    "improve.error": "Lỗi:",
-    "improve.responsible": "Người phụ trách",
-    "improve.dueDate": "Ngày dự kiến hoàn thành",
-    "improve.notes": "Ghi chú tiến độ",
-    "improve.doneDate": "Ngày hoàn thành",
-    "improve.images": "Ảnh cải thiện",
-    "improve.viewImage": "Xem ảnh đã tải lên",
-    "improve.save": "Lưu thay đổi",
-    "improve.saving": "Đang lưu...",
     "improve.uploadFail": "Tải ảnh cải thiện thất bại!",
 
     // Gemba Checklist
@@ -449,38 +422,11 @@ export const DICTS = {
     "shift.HC": "Office Shift",
     "shift.S8": "Shift 8",
     "shift.Off": "Off",
-    "page.shifts.title": "Shift Planning & EHS Committee Tasks",
-    "shifts.myWeek": "My shifts (Week {week})",
-    "shifts.selectShift": "-- Select shift --",
-    "shifts.availableStaff": "Shifts (Available staff)",
-    "board.titleForDay": "Assignments for: {date}",
-    "nav.prevWeek": "« Previous week",
-    "nav.nextWeek": "Next week »",
-    "nav.weekRange": "Week {week} ({from} - {to})",
-    "nav.backToCurrentWeek": "Back to current week",
-    "loading.shifts": "Loading shift data...",
-    "errors.updateShift": "Unable to update your shift. Please check permissions.",
-
-    // Reports
-    "report.export.cap": "Export CAP",
+    // Shift/Calamviec, Reports and Improvement strings are defined once in the
+    // Calamviec/TuGemba section below; only the keys unique to this section remain here.
     "report.export.score": "Export SCORING TABLE",
-    "report.export.range": "Select date range",
-    "report.export.department": "Select department (CAP only)",
     "report.export": "Export report",
-    "report.processing": "Processing...",
     "report.noData": "No data found in the selected time range / department.",
-
-    // Improvement form
-    "improve.title": "Update Improvement & Corrective Action",
-    "improve.error": "Error:",
-    "improve.responsible": "Responsible person",
-    "improve.dueDate": "Planned due date",
-    "improve.notes": "Progress notes",
-    "improve.doneDate": "Completion date",
-    "improve.images": "Improvement images",
-    "improve.viewImage": "View uploaded image",
-    "improve.save": "Save changes",
-    "improve.saving": "Saving...",
     "improve.uploadFail": "Failed to upload improvement image!",
 
     // Gemba Checklist

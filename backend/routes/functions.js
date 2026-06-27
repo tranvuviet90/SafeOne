@@ -649,11 +649,12 @@ router.post("/adminUserAction", authenticateToken, requireAdmin, async (req, res
         await pool.query("UPDATE users SET password_hash = ? WHERE uid = ?", [newPasswordHash, targetUid]);
         break;
       }
-      case "changeRole":
+      case "changeRole": {
         if (!data || !data.newRole) return res.status(400).json({ error: "Thiếu quyền mới" });
         const newRoleStr = Array.isArray(data.newRole) ? data.newRole.join(",") : data.newRole;
         await pool.query("UPDATE users SET role = ? WHERE uid = ?", [newRoleStr, targetUid]);
         break;
+      }
       case "disable":
         await pool.query("UPDATE users SET disabled = 1 WHERE uid = ?", [targetUid]);
         break;
@@ -685,7 +686,7 @@ router.post("/adminUserAction", authenticateToken, requireAdmin, async (req, res
         );
         break;
       }
-      case "rejectRoleRequest":
+      case "rejectRoleRequest": {
         if (!data || !data.requestId) return res.status(400).json({ error: "Thiếu ID yêu cầu" });
         await pool.query("UPDATE role_requests SET status = 'rejected' WHERE id = ?", [data.requestId]);
 
@@ -700,6 +701,7 @@ router.post("/adminUserAction", authenticateToken, requireAdmin, async (req, res
           [notificationReject.type, notificationReject.message, notificationReject.target_user_id, notificationReject.read_by]
         );
         break;
+      }
       default:
         return res.status(400).json({ error: "Hành động không hợp lệ" });
     }
