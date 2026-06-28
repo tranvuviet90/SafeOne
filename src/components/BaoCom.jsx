@@ -48,7 +48,19 @@ import { formatDateToId } from '../utils/string';
 
 const DEPARTMENTS = DEPARTMENT_ROLES;
 const dateKey = formatDateToId;
-const tsSec = (ts) => (ts && typeof ts.seconds === 'number') ? ts.seconds : 0;
+// Chuẩn hóa nhiều dạng timestamp (ISO string, số ms, hoặc {seconds}) về mili-giây để so sánh.
+// Lưu ý: các mốc thời gian trong luồng này được lưu bằng new Date().toISOString() (chuỗi),
+// nên chỉ đọc .seconds sẽ luôn ra 0 và làm hỏng so sánh "đã cập nhật sau khi gửi/xác nhận".
+const tsSec = (ts) => {
+  if (!ts) return 0;
+  if (typeof ts === 'number') return ts;
+  if (typeof ts === 'string') {
+    const ms = Date.parse(ts);
+    return Number.isNaN(ms) ? 0 : ms;
+  }
+  if (typeof ts.seconds === 'number') return ts.seconds * 1000;
+  return 0;
+};
 const fmtTime = (t) => {
   if (!t) return '';
   if (t.seconds) return new Date(t.seconds * 1000).toLocaleString('vi-VN');
@@ -1051,10 +1063,11 @@ function AdminView({ user, reportData, selectedDateKey, onDeptClick, onOpenExpor
   useEffect(() => {
     const init = {};
     SHIFTS.forEach(shift => {
-      const adminSummary = reportData?.[shift]?.summary || {};
       const deptSummary = summary[shift] || {};
       init[shift] = {
-        ...adminSummary,
+        // Mặc định theo TỔNG MỚI NHẤT từ các bộ phận để khi bộ phận báo thêm (tăng/giảm)
+        // thì số gửi cho Nhà Ăn tự đổi theo; EHS vẫn có thể tinh chỉnh trước khi gửi lại.
+        ...deptSummary,
         // Cố định mì và sữa theo tổng nhận được từ các bộ phận, EHS không tăng/giảm
         tangCaMi: Number(deptSummary.tangCaMi || 0),
         tangCaSua: Number(deptSummary.tangCaSua || 0)
@@ -1381,6 +1394,7 @@ function AdminView({ user, reportData, selectedDateKey, onDeptClick, onOpenExpor
               <thead style={{ background: colors.primaryLight || '#eef5ff' }}>
                 <tr>
                   <th style={{ padding: 8, border: '1px solid #eee' }}>Loại cơm</th>
+                  <th style={{ padding: 8, border: '1px solid #eee' }}>Số lượng đã báo</th>
                   <th style={{ padding: 8, border: '1px solid #eee' }}>Tổng báo cáo</th>
                   <th style={{ padding: 8, border: '1px solid #eee' }}>Điều chỉnh</th>
                 </tr>
@@ -1395,6 +1409,9 @@ function AdminView({ user, reportData, selectedDateKey, onDeptClick, onOpenExpor
                       return (
                         <tr key={k}>
                           <td style={{ padding: 8, border: '1px solid #f0f0f0' }}>{label}</td>
+                          <td style={{ padding: 8, border: '1px solid #f0f0f0', textAlign: 'center', color: '#64748b' }}>
+                            {sent}
+                          </td>
                           <td style={{ padding: 8, border: '1px solid #f0f0f0', textAlign: 'center' }}>
                             {current}
                             <Delta diff={diff} />

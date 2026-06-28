@@ -4,7 +4,6 @@ import apiClient from '../services/apiClient';
 import authService from '../services/authService';
 import { IoSettingsOutline } from 'react-icons/io5';
 import { useToast } from './LightboxSwipeOnly';
-import LanguageSwitcher from './LanguageSwitcher';
 
 const ALL_ROLES = [
   "admin", "ehs", "ehs committee", "trainer", "manager", "Nhà Ăn",
@@ -26,9 +25,15 @@ export default function UserSettings({ user, onLogout }) {
   const [newPassword, setNewPassword] = useState('');
   const [isUpdatingPass, setIsUpdatingPass] = useState(false);
 
-  // Quyền state
-  const [requestedRole, setRequestedRole] = useState(ALL_ROLES[0]);
+  // Quyền state — cho phép chọn nhiều chức vụ cùng lúc
+  const [requestedRoles, setRequestedRoles] = useState([]);
   const [isRequestingRole, setIsRequestingRole] = useState(false);
+
+  const toggleRequestedRole = (role) => {
+    setRequestedRoles(prev =>
+      prev.includes(role) ? prev.filter(r => r !== role) : [...prev, role]
+    );
+  };
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -65,15 +70,20 @@ export default function UserSettings({ user, onLogout }) {
 
   const handleRequestRole = async (e) => {
     e.preventDefault();
+    if (requestedRoles.length === 0) {
+      pushToast(t('settings.requestRole.empty'), 'error');
+      return;
+    }
     setIsRequestingRole(true);
     try {
       await apiClient.post('/api/functions/submitRoleRequest', {
-        requestedRole,
+        requestedRole: requestedRoles.join(','),
         currentRole: user.role,
         name: user.name,
         email: user.email
       });
       pushToast(t('settings.requestRole.pending'), 'success');
+      setRequestedRoles([]);
       setModalType(null);
     } catch (error) {
       console.error(error);
@@ -123,23 +133,17 @@ export default function UserSettings({ user, onLogout }) {
             {t('settings.changePassword')}
           </button>
           <button 
-            onClick={() => { setModalType('role'); setIsOpen(false); }}
+            onClick={() => { setRequestedRoles([]); setModalType('role'); setIsOpen(false); }}
             style={{ width: '100%', padding: '10px 16px', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 14, color: '#333' }}
             onMouseOver={(e) => e.target.style.background = '#f5f5f5'}
             onMouseOut={(e) => e.target.style.background = 'none'}
           >
             {t('settings.requestRole')}
           </button>
-          
+
           <hr style={{ border: 'none', borderTop: '1px solid #eee', margin: '6px 0' }} />
-          
-          <div style={{ display: 'flex', justifyContent: 'center', padding: '6px 16px' }}>
-            <LanguageSwitcher />
-          </div>
-          
-          <hr style={{ border: 'none', borderTop: '1px solid #eee', margin: '6px 0' }} />
-          
-          <button 
+
+          <button
             onClick={() => { onLogout && onLogout(); setIsOpen(false); }}
             style={{ 
               width: '100%', 
@@ -188,13 +192,30 @@ export default function UserSettings({ user, onLogout }) {
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
           <form onSubmit={handleRequestRole} style={{ background: 'white', padding: 24, borderRadius: 12, width: '90%', maxWidth: 400 }}>
             <h3 style={{ marginTop: 0, color: '#333' }}>{t('settings.requestRole')}</h3>
-            <p style={{ fontSize: 14, color: '#666', marginBottom: 16 }}>{t('settings.requestRole.desc')}</p>
-            <div style={{ marginBottom: 20 }}>
-              <select value={requestedRole} onChange={e => setRequestedRole(e.target.value)} style={{ width: '100%', padding: 10, borderRadius: 6, border: '1px solid #ccc', boxSizing: 'border-box' }}>
-                {ALL_ROLES.map(r => (
-                  <option key={r} value={r}>{r}</option>
-                ))}
-              </select>
+            <p style={{ fontSize: 14, color: '#666', marginBottom: 8 }}>{t('settings.requestRole.desc')}</p>
+            <p style={{ fontSize: 13, color: '#888', marginBottom: 12 }}>{t('settings.requestRole.multiHint')}</p>
+            <div style={{
+              marginBottom: 20,
+              maxHeight: 260,
+              overflowY: 'auto',
+              border: '1px solid #eee',
+              borderRadius: 8,
+              padding: '8px 10px',
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '4px 12px'
+            }}>
+              {ALL_ROLES.map(r => (
+                <label key={r} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 2px', fontSize: 13, color: '#333', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={requestedRoles.includes(r)}
+                    onChange={() => toggleRequestedRole(r)}
+                    style={{ width: 16, height: 16, accentColor: '#10b981', cursor: 'pointer' }}
+                  />
+                  {r}
+                </label>
+              ))}
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
               <button type="button" onClick={() => setModalType(null)} style={{ padding: '8px 16px', border: 'none', borderRadius: 6, background: '#e0e0e0', cursor: 'pointer' }}>{t('common.cancel')}</button>

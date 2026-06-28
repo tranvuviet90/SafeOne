@@ -278,6 +278,12 @@ export default function License({ user }) {
   // EHS Committee / Trainer (and admin/ehs) may push a trainee straight to evaluation
   // without waiting out the full 7-day training window.
   const canManageTraining = userRolesList.some(r => ["admin", "ehs", "ehs committee", "ehscommittee", "trainer"].includes(r));
+  // Chỉ admin/ehs được chỉnh sửa (isAdmin). Trainer/Manager không sửa được, chỉ được
+  // gửi yêu cầu xóa và chờ admin/ehs duyệt.
+  const canRequestDelete = userRolesList.some(r => r === "trainer" || r === "manager");
+  const canSeeActions = isAdmin || canRequestDelete;
+  // Nút "Thêm chứng nhận" mở cho admin, ehs, ehs committee, manager, trainer.
+  const canAddCert = userRolesList.some(r => ["admin", "ehs", "ehs committee", "ehscommittee", "manager", "trainer"].includes(r));
 
   // Quick-access management panel: 'training' (Đang đào tạo) | 'eval' (Chờ đánh giá) | null
   const [trainingPanel, setTrainingPanel] = useState(null);
@@ -968,6 +974,52 @@ export default function License({ user }) {
     }
   };
 
+  // Trainer/Manager không xóa trực tiếp được: gửi yêu cầu xóa, đánh dấu hồ sơ
+  // "CHỜ DUYỆT XÓA" và thông báo cho admin/EHS để duyệt.
+  const requestDelete = async (record) => {
+    if (!(await askConfirm(
+      `Gửi yêu cầu XÓA hồ sơ của ${record.name} (${record.msnv})? Yêu cầu sẽ chờ admin/EHS duyệt.`,
+      "Xác nhận yêu cầu xóa"
+    ))) return;
+
+    try {
+      const docId = `${record.deptCode}_${record.msnv}`;
+      await setDoc(doc(db, "operation_certifications", docId), {
+        deleteRequested: true,
+        deleteRequestedBy: user.name || user.email,
+        deleteRequestedAt: new Date().toISOString()
+      });
+      await dbService.createDoc("notifications", {
+        type: "operation_cert_delete_request",
+        message: `${user.name || user.email} yêu cầu xóa hồ sơ chứng nhận vận hành của ${record.name} (${record.msnv}) - ${record.department || record.deptCode}. Cần admin/EHS duyệt.`,
+        targetRoles: ["admin", "ehs"],
+        createdBy: user.uid || user.email,
+        readBy: [],
+        timestamp: new Date().toISOString()
+      });
+      pushToast("Đã gửi yêu cầu xóa, chờ admin/EHS duyệt.", "success");
+    } catch (err) {
+      console.error("Lỗi gửi yêu cầu xóa:", err);
+      pushToast("Gửi yêu cầu xóa thất bại.", "error");
+    }
+  };
+
+  // Admin/EHS hủy yêu cầu xóa (giữ lại hồ sơ).
+  const cancelDeleteRequest = async (record) => {
+    try {
+      const docId = `${record.deptCode}_${record.msnv}`;
+      await setDoc(doc(db, "operation_certifications", docId), {
+        deleteRequested: false,
+        deleteRequestedBy: null,
+        deleteRequestedAt: null
+      });
+      pushToast("Đã hủy yêu cầu xóa.", "success");
+    } catch (err) {
+      console.error("Lỗi hủy yêu cầu xóa:", err);
+      pushToast("Hủy yêu cầu xóa thất bại.", "error");
+    }
+  };
+
   // Import from Excel
   const handleImportExcel = (e) => {
     const file = e.target.files[0];
@@ -1580,9 +1632,11 @@ export default function License({ user }) {
         </div>
         
         <div className="license-header-buttons">
-          <button className="license-btn license-btn-primary" onClick={() => openModal()}>
-            <FaPlus /> {t("license.btn.add")}
-          </button>
+          {canAddCert && (
+            <button className="license-btn license-btn-primary" onClick={() => openModal()}>
+              <FaPlus /> {t("license.btn.add")}
+            </button>
+          )}
           {(canManageTraining || isPrivileged) && (
             <>
               <button className="license-btn license-btn-outline" onClick={() => setTrainingPanel("training")}>
@@ -1917,7 +1971,7 @@ export default function License({ user }) {
                     <th>{t("license.table.reason")}</th>
                     <th>{t("license.table.targetDate")}</th>
                     <th style={{ textAlign: "center" }}>Chứng chỉ</th>
-                    {isPrivileged && <th style={{ textAlign: "center" }}>{t("license.table.actions")}</th>}
+                    {canSeeActions && <th style={{ textAlign: "center" }}>{t("license.table.actions")}</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -1951,11 +2005,11 @@ export default function License({ user }) {
                             <span style={{ color: "var(--cn-text-muted)", fontSize: "12px" }}>—</span>
                           )}
                         </td>
-                        {isPrivileged && (
+                        {canSeeActions && (
                           <td style={{ textAlign: "center" }}>
-                            <div style={{ display: "flex", gap: "8px", justifyContent: "center", alignItems: "center" }}>
-                              {isEvaluator && r.status === "Thiếu chứng nhận" && (
-                                <button 
+                            <div style={{ display: "flex", gap: "8px", justifyContent: "center", alignItems: "center", flexWrap: "wrap" }}>
+                              {isEvaluator && r.status === "Thiếu chứng nhận" && !r.deleteRequested && (
+                                <button
                                   onClick={() => startEvaluation(r)}
                                   className="license-btn license-btn-primary"
                                   style={{ padding: "4px 8px", fontSize: "11px", borderRadius: "6px" }}
@@ -1964,8 +2018,8 @@ export default function License({ user }) {
                                   Đánh giá
                                 </button>
                               )}
-                              {r.evalScores && (
-                                <button 
+                              {isAdmin && r.evalScores && (
+                                <button
                                   onClick={() => exportWordDoc(r)}
                                   style={{ background: "none", border: "none", color: colors.success, cursor: "pointer", padding: "4px" }}
                                   title="Xuất biểu mẫu Word (.doc)"
@@ -1973,20 +2027,69 @@ export default function License({ user }) {
                                   <FaDownload size={14} />
                                 </button>
                               )}
-                              <button 
-                                onClick={() => openModal(r)} 
-                                style={{ background: "none", border: "none", color: colors.primary, cursor: "pointer", padding: "4px" }}
-                                title="Sửa"
-                              >
-                                <FaEdit size={14} />
-                              </button>
-                              <button 
-                                onClick={() => handleDelete(r)} 
-                                style={{ background: "none", border: "none", color: colors.error, cursor: "pointer", padding: "4px" }}
-                                title="Xóa"
-                              >
-                                <FaTrash size={14} />
-                              </button>
+                              {/* Sửa: chỉ admin/EHS */}
+                              {isAdmin && (
+                                <button
+                                  onClick={() => openModal(r)}
+                                  style={{ background: "none", border: "none", color: colors.primary, cursor: "pointer", padding: "4px" }}
+                                  title="Sửa"
+                                >
+                                  <FaEdit size={14} />
+                                </button>
+                              )}
+                              {/* Xóa / Yêu cầu xóa / Duyệt xóa */}
+                              {r.deleteRequested ? (
+                                isAdmin ? (
+                                  <>
+                                    <span
+                                      className="license-badge lacking"
+                                      style={{ fontSize: "10px" }}
+                                      title={`Yêu cầu xóa bởi ${r.deleteRequestedBy || "?"}`}
+                                    >
+                                      CHỜ DUYỆT XÓA
+                                    </span>
+                                    <button
+                                      onClick={() => handleDelete(r)}
+                                      style={{ background: "none", border: "none", color: colors.error, cursor: "pointer", padding: "4px" }}
+                                      title="Duyệt xóa (xóa vĩnh viễn)"
+                                    >
+                                      <FaCheck size={14} />
+                                    </button>
+                                    <button
+                                      onClick={() => cancelDeleteRequest(r)}
+                                      style={{ background: "none", border: "none", color: colors.textSecondary, cursor: "pointer", padding: "4px" }}
+                                      title="Hủy yêu cầu xóa"
+                                    >
+                                      <FaTimes size={14} />
+                                    </button>
+                                  </>
+                                ) : (
+                                  <span
+                                    style={{ fontSize: "11px", color: "var(--cn-text-muted)" }}
+                                    title={`Yêu cầu xóa bởi ${r.deleteRequestedBy || "?"}`}
+                                  >
+                                    ⏳ Chờ duyệt xóa
+                                  </span>
+                                )
+                              ) : (
+                                isAdmin ? (
+                                  <button
+                                    onClick={() => handleDelete(r)}
+                                    style={{ background: "none", border: "none", color: colors.error, cursor: "pointer", padding: "4px" }}
+                                    title="Xóa"
+                                  >
+                                    <FaTrash size={14} />
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => requestDelete(r)}
+                                    style={{ background: "none", border: "none", color: colors.error, cursor: "pointer", padding: "4px" }}
+                                    title="Yêu cầu xóa (chờ admin/EHS duyệt)"
+                                  >
+                                    <FaTrash size={14} />
+                                  </button>
+                                )
+                              )}
                             </div>
                           </td>
                         )}

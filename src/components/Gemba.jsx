@@ -653,7 +653,7 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
   const [viewer, setViewer] = useState({ open: false, list: [], index: 0 });
   const [note, setNote] = useState("");
   const [responsiblePerson, setResponsiblePerson] = useState("");
-  const [ca, setCa] = useState("S1");
+  const [ca, setCa] = useState("");
   const fileRef = useRef();
   const [thumbMap, setThumbMap] = useState({});
   const [improvementModal, setImprovementModal] = useState({ isOpen: false, error: null, logId: "" });
@@ -795,6 +795,8 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
     if (!isCustomError && !selectedError) { alert(t("gemba.alert.selectError")); return; }
     if (!note.trim()) { alert(t("gemba.alert.requireNote")); return; }
     if (imageFiles.length === 0) { alert(t("gemba.alert.requirePhoto")); return; }
+    if (!ca) { alert(t("gemba.alert.requireShift")); return; }
+    if (!responsiblePerson.trim()) { alert(t("gemba.alert.requireRecipient")); return; }
 
     if (autoCorrect && note.trim()) {
       setIsCorrecting(true);
@@ -898,7 +900,7 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
       if (fileRef.current) fileRef.current.value = "";
       setNote("");
       setResponsiblePerson("");
-      setCa("S1");
+      setCa("");
     } catch (globalError) {
       console.error("Lỗi không xác định trong doSaveError:", globalError);
       alert(`Đã xảy ra lỗi không mong muốn: ${globalError.message || globalError}`);
@@ -1168,6 +1170,7 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
                   onChange={(e) => setCa(e.target.value)}
                   style={{ width: "100%", boxSizing: "border-box", padding: "8px 12px", borderRadius: 8, border: `1.5px solid ${colors.primaryLight}`, fontSize: 15 }}
                 >
+                  <option value="">{t("gemba.shift.placeholder")}</option>
                   <option value="S1">S1</option>
                   <option value="S2">S2</option>
                   <option value="S3">S3</option>

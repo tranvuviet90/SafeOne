@@ -14,6 +14,13 @@ import { callSpellCheckService } from "../utils/aiAdapter";
 import realtimeService from "../services/realtimeService";
 
 /* ====================== BIỂU TƯỢNG (ICON) ====================== */
+// Hiển thị nhãn mức độ nghiêm trọng theo ngôn ngữ, nhưng GIỮ giá trị lưu trữ là tiếng Việt
+// (giá trị này còn dùng làm khóa cho pointsMap nên không được đổi).
+const severityLabel = (t, s) => {
+  const map = { "Nhẹ": "ehs.severity.light", "Trung bình": "ehs.severity.medium", "Nặng": "ehs.severity.heavy", "Nghiêm trọng": "ehs.severity.critical" };
+  return map[s] ? t(map[s]) : s;
+};
+
 function ImprovementIcon({ color = 'currentColor', size = 18 }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -163,6 +170,7 @@ const normalizeEvent = (ev) => {
    ExportModal
    ========================= */
 function ExportModal({ onClose, departments }) {
+  const { t } = useI18n();
   const [dateRange, setDateRange] = useState([null, null]);
   const [startDate, endDate] = dateRange;
   const [isGenerating, setIsGenerating] = useState(false);
@@ -433,7 +441,7 @@ function ExportModal({ onClose, departments }) {
 
   const handleExport = async (mode) => {
     if (!startDate || !endDate) {
-      alert("Vui lòng chọn ngày tháng trước khi xuất báo cáo.");
+      alert(t("ehs.export.selectDateFirst"));
       return;
     }
     setIsGenerating(true);
@@ -452,7 +460,7 @@ function ExportModal({ onClose, departments }) {
       });
 
       if (filteredEvents.length === 0) {
-        alert(`Kh\u00f4ng c\u00f3 d\u1eef li\u1ec7u trong kho\u1ea3ng th\u1eddi gian / b\u1ed9 ph\u1eadn \u0111\u00e3 ch\u1ecdn.`);
+        alert(t("ehs.export.noData"));
         setIsGenerating(false); return;
       }
 
@@ -505,7 +513,7 @@ function ExportModal({ onClose, departments }) {
       }
     } catch (err) {
       console.error("C\u00f3 l\u1ed7i khi xu\u1ea5t b\u00e1o c\u00e1o:", err);
-      alert(`Xu\u1ea5t b\u00e1o c\u00e1o th\u1ea5t b\u1ea1i: ${err.message}`);
+      alert(`${t("gemba.alert.exportFail")} ${err.message}`);
     } finally {
       setIsGenerating(false);
     }
@@ -515,10 +523,10 @@ function ExportModal({ onClose, departments }) {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 1200 }}>
       <div style={{ background: colors.surface, padding: 22, borderRadius: 12, width: 520, boxShadow: "0 4px 15px rgba(0,0,0,.2)" }}>
-        <h3 style={{ marginTop: 0, color: colors.primary }}>Xuất báo cáo</h3>
+        <h3 style={{ marginTop: 0, color: colors.primary }}>{t("ehs.export.title")}</h3>
         <div style={{ display: 'grid', gap: '15px' }}>
           <div>
-            <label style={{ fontWeight: 700, color: colors.textPrimary, display: 'block', marginBottom: 5 }}>Chọn khoảng ngày</label>
+            <label style={{ fontWeight: 700, color: colors.textPrimary, display: 'block', marginBottom: 5 }}>{t("ehs.export.dateRange")}</label>
             <DatePicker
               selectsRange={true}
               startDate={startDate}
@@ -526,24 +534,24 @@ function ExportModal({ onClose, departments }) {
               onChange={(update) => setDateRange(update)}
               isClearable={true}
               dateFormat="dd/MM/yyyy"
-              placeholderText="Bắt buộc"
+              placeholderText={t("ehs.required")}
               className="date-picker-input"
               wrapperClassName="date-picker-wrapper"
             />
           </div>
           <div>
-            <label style={{ fontWeight: 700, color: colors.textPrimary, display: 'block', marginBottom: 5 }}>Chọn bộ phận (chỉ cho CAP)</label>
+            <label style={{ fontWeight: 700, color: colors.textPrimary, display: 'block', marginBottom: 5 }}>{t("ehs.export.selectDeptCap")}</label>
             <select value={selectedDept} onChange={e => setSelectedDept(e.target.value)} className="date-picker-input">
-              <option value="all">Tất cả bộ phận</option>
+              <option value="all">{t("ehs.export.allDepts")}</option>
               {departments.map(dept => <option key={dept.name} value={dept.name}>{dept.name}</option>)}
             </select>
           </div>
         </div>
         <style>{`.date-picker-wrapper{width:100%}.date-picker-input{width:100%;padding:8px;border-radius:6px;border:1px solid ${colors.border};box-sizing:border-box}`}</style>
         <div style={{ display: "flex", gap: 12, marginTop: 20, justifyContent: "flex-end", flexWrap: "wrap" }}>
-          <button onClick={onClose} disabled={isGenerating} style={{ padding: "8px 16px", borderRadius: 6, border: `1px solid ${colors.border}`, background: colors.background, cursor: "pointer" }}>Hủy</button>
-          <button onClick={() => handleExport("bang")} disabled={isGenerating} style={{ padding: "8px 16px", borderRadius: 6, border: "none", background: colors.success, color: colors.white, fontWeight: 700, cursor: "pointer" }}>{isGenerating ? "Đang xử lý..." : "Xuất BẢNG CHẤM ĐIỂM"}</button>
-          <button onClick={() => handleExport("cap")} disabled={isGenerating} style={{ padding: "8px 16px", borderRadius: 6, border: "none", background: "#1f80e0", color: colors.white, fontWeight: 700, cursor: "pointer" }}>{isGenerating ? "Đang xử lý..." : "Xuất CAP"}</button>
+          <button onClick={onClose} disabled={isGenerating} style={{ padding: "8px 16px", borderRadius: 6, border: `1px solid ${colors.border}`, background: colors.background, cursor: "pointer" }}>{t("common.cancel")}</button>
+          <button onClick={() => handleExport("bang")} disabled={isGenerating} style={{ padding: "8px 16px", borderRadius: 6, border: "none", background: colors.success, color: colors.white, fontWeight: 700, cursor: "pointer" }}>{isGenerating ? t("ehs.processing") : t("ehs.export.btnScoreSheet")}</button>
+          <button onClick={() => handleExport("cap")} disabled={isGenerating} style={{ padding: "8px 16px", borderRadius: 6, border: "none", background: "#1f80e0", color: colors.white, fontWeight: 700, cursor: "pointer" }}>{isGenerating ? t("ehs.processing") : t("ehs.export.btnCap")}</button>
         </div>
       </div>
     </div>
@@ -554,6 +562,7 @@ function ExportModal({ onClose, departments }) {
    CỬA SỔ (MODAL) CẢI THIỆN
    ========================= */
 function ImprovementModal({ modalData, onClose, onSave }) {
+  const { t } = useI18n();
   const [pic, setPic] = useState(modalData.error?.pic || "");
   const [dueDate, setDueDate] = useState(modalData.error?.dueDate || "");
   const [progressNotes, setProgressNotes] = useState(modalData.error?.progressNotes || "");
@@ -570,7 +579,7 @@ function ImprovementModal({ modalData, onClose, onSave }) {
         setImprovementImageFile(processed);
       } catch (err) {
         console.error("Lỗi nén ảnh cải thiện:", err);
-        alert("Đã xảy ra lỗi xử lý ảnh.");
+        alert(t("ehs.improve.imageProcessError"));
         setImprovementImageFile(null);
       }
     } else {
@@ -592,7 +601,7 @@ function ImprovementModal({ modalData, onClose, onSave }) {
         imageUrl = res.data.url;
       } catch (error) {
         console.error("Lỗi tải ảnh cải thiện: ", error);
-        alert("Tải ảnh cải thiện thất bại!");
+        alert(t("ehs.improve.uploadFail"));
         setIsSaving(false);
         return;
       }
@@ -609,12 +618,12 @@ function ImprovementModal({ modalData, onClose, onSave }) {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 1001 }}>
       <div style={{ background: colors.surface, padding: 22, borderRadius: 12, width: '90%', maxWidth: 550, boxShadow: "0 4px 15px rgba(0,0,0,.2)" }}>
-        <h3 style={{ marginTop: 0, color: colors.primary, borderBottom: `2px solid ${colors.primaryLight}`, paddingBottom: 10 }}>Cập nhật Cải thiện & Khắc phục</h3>
-        <p><b>Lỗi:</b> {modalData.error.desc}</p>
+        <h3 style={{ marginTop: 0, color: colors.primary, borderBottom: `2px solid ${colors.primaryLight}`, paddingBottom: 10 }}>{t("ehs.improve.title")}</h3>
+        <p><b>{t("ehs.errorColon")}</b> {modalData.error.desc}</p>
         <div style={{ display: 'grid', gap: 12 }}>
-          <div> <label style={labelStyle}>P.I.C</label> <input type="text" value={pic} onChange={e => setPic(e.target.value)} style={inputStyle} placeholder="Người chịu trách nhiệm cải thiện" /> </div>
+          <div> <label style={labelStyle}>P.I.C</label> <input type="text" value={pic} onChange={e => setPic(e.target.value)} style={inputStyle} placeholder={t("ehs.improve.picPlaceholder")} /> </div>
           <div>
-            <label style={labelStyle}>Ngày dự kiến hoàn thành</label>
+            <label style={labelStyle}>{t("ehs.improve.dueDate")}</label>
             <DatePicker
               selected={dueDate ? parseDateStr(dueDate) : null}
               onChange={(date) => setDueDate(formatDateStr(date))}
@@ -624,7 +633,7 @@ function ImprovementModal({ modalData, onClose, onSave }) {
               customInput={<input style={inputStyle} />}
             />
           </div>
-          <div> <label style={labelStyle}>Biện pháp khắc phục</label> <textarea value={progressNotes} onChange={e => setProgressNotes(e.target.value)} style={{...inputStyle, minHeight: 70}} /> </div>
+          <div> <label style={labelStyle}>{t("ehs.improve.measure")}</label> <textarea value={progressNotes} onChange={e => setProgressNotes(e.target.value)} style={{...inputStyle, minHeight: 70}} /> </div>
           <div style={{ marginTop: 4 }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none', ...labelStyle }}>
               <input
@@ -633,19 +642,19 @@ function ImprovementModal({ modalData, onClose, onSave }) {
                 onChange={e => setEhsVerified(e.target.checked)}
                 style={{ width: 18, height: 18, accentColor: colors.primary, cursor: 'pointer' }}
               />
-              <span>Xác nhận đã hoàn thành của EHS</span>
+              <span>{t("ehs.improve.ehsConfirm")}</span>
             </label>
           </div>
           <div>
-            <label style={labelStyle}>Ảnh cải thiện</label>
+            <label style={labelStyle}>{t("ehs.improve.photo")}</label>
             <input type="file" accept="image/*" onChange={handleImageChange} style={{...inputStyle, padding: 5}} />
             {modalData.error.improvementImageUrl && !improvementImageFile && (
               <div style={{ marginTop: 8 }}>
-                <span style={{ fontSize: 12, color: colors.textSecondary, display: 'block', marginBottom: 4 }}>Ảnh cải thiện đã lưu:</span>
+                <span style={{ fontSize: 12, color: colors.textSecondary, display: 'block', marginBottom: 4 }}>{t("ehs.improve.photoSaved")}</span>
                 <a href={modalData.error.improvementImageUrl} target="_blank" rel="noopener noreferrer">
                   <img
                     src={modalData.error.improvementImageUrl}
-                    alt="Ảnh cải thiện"
+                    alt={t("ehs.improve.photo")}
                     style={{ maxWidth: '100%', maxHeight: 150, borderRadius: 6, border: `1px solid ${colors.border}`, display: 'block', objectFit: 'contain' }}
                   />
                 </a>
@@ -654,8 +663,8 @@ function ImprovementModal({ modalData, onClose, onSave }) {
           </div>
         </div>
         <div style={{ display: "flex", gap: 12, marginTop: 20, justifyContent: "flex-end" }}>
-          <button onClick={onClose} disabled={isSaving} style={{ padding: "8px 16px", borderRadius: 6, border: `1px solid ${colors.border}`, background: colors.background, cursor: "pointer" }}>Hủy</button>
-          <button onClick={handleSave} disabled={isSaving} style={{ padding: "8px 16px", borderRadius: 6, border: "none", background: colors.primary, color: colors.white, fontWeight: 700, cursor: "pointer" }}> {isSaving ? "Đang lưu..." : "Lưu thay đổi"} </button>
+          <button onClick={onClose} disabled={isSaving} style={{ padding: "8px 16px", borderRadius: 6, border: `1px solid ${colors.border}`, background: colors.background, cursor: "pointer" }}>{t("common.cancel")}</button>
+          <button onClick={handleSave} disabled={isSaving} style={{ padding: "8px 16px", borderRadius: 6, border: "none", background: colors.primary, color: colors.white, fontWeight: 700, cursor: "pointer" }}> {isSaving ? t("ehs.saving") : t("ehs.improve.saveChanges")} </button>
         </div>
       </div>
     </div>
@@ -739,7 +748,7 @@ function GembaReportDashboard({ onClose, onExport, departments, allDeptScores, s
     return { main: '#c62828', top: '#ef5350', side: '#7f0000', light: '#ffebee', score: '#ff8a80' };
   };
 
-  const monthLabel = `Tháng ${activeMonth.slice(5, 7)}/${activeMonth.slice(0, 4)}`;
+  const monthLabel = t("ehs.report.monthLabel").replace("{month}", activeMonth.slice(5, 7)).replace("{year}", activeMonth.slice(0, 4));
 
   const handleBarEnter = (e, dept) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -893,7 +902,7 @@ function GembaReportDashboard({ onClose, onExport, departments, allDeptScores, s
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
           <div>
             <div style={{ fontWeight: 800, fontSize: isMobile ? 16 : 21, color: '#e8f0fe', letterSpacing: '-0.3px' }}>
-              📊 Báo cáo kết quả EHS Audit — {monthLabel}
+              {t("ehs.report.title")}{monthLabel}
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -915,7 +924,7 @@ function GembaReportDashboard({ onClose, onExport, departments, allDeptScores, s
 
         {/* Legend */}
         <div style={{ display: 'flex', gap: 18, marginBottom: 20, flexWrap: 'wrap' }}>
-          {[['#1565c0','#5b9bd5','≥ 90 điểm'], ['#f9a825','#fdd835','70–90 điểm'], ['#c62828','#ef5350','< 70 điểm']].map(([c1, c2, label]) => (
+          {[['#1565c0','#5b9bd5',t("ehs.report.legendHigh")], ['#f9a825','#fdd835',t("ehs.report.legendMid")], ['#c62828','#ef5350',t("ehs.report.legendLow")]].map(([c1, c2, label]) => (
             <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: '#8a9fc8' }}>
               <div style={{ width: 18, height: 13, background: `linear-gradient(135deg,${c2},${c1})`, borderRadius: 3, boxShadow: `2px 2px 0 ${c1}88` }} />
               {label}
@@ -984,7 +993,7 @@ function GembaReportDashboard({ onClose, onExport, departments, allDeptScores, s
           {/* Details Grid */}
           <div style={{ marginTop: 24 }}>
             <div style={{ marginBottom: 12 }}>
-              <div style={{ fontWeight: 800, color: '#e8f0fe', fontSize: 16 }}>Bảng chi tiết thông số</div>
+              <div style={{ fontWeight: 800, color: '#e8f0fe', fontSize: 16 }}>{t("ehs.report.detailTable")}</div>
             </div>
             
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 14 }}>
@@ -1000,14 +1009,14 @@ function GembaReportDashboard({ onClose, onExport, departments, allDeptScores, s
                     </div>
                     
                     <div style={{ display: 'flex', gap: 16, fontSize: 13, color: '#666' }}>
-                      <div>Nhân sự: <b>{stat.people}</b> (hệ số {stat.heSo})</div>
-                      <div>Lỗi trừ: <b style={{ color: '#d32f2f' }}>{stat.errorCount}</b></div>
-                      <div>Nhắc nhở: <b style={{ color: '#ff9800' }}>{stat.reminderCount}</b></div>
+                      <div>{t("ehs.report.staff")}: <b>{stat.people}</b> ({t("ehs.report.factor")} {stat.heSo})</div>
+                      <div>{t("ehs.report.errorCount")}: <b style={{ color: '#d32f2f' }}>{stat.errorCount}</b></div>
+                      <div>{t("ehs.report.reminderCount")}: <b style={{ color: '#ff9800' }}>{stat.reminderCount}</b></div>
                     </div>
 
                     {stat.topGroups.length > 0 && (
                       <div style={{ marginTop: 4, borderTop: '1px solid #f1f3f4', paddingTop: 8 }}>
-                        <div style={{ fontSize: 11, color: '#999', fontWeight: 700, textTransform: 'uppercase', marginBottom: 4 }}>Nhóm lỗi phổ biến:</div>
+                        <div style={{ fontSize: 11, color: '#999', fontWeight: 700, textTransform: 'uppercase', marginBottom: 4 }}>{t("ehs.report.commonErrors")}</div>
                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                           {stat.topGroups.map(([group, count]) => (
                             <span key={group} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, background: '#f5f5f5', color: '#555', fontWeight: 600 }}>
@@ -1050,34 +1059,34 @@ function GembaReportDashboard({ onClose, onExport, departments, allDeptScores, s
               {/* Dải màu trên cùng */}
               <div style={{ height: 4, background: `linear-gradient(90deg,${c.top},${c.main})`, margin: '-14px -18px 10px', borderRadius: '12px 12px 0 0' }} />
               <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 8, color: '#e8f0fe' }}>
-                {d.isAverage ? 'Trung bình toàn nhà máy' : d.name}
+                {d.isAverage ? t("ehs.report.factoryAvg") : d.name}
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                <span style={{ color: '#7b9bd4' }}>Điểm còn lại</span>
+                <span style={{ color: '#7b9bd4' }}>{t("ehs.report.remainingScore")}</span>
                 <span style={{ fontWeight: 900, fontSize: 16, color: c.score }}>{d.remaining.toFixed(2)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#7b9bd4' }}>Điểm trừ</span>
+                <span style={{ color: '#7b9bd4' }}>{t("ehs.report.deduction")}</span>
                 <span style={{ fontWeight: 700, color: '#ff8a80' }}>−{d.totalDeduction.toFixed(2)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#7b9bd4' }}>Số người</span>
-                <span style={{ fontWeight: 600, color: '#c8d8f8' }}>{d.people} <span style={{ color: '#4a6098', fontWeight: 400 }}>(HS {d.heSo})</span></span>
+                <span style={{ color: '#7b9bd4' }}>{t("ehs.report.peopleCount")}</span>
+                <span style={{ fontWeight: 600, color: '#c8d8f8' }}>{d.people} <span style={{ color: '#4a6098', fontWeight: 400 }}>({t("ehs.report.factorAbbr")} {d.heSo})</span></span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#7b9bd4' }}>Lỗi</span>
-                <span style={{ fontWeight: 700, color: d.errorCount > 0 ? '#ff8a80' : '#a5d6a7' }}>{d.errorCount > 0 ? `${d.errorCount} lỗi` : '✓ Không lỗi'}</span>
+                <span style={{ color: '#7b9bd4' }}>{t("ehs.report.errorsLabel")}</span>
+                <span style={{ fontWeight: 700, color: d.errorCount > 0 ? '#ff8a80' : '#a5d6a7' }}>{d.errorCount > 0 ? `${d.errorCount} ${t("ehs.report.errorsSuffix")}` : t("ehs.report.noError")}</span>
               </div>
               {d.reminderCount > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: '#7b9bd4' }}>Nhắc nhở</span>
+                  <span style={{ color: '#7b9bd4' }}>{t("ehs.report.reminderCount")}</span>
                   <span style={{ fontWeight: 600, color: '#ffe082' }}>{d.reminderCount}</span>
                 </div>
               )}
               {d.topGroups && d.topGroups.length > 0 && (
                 <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
                   <div style={{ fontSize: 11, color: '#4a6098', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                    {d.isAverage ? 'Nhóm lỗi nhiều nhất' : 'Top vi phạm'}
+                    {d.isAverage ? t("ehs.report.mostErrors") : t("ehs.report.topViolations")}
                   </div>
                   {d.topGroups.map(([group, count]) => (
                     <div key={group} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
@@ -1088,7 +1097,7 @@ function GembaReportDashboard({ onClose, onExport, departments, allDeptScores, s
                 </div>
               )}
               {!d.isAverage && d.errorCount === 0 && (
-                <div style={{ marginTop: 8, color: '#a5d6a7', fontWeight: 700, fontSize: 13, textAlign: 'center' }}>🎉 Hoàn hảo tháng này!</div>
+                <div style={{ marginTop: 8, color: '#a5d6a7', fontWeight: 700, fontSize: 13, textAlign: 'center' }}>{t("ehs.report.perfect")}</div>
               )}
             </div>
           );
@@ -1106,6 +1115,7 @@ function GembaReportDashboard({ onClose, onExport, departments, allDeptScores, s
    KHÔNG cho sửa department / timestamp / addedBy.
    ========================= */
 function EditErrorModal({ modalData, onClose, onSave }) {
+  const { t } = useI18n();
   const err = modalData.error || {};
   const [group, setGroup] = useState(err.group || "");
   const [code, setCode] = useState(err.code || "");
@@ -1175,17 +1185,17 @@ function EditErrorModal({ modalData, onClose, onSave }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1300 }}>
       <div style={{ background: '#fff', padding: 26, borderRadius: 16, width: '92%', maxWidth: 520, boxShadow: '0 6px 32px rgba(0,0,0,.25)', maxHeight: '90vh', overflowY: 'auto' }}>
-        <h3 style={{ marginTop: 0, color: colors.primary, display: 'flex', alignItems: 'center', gap: 8 }}>✏️ Sửa lỗi</h3>
+        <h3 style={{ marginTop: 0, color: colors.primary, display: 'flex', alignItems: 'center', gap: 8 }}>{t("ehs.edit.title")}</h3>
 
         {/* Thông tin KHÔNG cho sửa */}
         <div style={{ fontSize: 12, color: '#888', marginBottom: 16, lineHeight: 1.6 }}>
-          Bộ phận: <b>{modalData.department || ''}</b> · Người ghi: <b>{err.addedBy || ''}</b>
+          {t("ehs.edit.dept")}: <b>{modalData.department || ''}</b> · {t("ehs.edit.recorder")}: <b>{err.addedBy || ''}</b>
         </div>
 
         {/* Ngày + Giờ phát hiện */}
         <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
           <div style={{ flex: 1 }}>
-            <div style={labelStyle}>Ngày phát hiện</div>
+            <div style={labelStyle}>{t("ehs.edit.dateDetected")}</div>
             <DatePicker
               selected={editDate}
               onChange={(date) => setEditDate(date)}
@@ -1195,7 +1205,7 @@ function EditErrorModal({ modalData, onClose, onSave }) {
             />
           </div>
           <div style={{ width: 120 }}>
-            <div style={labelStyle}>Giờ</div>
+            <div style={labelStyle}>{t("ehs.edit.time")}</div>
             <input type="time" value={editTime} onChange={e => setEditTime(e.target.value)} style={fieldStyle} />
           </div>
         </div>
@@ -1203,11 +1213,11 @@ function EditErrorModal({ modalData, onClose, onSave }) {
         {/* Người nhận + Ca */}
         <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
           <div style={{ flex: 1 }}>
-            <div style={labelStyle}>Người nhận Thông tin</div>
+            <div style={labelStyle}>{t("ehs.recipientShort")}</div>
             <input type="text" value={responsiblePerson} onChange={e => setResponsiblePerson(e.target.value)} style={fieldStyle} />
           </div>
           <div style={{ width: 120 }}>
-            <div style={labelStyle}>Ca</div>
+            <div style={labelStyle}>{t("ehs.shift")}</div>
             <select value={ca} onChange={e => setCa(e.target.value)} style={fieldStyle}>
               {["S1", "S2", "S3", "S8"].map(s => <option key={s} value={s}>{s}</option>)}
             </select>
@@ -1216,7 +1226,7 @@ function EditErrorModal({ modalData, onClose, onSave }) {
 
         {/* Nhóm lỗi */}
         <div style={{ marginBottom: 14 }}>
-          <div style={labelStyle}>Nhóm lỗi</div>
+          <div style={labelStyle}>{t("gemba.table.group")}</div>
           <select value={group} onChange={e => handleGroupChange(e.target.value)} style={fieldStyle}>
             {errorGroups.map(g => <option key={g.group} value={g.group}>{g.group}</option>)}
             {group && !errorGroups.some(g => g.group === group) && <option value={group}>{group}</option>}
@@ -1226,9 +1236,9 @@ function EditErrorModal({ modalData, onClose, onSave }) {
         {/* Chi tiết lỗi (dropdown code) — chỉ khi không phải "Lỗi Khác" */}
         {!isOther && (
           <div style={{ marginBottom: 14 }}>
-            <div style={labelStyle}>Chi tiết lỗi</div>
+            <div style={labelStyle}>{t("ehs.edit.errorDetail")}</div>
             <select value={code} onChange={e => handleCodeChange(e.target.value)} style={fieldStyle}>
-              <option value="">-- Chọn chi tiết --</option>
+              <option value="">{t("ehs.edit.selectDetail")}</option>
               {codeItems.map(it => <option key={it.code} value={it.code}>{it.code} - {it.desc}</option>)}
               {code && !codeItems.some(it => it.code === code) && <option value={code}>{code} - {desc}</option>}
             </select>
@@ -1237,33 +1247,33 @@ function EditErrorModal({ modalData, onClose, onSave }) {
 
         {/* Mức độ nghiêm trọng */}
         <div style={{ marginBottom: 14 }}>
-          <div style={labelStyle}>Mức độ nghiêm trọng</div>
+          <div style={labelStyle}>{t("ehs.edit.severity")}</div>
           <select value={severity} onChange={e => setSeverity(e.target.value)} style={{ ...fieldStyle, width: 200 }}>
-            {["Nhẹ", "Trung bình", "Nặng"].map(s => <option key={s} value={s}>{s}</option>)}
+            {["Nhẹ", "Trung bình", "Nặng"].map(s => <option key={s} value={s}>{severityLabel(t, s)}</option>)}
           </select>
         </div>
 
         {/* Mô tả lỗi */}
         <div style={{ marginBottom: 14 }}>
-          <div style={labelStyle}>Mô tả lỗi</div>
+          <div style={labelStyle}>{t("ehs.edit.errorDesc")}</div>
           <textarea value={desc} onChange={e => setDesc(e.target.value)} style={{ ...fieldStyle, minHeight: 60 }} />
         </div>
 
         {/* Ghi chú */}
         <div style={{ marginBottom: 14 }}>
-          <div style={labelStyle}>Ghi chú</div>
+          <div style={labelStyle}>{t("gemba.table.note")}</div>
           <textarea value={note} onChange={e => setNote(e.target.value)} style={{ ...fieldStyle, minHeight: 50 }} />
         </div>
 
         {/* Điểm trừ cơ bản */}
         <div style={{ marginBottom: 22 }}>
-          <div style={labelStyle}>Điểm trừ cơ bản</div>
+          <div style={labelStyle}>{t("ehs.edit.basePoint")}</div>
           <input type="number" value={point} min={0} onChange={e => setPoint(e.target.value)} style={{ ...fieldStyle, width: 120 }} />
         </div>
 
         <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
-          <button onClick={onClose} disabled={saving} style={{ padding: '8px 18px', borderRadius: 8, border: `1px solid ${colors.border}`, background: '#f5f5f5', cursor: 'pointer', fontWeight: 600 }}>Hủy</button>
-          <button onClick={handleSubmit} disabled={saving} style={{ padding: '8px 22px', borderRadius: 8, border: 'none', background: colors.primary, color: '#fff', cursor: 'pointer', fontWeight: 700 }}>{saving ? 'Đang lưu...' : '✓ Lưu'}</button>
+          <button onClick={onClose} disabled={saving} style={{ padding: '8px 18px', borderRadius: 8, border: `1px solid ${colors.border}`, background: '#f5f5f5', cursor: 'pointer', fontWeight: 600 }}>{t("common.cancel")}</button>
+          <button onClick={handleSubmit} disabled={saving} style={{ padding: '8px 22px', borderRadius: 8, border: 'none', background: colors.primary, color: '#fff', cursor: 'pointer', fontWeight: 700 }}>{saving ? t("ehs.saving") : `✓ ${t("common.save")}`}</button>
         </div>
       </div>
     </div>
@@ -1292,7 +1302,7 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
   const [otherErrorSeverity, setOtherErrorSeverity] = useState("Nhẹ");
   const [note, setNote] = useState("");
   const [responsiblePerson, setResponsiblePerson] = useState("");
-  const [ca, setCa] = useState("S1");
+  const [ca, setCa] = useState("");
   const fileRef = useRef();
   const [thumbMap, setThumbMap] = useState({});
   const [improvementModal, setImprovementModal] = useState({ isOpen: false, error: null, logId: "" });
@@ -1489,7 +1499,7 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
       await fetchScores();
     } catch (error) {
       console.error("Lỗi cập nhật số người: ", error);
-      alert("Có lỗi xảy ra khi cập nhật.");
+      alert(t("ehs.alert.updateError"));
     }
   }
 
@@ -1497,7 +1507,7 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
     if (e.target.files && e.target.files.length > 0) {
       const files = Array.from(e.target.files);
       if (files.length > 5) {
-        alert("Bạn chỉ có thể chọn tối đa 5 ảnh.");
+        alert(t("gemba.alert.maxPhoto"));
         if (fileRef.current) fileRef.current.value = "";
         return;
       }
@@ -1510,7 +1520,7 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
         setImageFileNames(processedFiles.map(f => f.name));
       } catch (err) {
         console.error("Lỗi nén ảnh:", err);
-        alert("Đã xảy ra lỗi xử lý ảnh.");
+        alert(t("ehs.improve.imageProcessError"));
         setImageFiles([]);
         setImageFileNames([]);
         if (fileRef.current) fileRef.current.value = "";
@@ -1526,6 +1536,8 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
     if (!isCustomError && !selectedError) { alert(t("gemba.alert.selectError")); return; }
     if (!note.trim()) { alert(t("gemba.alert.requireNote")); return; }
     if (imageFiles.length === 0) { alert(t("gemba.alert.requirePhoto")); return; }
+    if (!ca) { alert(t("gemba.alert.requireShift")); return; }
+    if (!responsiblePerson.trim()) { alert(t("gemba.alert.requireRecipient")); return; }
 
     if (autoCorrect && note.trim()) {
       setIsCorrecting(true);
@@ -1562,7 +1574,7 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
         urls = await Promise.all(uploadPromises);
       } catch (error) {
         console.error("Lỗi tải ảnh: ", error);
-        alert("Tải ảnh thất bại!");
+        alert(t("gemba.alert.uploadFail"));
         setIsUploading(false);
         return;
       }
@@ -1637,20 +1649,20 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
     if (fileRef.current) fileRef.current.value = "";
     setOtherErrorSeverity("Nhẹ"); setNote(""); setIsUploading(false); setIsReminder(false);
     setResponsiblePerson("");
-    setCa("S1");
+    setCa("");
   }
 
   async function handleDelete(logId) {
     const errorToDelete = allScores.find(s => s.id === logId);
     if (!errorToDelete) return;
-    if (await askConfirm(`Bạn có chắc muốn XÓA VĨNH VIỄN lỗi "${errorToDelete.desc}" không?`, "Xác nhận xóa lỗi")) {
+    if (await askConfirm(t("gemba.delete.confirm").replace("{desc}", errorToDelete.desc), t("ehs.confirm.deleteTitle"))) {
         // Xóa khỏi gemba_events (bản ghi mới phẳng)
         if (!String(logId).startsWith("legacy-")) {
           try {
             await dbService.updateDoc("gemba_events", logId, { is_deleted: true });
           } catch (err) {
             console.error("Lỗi đánh dấu gemba_events:", err);
-            alert("Xóa vi phạm thất bại!");
+            alert(t("ehs.alert.deleteViolationFail"));
             return;
           }
         } else {
@@ -1663,7 +1675,7 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
             }
           } catch (err) {
             console.error("Lỗi xóa bản ghi cũ khỏi gemba_scores:", err);
-            alert("Xóa vi phạm thất bại!");
+            alert(t("ehs.alert.deleteViolationFail"));
             return;
           }
         }
@@ -1741,7 +1753,7 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
   async function handleDeleteRequest(logId) {
     const errorToDelete = allScores.find(s => s.id === logId);
     if (!errorToDelete) return;
-    if (await askConfirm(`Bạn có chắc muốn gửi yêu cầu xóa lỗi "${errorToDelete.desc}" đến EHS duyệt không?`, "Yêu cầu xóa lỗi")) {
+    if (await askConfirm(t("ehs.confirm.requestDelete").replace("{desc}", errorToDelete.desc), t("ehs.title.requestDelete"))) {
       try {
         if (!String(logId).startsWith("legacy-")) {
           await dbService.updateDoc("gemba_events", logId, {
@@ -1762,10 +1774,10 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
           }
         }
         await fetchScores();
-        alert("Đã gửi yêu cầu xóa lỗi. Vui lòng chờ EHS duyệt!");
+        alert(t("ehs.alert.requestDeleteSent"));
       } catch (err) {
         console.error("Lỗi gửi yêu cầu xóa:", err);
-        alert("Gửi yêu cầu xóa thất bại!");
+        alert(t("ehs.alert.requestDeleteFail"));
       }
     }
   }
@@ -1793,10 +1805,10 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
         }
       }
       await fetchScores();
-      alert("Đã từ chối yêu cầu xóa!");
+      alert(t("ehs.alert.rejectDeleteDone"));
     } catch (err) {
       console.error("Lỗi từ chối xóa:", err);
-      alert("Thao tác thất bại!");
+      alert(t("ehs.alert.actionFail"));
     }
   }
   
@@ -1834,7 +1846,7 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
       await fetchScores();
     } catch (err) {
       console.error("Lỗi cập nhật cải thiện:", err);
-      alert("Lưu cải thiện thất bại!");
+      alert(t("ehs.alert.saveImproveFail"));
     }
   };
   
@@ -1869,7 +1881,7 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
       }
     } catch (err) {
       console.error("Lỗi sửa lỗi:", err);
-      alert("Sửa thất bại!");
+      alert(t("ehs.alert.editFail"));
     }
 
     await fetchScores();
@@ -1912,14 +1924,14 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1002 }}>
             <div style={{ background: '#fff', padding: 26, borderRadius: 16, width: '92%', maxWidth: 540, boxShadow: '0 6px 32px rgba(0,0,0,.25)' }}>
               <h3 style={{ marginTop: 0, color: colors.primary, display: 'flex', alignItems: 'center', gap: 8 }}>
-                ✍️ Đề xuất sửa ghi chú
+                {t("gemba.correct.title")}
               </h3>
               <div style={{ marginBottom: 14 }}>
-                <div style={{ fontWeight: 600, color: '#888', marginBottom: 6, fontSize: 13 }}>Bản gốc:</div>
+                <div style={{ fontWeight: 600, color: '#888', marginBottom: 6, fontSize: 13 }}>{t("gemba.correct.original")}</div>
                 <div style={{ background: '#fff8e1', border: '1px solid #ffe082', borderRadius: 8, padding: '10px 14px', fontSize: 14, lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{note}</div>
               </div>
               <div style={{ marginBottom: 22 }}>
-                <div style={{ fontWeight: 600, color: '#2e7d32', marginBottom: 6, fontSize: 13 }}>✨ Đã sửa:</div>
+                <div style={{ fontWeight: 600, color: '#2e7d32', marginBottom: 6, fontSize: 13 }}>{t("gemba.correct.corrected")}</div>
                 <div style={{ background: '#f1f8e9', border: '1px solid #a5d6a7', borderRadius: 8, padding: '10px 14px', fontSize: 14, lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{correctedNote}</div>
               </div>
               <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
@@ -1927,13 +1939,13 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
                   onClick={async () => { setShowCorrectModal(false); await doSaveError(note); }}
                   style={{ padding: '8px 18px', borderRadius: 8, border: `1px solid ${colors.border}`, background: '#f5f5f5', cursor: 'pointer', fontWeight: 600, fontSize: 14 }}
                 >
-                  Dùng bản gốc
+                  {t("gemba.correct.useOriginal")}
                 </button>
                 <button
                   onClick={async () => { setShowCorrectModal(false); await doSaveError(correctedNote); }}
                   style={{ padding: '8px 22px', borderRadius: 8, border: 'none', background: '#2e7d32', color: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: 14 }}
                 >
-                  ✓ Dùng bản đã sửa
+                  {t("gemba.correct.useCorrected")}
                 </button>
               </div>
             </div>
@@ -1954,7 +1966,7 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
           <div style={{ flex: "1 1 auto", minWidth: 270, order: isMobile ? 2 : 1 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap" }}>
               <div style={{ fontWeight: 700, fontSize: isMobile ? 16 : 18, color: colors.primary, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                <span>Bộ phận: {departments[depIndex].name} |</span>
+                <span>{t("gemba.dept")} {departments[depIndex].name} |</span>
                 <span>{t("gemba.people")}</span>
                 {(userRole === "admin" || userRole === "ehs") ? (<input type="number" value={peopleCount} onChange={(e) => setPeopleCount(parseInt(e.target.value, 10) || 0)} onBlur={handleSavePeople} style={numberInputStyle} />) : ( <span>{peopleCount}</span> )}
                 <span>| {t("gemba.factor")} {heSo}</span>
@@ -1962,7 +1974,7 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
               <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
                   <input type="month" value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} style={{ padding: 8, borderRadius: 6, border: `1px solid ${colors.border}` }} />
                   <button onClick={() => setShowReportDashboard(true)} style={{ background: '#1565c0', color: colors.white, border: "none", padding: "8px 15px", borderRadius: 6, fontWeight: "bold", cursor: "pointer", marginTop: isMobile ? 10 : 0 }}>
-                    📊 Báo cáo
+                    {t("ehs.report.btn")}
                   </button>
               </div>
             </div>
@@ -1978,7 +1990,7 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
                   <div style={{ fontSize: 15, color: colors.textPrimary, marginBottom: 5 }}>{t("gemba.error.label")}</div>
                   <select value={selectedError} onChange={(e) => setSelectedError(e.target.value)} style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: `1.5px solid ${colors.primaryLight}`, fontSize: 15 }}>
                   <option value="">{t("gemba.error.placeholder")}</option>
-                  {(errorGroups.find(g => g.group === selectedGroup)?.items || []).map(e => <option key={e.code} value={e.code}>{e.code} - {e.desc} ({e.point > 0 ? `${e.point}đ` : 'Tùy chỉnh'})</option>)}
+                  {(errorGroups.find(g => g.group === selectedGroup)?.items || []).map(e => <option key={e.code} value={e.code}>{e.code} - {e.desc} ({e.point > 0 ? `${e.point}đ` : t("ehs.customLabel")})</option>)}
                   </select>
               </div>
             )}
@@ -1988,7 +2000,7 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
                     <div style={{ marginBottom: 10 }}>
                         <div style={{ fontSize: 15, color: colors.textPrimary, marginBottom: 5 }}>{t("gemba.custom.severity")}</div>
                         <div style={{ display: "flex", gap: 15, flexWrap: "wrap" }}>
-                        {["Nhẹ", "Nặng", "Nghiêm trọng"].map(level => ( <label key={level}> <input type="radio" name="severity" value={level} checked={otherErrorSeverity === level} onChange={(e) => setOtherErrorSeverity(e.target.value)} style={{ marginRight: 4, accentColor: colors.primary }} /> {level} ({level === "Nhẹ" ? 2 : level === "Nặng" ? 4 : 6}đ) </label> ))}
+                        {["Nhẹ", "Nặng", "Nghiêm trọng"].map(level => ( <label key={level}> <input type="radio" name="severity" value={level} checked={otherErrorSeverity === level} onChange={(e) => setOtherErrorSeverity(e.target.value)} style={{ marginRight: 4, accentColor: colors.primary }} /> {severityLabel(t, level)} ({level === "Nhẹ" ? 2 : level === "Nặng" ? 4 : 6}đ) </label> ))}
                         </div>
                     </div>
                 </div>
@@ -2011,6 +2023,7 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
                     onChange={(e) => setCa(e.target.value)}
                     style={{ width: "100%", boxSizing: "border-box", padding: "8px 12px", borderRadius: 8, border: `1.5px solid ${colors.primaryLight}`, fontSize: 15 }}
                   >
+                    <option value="">{t("gemba.shift.placeholder")}</option>
                     {["S1", "S2", "S3", "S8"].map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
@@ -2041,7 +2054,7 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
                   style={{ width: 16, height: 16, accentColor: colors.primary, cursor: 'pointer' }}
                 />
                 <span style={{ fontSize: 14, color: colors.textPrimary, fontWeight: 500 }}>
-                  Nhắc nhở (Không trừ điểm)
+                  {t("ehs.reminder")}
                 </span>
               </label>
             </div>
@@ -2069,25 +2082,25 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
                     return (
                       <div key={`${e.code}-${dateForkey ? dateForkey.getTime() : i}`} style={{ border: '1.2px solid ' + colors.primaryLight, borderRadius: 12, padding: 12, background: colors.surface, boxShadow: `0 1.5px 10px ${colors.primary}11` }}>
                         <div style={{ display:'flex', justifyContent:'space-between', gap:8, flexWrap:'wrap' }}>
-                          <div style={{ fontSize: 12, color: colors.textSecondary }}>{safeTsToDate(e.timestamp)?.toLocaleString('vi-VN')}{e.ca ? ` | Ca: ${e.ca}` : ''}</div>
+                          <div style={{ fontSize: 12, color: colors.textSecondary }}>{safeTsToDate(e.timestamp)?.toLocaleString('vi-VN')}{e.ca ? ` | ${t("ehs.shift")}: ${e.ca}` : ''}</div>
                           <div style={{ fontWeight: 700, color: colors.primary }}>{e.group}</div>
                         </div>
                         <div style={{ marginTop: 6, overflowWrap:'anywhere' }}>
-                           <div>{e.group === 'Lỗi Khác' ? 'Lỗi khác' : e.desc}</div>
+                           <div>{e.group === 'Lỗi Khác' ? t("ehs.otherError") : e.desc}</div>
                            {e.responsiblePerson && (
                              <div style={{ fontSize: '12px', color: '#b94a48', fontWeight: 600, marginTop: 4 }}>
-                             Người nhận Thông tin: {e.responsiblePerson}
+                             {t("ehs.recipientShort")}: {e.responsiblePerson}
                              </div>
                            )}
                            {e.addedBy && <div style={{fontSize: 11, color: colors.textSecondary, fontStyle:'italic', marginTop: 2}}>{t("gemba.by")} {e.addedBy}</div>}
                            {e.ehsVerified && (
                              <div style={{ fontSize: '12px', color: '#2e7d32', fontWeight: 700, background: '#e8f5e9', padding: '2px 8px', borderRadius: 6, marginTop: 4, display: 'inline-block' }}>
-                               ✅ Đã xác nhận hoàn thành
-                             </div>
+                               {t("ehs.confirmedDone")}
+</div>
                            )}
                            {e.deleteRequested && (
                              <div style={{ fontSize: '12px', color: '#c62828', fontWeight: 'bold', background: '#ffebee', padding: '4px 8px', borderRadius: 6, marginTop: 6, display: 'inline-block' }}>
-                               ⚠️ Chờ duyệt xóa (Yêu cầu bởi: {e.deleteRequestedBy})
+                               {t("ehs.pendingDeleteBy").replace("{by}", e.deleteRequestedBy)}
                              </div>
                            )}
                         </div>
@@ -2102,14 +2115,14 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
                           </div>
                         )}
                         <div style={{ marginTop: 10, fontWeight: 700, color: colors.primary }}>
-                          {e.isReminder ? "Nhắc nhở (Không trừ điểm)" : `Điểm trừ: ${((e.point + heSo) / 2).toFixed(2)}`}
+                          {e.isReminder ? t("ehs.reminder") : `${t("gemba.table.deduction")}: ${((e.point + heSo) / 2).toFixed(2)}`}
                         </div>
                         <div style={{ marginTop: 8, display:'flex', justifyContent:'flex-end', gap:6, alignItems:'center' }}>
                           <ActionButton 
                             onClick={() => {
                               setCommentModal({ isOpen: true, eventId: e.id, error: e });
                             }} 
-                            title="Thảo luận / Bình luận" 
+                            title={t("ehs.title.discuss")}
                             color={colors.white} 
                             bg={colors.primary}
                           >
@@ -2117,16 +2130,16 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
                           </ActionButton>
                           <ActionButton onClick={() => setImprovementModal({ isOpen: true, error: e, logId: e.id })} title={t("gemba.improve.action")} color={colors.white} bg={isImproved ? '#4caf50' : '#f44336'}><ImprovementIcon /></ActionButton>
                           {isEhsCommitteeOnly && (e.addedByUid === user.uid || e.addedBy === user.name) && !e.deleteRequested && (
-                            <ActionButton onClick={() => handleDeleteRequest(e.id)} title="Yêu cầu xóa lỗi" color="#d32f2f" bg="transparent">x</ActionButton>
+                            <ActionButton onClick={() => handleDeleteRequest(e.id)} title={t("ehs.title.requestDelete")} color="#d32f2f" bg="transparent">x</ActionButton>
                           )}
                           {isAdminOrEhs && e.deleteRequested && (
                             <>
-                              <ActionButton onClick={() => handleDelete(e.id)} title="Duyệt xóa" color="#fff" bg="#2e7d32">✅</ActionButton>
-                              <ActionButton onClick={() => handleCancelDeleteRequest(e.id)} title="Từ chối xóa" color="#fff" bg="#e65100">❌</ActionButton>
+                              <ActionButton onClick={() => handleDelete(e.id)} title={t("ehs.title.approveDelete")} color="#fff" bg="#2e7d32">✅</ActionButton>
+                              <ActionButton onClick={() => handleCancelDeleteRequest(e.id)} title={t("ehs.title.rejectDelete")} color="#fff" bg="#e65100">❌</ActionButton>
                             </>
                           )}
                           {(userRole === 'admin' || userRole === 'ehs') && !e.deleteRequested && (
-                            <ActionButton onClick={() => setEditModal({ isOpen: true, error: e, logId: e.id, department: dep.name })} title="Sửa lỗi" color="#1565c0" bg="transparent">✏️</ActionButton>
+                            <ActionButton onClick={() => setEditModal({ isOpen: true, error: e, logId: e.id, department: dep.name })} title={t("ehs.title.editError")} color="#1565c0" bg="transparent">✏️</ActionButton>
                           )}
                           {(userRole === 'admin' || userRole === 'ehs') && !e.deleteRequested && (
                             <ActionButton onClick={() => handleDelete(e.id)} title={t("gemba.delete.action")} color="#d32f2f" bg="transparent">x</ActionButton>
@@ -2143,7 +2156,7 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
                   <thead>
                     <tr style={{ background: colors.primaryLight }}>
                         <th style={{ padding: "10px 14px", color: colors.textPrimary }}>{t("gemba.table.time")}</th>
-                        <th style={{ padding: "10px 8px", color: colors.textPrimary }}>Ca</th>
+                        <th style={{ padding: "10px 8px", color: colors.textPrimary }}>{t("ehs.shift")}</th>
                         <th style={{ padding: "10px 14px", color: colors.textPrimary }}>{t("gemba.table.group")}</th>
                         <th style={{ padding: "10px 14px", color: colors.textPrimary, width: "40%" }}>{t("gemba.table.desc")}</th>
                         <th style={{ padding: "10px 8px", color: colors.textPrimary }}>{t("gemba.table.photo")}</th>
@@ -2163,10 +2176,10 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
                       <td style={{ padding: "10px 8px", textAlign: "center", fontWeight: 600, color: '#666' }}>{e.ca || ""}</td>
                       <td style={{ padding: "10px 14px" }}>{e.group}</td>
                       <td style={{ padding: "10px 14px" }}>
-                        <div>{e.group === 'Lỗi Khác' ? 'Lỗi khác' : e.desc}</div>
+                        <div>{e.group === 'Lỗi Khác' ? t("ehs.otherError") : e.desc}</div>
                         {e.responsiblePerson && (
                           <div style={{ fontSize: '12px', color: '#b94a48', fontWeight: 600, marginTop: 4 }}>
-                            Người nhận Thông tin: {e.responsiblePerson}
+                            {t("ehs.recipientShort")}: {e.responsiblePerson}
                           </div>
                         )}
                         {e.addedBy && (
@@ -2176,12 +2189,12 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
                         )}
                         {e.ehsVerified && (
                           <div style={{ fontSize: '11px', color: '#2e7d32', fontWeight: 700, background: '#e8f5e9', padding: '2px 6px', borderRadius: 4, marginTop: 4, display: 'inline-block' }}>
-                            ✅ Đã xác nhận hoàn thành
-                          </div>
+                            {t("ehs.confirmedDone")}
+</div>
                         )}
                         {e.deleteRequested && (
                           <div style={{ fontSize: '11px', color: '#c62828', fontWeight: 'bold', background: '#ffebee', padding: '2px 6px', borderRadius: 4, marginTop: 4, display: 'inline-block' }}>
-                            ⚠️ Chờ duyệt xóa (Yêu cầu bởi: {e.deleteRequestedBy})
+                            {t("ehs.pendingDeleteBy").replace("{by}", e.deleteRequestedBy)}
                           </div>
                         )}
                       </td>
@@ -2197,32 +2210,32 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
                           </div>
                         )}
                       </td>
-                      <td style={{ padding: "10px 8px", textAlign: "center" }}>{(e.note || (e.group === 'Lỗi Khác' && e.desc !== 'Lỗi khác' ? e.desc : null)) && <button onClick={() => alert(`Ghi chú:\n\n${e.note || e.desc}`)} style={{ border: "none", background: "transparent", fontSize: 24, cursor: "pointer" }} title="Xem ghi chú">🗒️</button>}</td>
-                      <td style={{ padding: "10px 8px", fontWeight: 700, color: colors.primary, textAlign: "center", fontSize: e.isReminder ? 12 : 14 }}>{e.isReminder ? "Nhắc nhở" : ((e.point + heSo) / 2).toFixed(2)}</td>
+                      <td style={{ padding: "10px 8px", textAlign: "center" }}>{(e.note || (e.group === 'Lỗi Khác' && e.desc !== 'Lỗi khác' ? e.desc : null)) && <button onClick={() => alert(`${t("ehs.noteAlertPrefix")}\n\n${e.note || e.desc}`)} style={{ border: "none", background: "transparent", fontSize: 24, cursor: "pointer" }} title={t("gemba.note.view")}>🗒️</button>}</td>
+                      <td style={{ padding: "10px 8px", fontWeight: 700, color: colors.primary, textAlign: "center", fontSize: e.isReminder ? 12 : 14 }}>{e.isReminder ? t("ehs.reminderShort") : ((e.point + heSo) / 2).toFixed(2)}</td>
                       <td style={{ textAlign: "center" }}>
                           <div style={{display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 4}}>
                             <ActionButton 
                               onClick={() => {
                                 setCommentModal({ isOpen: true, eventId: e.id, error: e });
                               }} 
-                              title="Thảo luận" 
+                              title={t("ehs.title.discussShort")}
                               color={colors.white} 
                               bg={colors.primary}
                             >
                               💬
                             </ActionButton>
-                            <ActionButton onClick={() => setImprovementModal({ isOpen: true, error: e, logId: e.id })} title="Cải thiện/Khắc phục" color={colors.white} bg={isImproved ? "#4caf50" : "#f44336"}> <ImprovementIcon /> </ActionButton>
+                            <ActionButton onClick={() => setImprovementModal({ isOpen: true, error: e, logId: e.id })} title={t("gemba.improve.action")} color={colors.white} bg={isImproved ? "#4caf50" : "#f44336"}> <ImprovementIcon /> </ActionButton>
                             {isEhsCommitteeOnly && (e.addedByUid === user.uid || e.addedBy === user.name) && !e.deleteRequested && (
-                              <ActionButton onClick={() => handleDeleteRequest(e.id)} title="Yêu cầu xóa lỗi" color="#d32f2f" bg="transparent">x</ActionButton>
+                              <ActionButton onClick={() => handleDeleteRequest(e.id)} title={t("ehs.title.requestDelete")} color="#d32f2f" bg="transparent">x</ActionButton>
                             )}
                             {isAdminOrEhs && e.deleteRequested && (
                               <>
-                                <ActionButton onClick={() => handleDelete(e.id)} title="Duyệt xóa" color="#fff" bg="#2e7d32">✅</ActionButton>
-                                <ActionButton onClick={() => handleCancelDeleteRequest(e.id)} title="Từ chối xóa" color="#fff" bg="#e65100">❌</ActionButton>
+                                <ActionButton onClick={() => handleDelete(e.id)} title={t("ehs.title.approveDelete")} color="#fff" bg="#2e7d32">✅</ActionButton>
+                                <ActionButton onClick={() => handleCancelDeleteRequest(e.id)} title={t("ehs.title.rejectDelete")} color="#fff" bg="#e65100">❌</ActionButton>
                               </>
                             )}
                             {(userRole === "admin" || userRole === "ehs") && !e.deleteRequested && (
-                              <ActionButton onClick={() => setEditModal({ isOpen: true, error: e, logId: e.id, department: dep.name })} title="Sửa lỗi" color="#1565c0" bg="transparent">✏️</ActionButton>
+                              <ActionButton onClick={() => setEditModal({ isOpen: true, error: e, logId: e.id, department: dep.name })} title={t("ehs.title.editError")} color="#1565c0" bg="transparent">✏️</ActionButton>
                             )}
                             {(userRole === "admin" || userRole === "ehs") && !e.deleteRequested && (
                               <ActionButton onClick={() => handleDelete(e.id)} title={t("gemba.delete.action")} color="#d32f2f" bg="transparent">x</ActionButton>
@@ -2235,20 +2248,20 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
               </table>
               ))}
             <div style={{ color: colors.textPrimary, fontWeight: 700, fontSize: 22, marginTop: 28, background: remainingScore < 80 ? "#ffe3e3" : "#e3fff1", borderRadius: 10, padding: "14px 18px", boxShadow: "0 1.5px 7px #00000011", width: "fit-content" }}>
-              Số điểm còn lại (Tháng {selectedMonth.slice(5,7)}): <span style={{ color: remainingScore < 80 ? colors.error : colors.success }}>{remainingScore.toFixed(2)}</span>
+              {t("ehs.report.remainingMonth").replace("{month}", selectedMonth.slice(5,7))} <span style={{ color: remainingScore < 80 ? colors.error : colors.success }}>{remainingScore.toFixed(2)}</span>
             </div>
           </div>
           <div style={{ width: '100%', order: isMobile ? 1 : 2, flexShrink: 0, [isMobile ? 'width' : 'maxWidth']: isMobile ? '100%' : 220 }}>
               {isMobile ? (
               <div style={{ marginBottom: 20 }}>
-                  <label htmlFor="dept-select" style={{ fontWeight: 700, color: colors.primary, display: 'block', marginBottom: 8 }}>Chọn bộ phận:</label>
+                  <label htmlFor="dept-select" style={{ fontWeight: 700, color: colors.primary, display: 'block', marginBottom: 8 }}>{t("ehs.report.selectDept")}</label>
                   <select id="dept-select" value={depIndex} onChange={(e) => handleSelectDepartment(parseInt(e.target.value, 10))} style={{ width: "100%", padding: "12px 15px", borderRadius: 8, border: `1.5px solid ${colors.primaryLight}`, fontSize: 16, background: colors.surface, fontWeight: 'bold', color: colors.textPrimary }}>
                   {departments.map((d, i) => (<option key={d.name} value={i}>{d.name}</option>))}
                   </select>
               </div>
               ) : (
               <div style={{ padding: 18, background: colors.primaryLight, borderRadius: 14, boxShadow: `0 1.5px 10px ${colors.primary}11` }}>
-                  <div style={{ fontWeight: 700, color: colors.primary, marginBottom: 14, fontSize: 17 }}>Bộ phận</div>
+                  <div style={{ fontWeight: 700, color: colors.primary, marginBottom: 14, fontSize: 17 }}>{t("ehs.edit.dept")}</div>
                   <div>
                   {departments.map((d, i) => (
                       <button key={d.name} style={{ display: "block", width: "100%", marginBottom: 10, padding: "10px 15px", borderRadius: 8, border: "none", fontWeight: 600, fontSize: 15, background: depIndex === i ? colors.primary : colors.backgroundLight, color: depIndex === i ? colors.white : colors.primary, boxShadow: depIndex === i ? `0 1.5px 7px ${colors.primary}33` : "none", cursor: "pointer", transition: "all .13s", position: 'relative' }} onClick={() => handleSelectDepartment(i)}>
@@ -2280,6 +2293,7 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
 }
 
 function CommentModal({ isOpen, onClose, eventId, user, error }) {
+  const { t } = useI18n();
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState("");
   const [loadingComments, setLoadingComments] = useState(false);
@@ -2345,7 +2359,7 @@ function CommentModal({ isOpen, onClose, eventId, user, error }) {
       await fetchComments();
     } catch (err) {
       console.error("Lỗi gửi bình luận:", err);
-      alert("Không thể gửi bình luận.");
+      alert(t("ehs.comment.sendFail"));
     }
   };
 
@@ -2355,15 +2369,15 @@ function CommentModal({ isOpen, onClose, eventId, user, error }) {
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 1002 }}>
       <div style={{ background: colors.surface, padding: 22, borderRadius: 12, width: '90%', maxWidth: 500, height: 500, display: 'flex', flexDirection: 'column', boxShadow: "0 4px 15px rgba(0,0,0,.2)" }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: `2.5px solid ${colors.primaryLight}`, paddingBottom: 10, marginBottom: 12 }}>
-          <h3 style={{ margin: 0, color: colors.primary }}>Ý kiến phản hồi / Thảo luận</h3>
+          <h3 style={{ margin: 0, color: colors.primary }}>{t("ehs.comment.title")}</h3>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#888' }}>✕</button>
         </div>
         
         <div ref={scrollRef} style={{ flexGrow: 1, overflowY: 'auto', marginBottom: 15, paddingRight: 5 }}>
           {loadingComments ? (
-            <div style={{ textAlign: 'center', color: '#888', marginTop: 20 }}>Đang tải bình luận...</div>
+            <div style={{ textAlign: 'center', color: '#888', marginTop: 20 }}>{t("ehs.comment.loading")}</div>
           ) : comments.length === 0 ? (
-            <div style={{ textAlign: 'center', color: '#888', marginTop: 20 }}>Chưa có bình luận nào cho lỗi này.</div>
+            <div style={{ textAlign: 'center', color: '#888', marginTop: 20 }}>{t("ehs.comment.empty")}</div>
           ) : (
             comments.map(c => {
               const isMe = c.userId === user.uid;
@@ -2398,14 +2412,14 @@ function CommentModal({ isOpen, onClose, eventId, user, error }) {
             value={newComment}
             onChange={e => setNewComment(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') handleSend(); }}
-            placeholder="Nhập nội dung phản hồi..."
+            placeholder={t("ehs.comment.placeholder")}
             style={{ flexGrow: 1, padding: '8px 12px', borderRadius: 8, border: `1.5px solid ${colors.primaryLight}`, fontSize: 14, outline: 'none' }}
           />
           <button
             onClick={handleSend}
             style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: colors.primary, color: colors.white, fontWeight: 700, cursor: 'pointer' }}
           >
-            Gửi
+            {t("common.send")}
           </button>
         </div>
       </div>

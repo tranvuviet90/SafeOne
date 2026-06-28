@@ -5,6 +5,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import Login from "./components/Login";
 import UserSettings from "./components/UserSettings";
 import NotificationBell from "./components/NotificationBell";
+import LanguageSwitcher from "./components/LanguageSwitcher";
 import { lazyWithRetry } from "./utils/lazyWithRetry";
 
 const EHSAudit = lazyWithRetry(() => import("./components/EHSAudit"));
@@ -449,6 +450,7 @@ function MainApp() {
               {user?.name} {!isMobile && `(${user?.role})`}
             </span>
 
+            <LanguageSwitcher />
             <NotificationBell user={user} setActiveTab={handleSetActiveTab} />
             <UserSettings user={user} onLogout={handleLogout} />
           </div>
