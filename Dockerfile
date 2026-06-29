@@ -21,8 +21,8 @@ RUN cd backend && npm ci --only=production
 # Sao chép mã nguồn backend
 COPY backend/ ./backend/
 
-# Sao chép thư mục dist đã biên dịch ở Stage 1 sang Stage 2
-COPY --from=builder /usr/src/app/dist ./dist
+# Sao chép giao diện đã build ở Stage 1 sang đúng nơi server.js phục vụ (backend/public)
+COPY --from=builder /usr/src/app/backend/public ./backend/public
 
 # Thiết lập các biến môi trường
 ENV NODE_ENV=production
