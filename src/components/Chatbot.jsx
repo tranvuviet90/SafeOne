@@ -65,11 +65,7 @@ function Chatbot({ user }) {
             chatBodyRef.current.scrollTop = chatBodyRef.current.scrollHeight;
         }
     }, [messages]);
-
-    const CLOUD_FUNCTION_URL = import.meta.env.VITE_ASKAI_URL || 'https://askai-zvblqnzylq-as.a.run.app';
-
-
-
+    const CLOUD_FUNCTION_URL = import.meta.env.VITE_ASKAI_URL || '/api/functions/askAI';
     const getDocAccess = (docItem, currentUser) => {
         const userRoles = currentUser?.role ? (Array.isArray(currentUser.role) ? currentUser.role.map(normalizeRole) : String(currentUser.role).split(',').map(normalizeRole)) : [];
         const canView = userRoles.some(r => ["admin", "ehs", "ehs committee", "trainer", "manager"].includes(r));
