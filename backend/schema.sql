@@ -1,6 +1,8 @@
 -- backend/schema.sql
-CREATE DATABASE IF NOT EXISTS safeone DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE safeone;
+-- LƯU Ý: KHÔNG đặt lệnh `CREATE DATABASE` / `USE` ở đây.
+-- Database `safeone` phải được tạo sẵn trước (xem README), và backend đã kết nối
+-- trực tiếp vào nó qua config/db.js. Đặt lệnh quản trị cấp server ở đây sẽ gây lỗi
+-- "Access denied" khi chạy dưới một MySQL user chỉ có quyền trên `safeone.*`.
 
 -- 1. Bảng Người dùng (Tích hợp Auth + User Profile)
 CREATE TABLE IF NOT EXISTS users (

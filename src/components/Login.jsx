@@ -20,6 +20,7 @@ function Login({ setUser }) {
 
   // States for system initialization form
   const [showInitForm, setShowInitForm] = useState(false);
+  const [initError, setInitError] = useState('');
   const [initName, setInitName] = useState('');
   const [initEmail, setInitEmail] = useState('');
   const [initPassword, setInitPassword] = useState('');
@@ -36,11 +37,19 @@ function Login({ setUser }) {
     const checkInit = async () => {
       try {
         const res = await apiClient.get("/api/auth/check-init");
+        setInitError('');
         if (res.data && res.data.initialized === false) {
           setShowInitForm(true);
         }
       } catch (e) {
+        // Do NOT swallow this silently: a 5xx / network failure here means the
+        // backend or MySQL isn't ready, so the first-admin setup form would
+        // otherwise never appear and the user would be stuck on a login screen
+        // with no account. Surface a clear, actionable message instead.
         console.warn("Check system init failed:", e);
+        setInitError(
+          "Không kiểm tra được trạng thái khởi tạo hệ thống. Backend hoặc MySQL có thể chưa sẵn sàng — hãy kiểm tra dịch vụ backend đang chạy, kết nối MySQL và file backend/.env, rồi tải lại trang."
+        );
       }
     };
     checkInit();
@@ -171,6 +180,7 @@ function Login({ setUser }) {
       <form onSubmit={handleLogin} style={{ background:'white', padding:'40px 50px', borderRadius:'16px', boxShadow:'0 10px 30px rgba(0,0,0,0.1)', width:'100%', maxWidth:'400px', textAlign:'center', boxSizing:'border-box' }}>
         <h2 style={{ color:'#222', marginBottom:'10px', fontWeight:'700', fontSize:'28px' }}>{t('login.title')}</h2>
         <p style={{ color:'#555', marginBottom:'30px', fontSize:'16px' }}>{t('login.subtitle')}</p>
+        {initError && <p style={{ color:'#c0392b', marginBottom:'20px', fontSize:'13px', fontWeight:'500', padding:'12px', background:'#fadbd8', borderRadius:'8px', lineHeight:'1.5', textAlign:'left' }}>⚠️ {initError}</p>}
         {error && <p style={{ color:'red', marginBottom:'20px' }}>{error}</p>}
         <div style={{ marginBottom:'20px', textAlign:'left' }}>
           <label style={{ display:'block', marginBottom:'8px', color:'#333', fontWeight:'600' }}>{t('login.email')}</label>

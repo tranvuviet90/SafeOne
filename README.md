@@ -258,8 +258,12 @@ pm2 restart safeone-app               # restart để nhận public mới
 Form chỉ hiện khi **gọi được API và backend báo chưa có user**. Nếu không hiện:
 1. **App có chạy không?** `pm2 status` → `safeone-app` phải `online` (`pm2 logs safeone-app` xem lỗi).
 2. **F12 → Network → F5**, tìm request `check-init`:
-   - **Đỏ / Failed / 500** ⇒ backend chưa chạy hoặc không nối được MySQL → kiểm tra `backend/.env`.
-   - **200 nhưng `initialized: true`** ⇒ backend nối vào **database khác** → kiểm tra `DB_NAME`.
+   - **Đỏ / Failed / 500 / 502** ⇒ backend chưa chạy hoặc không nối được MySQL → kiểm tra `backend/.env`. Màn hình đăng nhập giờ **hiện banner đỏ cảnh báo** thay vì im lặng.
+   - **200 nhưng `initialized: true`** ⇒ backend nối vào **database khác / DB đã có user** → kiểm tra `DB_NAME`; nếu trỏ nhầm DB cũ, `npm run clean-db` để reset.
+3. **Lối thoát hiểm:** nếu vẫn không hiện form, tạo admin trực tiếp từ terminal:
+   ```bash
+   cd backend && npm run seed-admin -- admin@congty.com 'MatKhauManh#2026' "Super Admin"
+   ```
 
 ### Upload ảnh báo lỗi 413 (Request Entity Too Large)
 Thiếu `client_max_body_size 25M;` trong cấu hình Nginx (Bước 5). Thêm vào rồi `sudo systemctl reload nginx`.
@@ -298,6 +302,7 @@ Chatbot dùng Gemini trả lời dựa trên tài liệu nội bộ trong module
 | `npm start` | Chạy app (giao diện + API) ở cổng 5000 |
 | `npm run lint` | Kiểm tra code bằng ESLint |
 | `npm run clean-db` | ⚠️ Xóa sạch bảng `users` (về trạng thái khởi tạo) |
+| `cd backend && npm run seed-admin -- <email> <mật khẩu> [tên]` | Tạo admin đầu tiên từ terminal (lưới an toàn khi form UI không hiện) |
 | `pm2 restart safeone-app` | Khởi động lại app trên VPS |
 | `pm2 logs safeone-app` | Xem log app trên VPS |
 
