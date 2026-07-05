@@ -525,7 +525,7 @@ function MainApp() {
           padding: "16px 0 22px 0",
           width: "100%"
         }}>
-          SafeOne © {new Date().getFullYear()} | Created by Viet Tran
+          SafeOne | ACP
         </div>
 
         <Chatbot user={user} />
