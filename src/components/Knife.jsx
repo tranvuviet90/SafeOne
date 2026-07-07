@@ -2,9 +2,8 @@ import React, { useState, useEffect, useMemo } from "react";
 import dbService from "../services/dbService";
 import { colors } from "../theme";
 import { useConfirm, useToast } from "./LightboxSwipeOnly";
-import { 
-  FaSearch, FaPlus, FaFileExcel, FaDownload, FaUpload, 
-  FaEdit, FaTrash, FaCheck, FaTimes 
+import {
+  FaSearch, FaFileExcel, FaDownload, FaUpload, FaEdit, FaTrash
 } from "react-icons/fa";
 import { FaScissors } from "react-icons/fa6";
 import * as XLSX from "xlsx";
@@ -42,6 +41,25 @@ const KNIFE_TYPES = [
   "Khác"
 ];
 
+// Tùy chọn cho "Loại dao đang dùng": các loại dao + "Không sử dụng" + "Khác" (chọn "Khác" sẽ hiện ô nhập tự do)
+const CURRENT_KNIFE_OPTIONS = [
+  ...KNIFE_TYPES.filter(t => t !== "Khác"),
+  "Không sử dụng",
+  "Khác"
+];
+
+// Tùy chọn cho "Dao mới đề xuất": mẫu Martor mặc định + cùng danh sách loại dao như "Loại dao đang dùng"
+const NEW_KNIFE_OPTIONS = [
+  "Dao cắt an toàn Martor 124001",
+  ...KNIFE_TYPES.filter(t => t !== "Khác"),
+  "Không sử dụng",
+  "Khác"
+];
+
+// Giá trị được coi là "Khác" (không nằm trong danh sách cố định, trừ mục "Khác")
+const isOtherValue = (value, options) =>
+  !options.filter(o => o !== "Khác").includes((value || "").trim());
+
 export default function Knife({ user, isMobile }) {
   const toast = useToast();
   const confirm = useConfirm();
@@ -56,22 +74,6 @@ export default function Knife({ user, isMobile }) {
   const [filterDept, setFilterDept] = useState("all");
   const [searchRegQuery, setSearchRegQuery] = useState("");
   const [filterRegDept, setFilterRegDept] = useState("all");
-
-  // Modal States for Knife Master
-  const [showKnifeModal, setShowKnifeModal] = useState(false);
-  const [editingKnife, setEditingKnife] = useState(null);
-  const [knifeForm, setKnifeForm] = useState({
-    department: "G_Cutting",
-    userLocation: "",
-    type: "Dao cán kim loại",
-    quantity: 1,
-    storageLocation: "",
-    intendedUse: "",
-    responsiblePerson: "",
-    registrationCode: "",
-    note: "",
-    martorStatus: ""
-  });
 
   // Modal States for Knife Registration/Evaluation
   const [showRegModal, setShowRegModal] = useState(false);
@@ -141,78 +143,65 @@ export default function Knife({ user, isMobile }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ chạy một lần khi mount
   }, []);
 
-  // Compute stats
+  // Compute stats — nguồn dữ liệu là các ĐĂNG KÝ (knife_registrations).
+  // "Dao" trong danh sách/báo cáo = các đăng ký đã được EHS duyệt (agreement === "Đồng ý").
   const stats = useMemo(() => {
-    let totalKnives = 0;
+    const approved = registrations.filter(r => r.agreement === "Đồng ý");
+
+    const totalRegs = registrations.length;
+    const approvedCount = approved.length;
+    // Chờ xác nhận = chưa có quyết định (Chờ duyệt / chưa đặt)
+    const pendingCount = registrations.filter(r => !r.agreement || r.agreement === "Chờ duyệt").length;
+    const agreeRate = totalRegs > 0 ? Math.round((approvedCount / totalRegs) * 100) : 0;
+
+    // Thống kê dao đã duyệt theo loại dao mới và theo bộ phận (khóa động, không cố định)
     const knivesByType = {};
     const knivesByDept = {};
-
-    // Initialize map
-    KNIFE_TYPES.forEach(t => { knivesByType[t] = 0; });
-    DEPARTMENTS.forEach(d => { knivesByDept[d.code] = 0; });
-
-    knives.forEach(k => {
-      totalKnives += k.quantity || 0;
-      
-      const type = k.type || "Khác";
-      if (knivesByType[type] !== undefined) {
-        knivesByType[type] += k.quantity || 0;
-      } else {
-        knivesByType["Khác"] = (knivesByType["Khác"] || 0) + (k.quantity || 0);
-      }
-
-      const dept = k.department || "Other";
-      if (knivesByDept[dept] !== undefined) {
-        knivesByDept[dept] += k.quantity || 0;
-      } else {
-        knivesByDept["Other"] = (knivesByDept["Other"] || 0) + (k.quantity || 0);
-      }
+    approved.forEach(r => {
+      const type = (r.newKnifeType || "").trim() || "Khác";
+      knivesByType[type] = (knivesByType[type] || 0) + 1;
+      const dept = r.department || "Other";
+      knivesByDept[dept] = (knivesByDept[dept] || 0) + 1;
     });
 
-    const totalEvals = registrations.length;
-    const agreeCount = registrations.filter(r => r.agreement === "Đồng ý").length;
-    const agreeRate = totalEvals > 0 ? Math.round((agreeCount / totalEvals) * 100) : 0;
-    // Số đăng ký đang chờ EHS duyệt (chưa có quyết định đồng ý / không đồng ý)
-    const pendingCount = registrations.filter(r => !r.agreement || r.agreement === "Chờ duyệt").length;
-
     return {
-      totalKnives,
-      knivesByType,
-      knivesByDept,
-      totalEvals,
-      agreeCount,
+      totalRegs,
+      approvedCount,
+      pendingCount,
       agreeRate,
-      pendingCount
+      knivesByType,
+      knivesByDept
     };
-  }, [knives, registrations]);
+  }, [registrations]);
 
-  // Filter Master Knives
-  const filteredKnives = useMemo(() => {
-    let list = [...knives];
+  // DANH SÁCH DAO = các đăng ký đã được duyệt (Đồng ý), áp bộ lọc của tab "Danh sách dao"
+  const filteredApproved = useMemo(() => {
+    let list = registrations.filter(r => r.agreement === "Đồng ý");
     if (filterDept !== "all") {
-      list = list.filter(k => k.department === filterDept);
+      list = list.filter(r => r.department === filterDept);
     }
     if (searchQuery) {
       const q = searchQuery.toLowerCase().trim();
-      list = list.filter(k => 
-        (k.userLocation || "").toLowerCase().includes(q) ||
-        (k.responsiblePerson || "").toLowerCase().includes(q) ||
-        (k.registrationCode || "").toLowerCase().includes(q) ||
-        (k.type || "").toLowerCase().includes(q)
+      list = list.filter(r =>
+        (r.employeeName || "").toLowerCase().includes(q) ||
+        (r.userLocation || "").toLowerCase().includes(q) ||
+        (r.supervisor || "").toLowerCase().includes(q) ||
+        (r.newKnifeType || "").toLowerCase().includes(q)
       );
     }
     return list;
-  }, [knives, filterDept, searchQuery]);
+  }, [registrations, filterDept, searchQuery]);
 
-  // Filter Registrations
+  // FORM ĐĂNG KÝ & ĐÁNH GIÁ = hộp chờ: các đăng ký CHƯA được duyệt (khác "Đồng ý").
+  // Sau khi EHS duyệt (Đồng ý), bản ghi rời khỏi tab này và sang tab "Danh sách dao".
   const filteredRegs = useMemo(() => {
-    let list = [...registrations];
+    let list = registrations.filter(r => r.agreement !== "Đồng ý");
     if (filterRegDept !== "all") {
       list = list.filter(r => r.department === filterRegDept);
     }
     if (searchRegQuery) {
       const q = searchRegQuery.toLowerCase().trim();
-      list = list.filter(r => 
+      list = list.filter(r =>
         (r.employeeName || "").toLowerCase().includes(q) ||
         (r.userLocation || "").toLowerCase().includes(q) ||
         (r.supervisor || "").toLowerCase().includes(q)
@@ -221,40 +210,7 @@ export default function Knife({ user, isMobile }) {
     return list;
   }, [registrations, filterRegDept, searchRegQuery]);
 
-  // Modal open helpers
-  const openKnifeModal = (knife = null) => {
-    if (knife) {
-      setEditingKnife(knife);
-      setKnifeForm({
-        department: knife.department || "G_Cutting",
-        userLocation: knife.userLocation || "",
-        type: knife.type || "Dao cán kim loại",
-        quantity: knife.quantity || 1,
-        storageLocation: knife.storageLocation || "",
-        intendedUse: knife.intendedUse || "",
-        responsiblePerson: knife.responsiblePerson || "",
-        registrationCode: knife.registrationCode || "",
-        note: knife.note || "",
-        martorStatus: knife.martorStatus || ""
-      });
-    } else {
-      setEditingKnife(null);
-      setKnifeForm({
-        department: "G_Cutting",
-        userLocation: "",
-        type: "Dao cán kim loại",
-        quantity: 1,
-        storageLocation: "",
-        intendedUse: "",
-        responsiblePerson: "",
-        registrationCode: "",
-        note: "",
-        martorStatus: ""
-      });
-    }
-    setShowKnifeModal(true);
-  };
-
+  // Modal open helper
   const openRegModal = (reg = null) => {
     if (reg) {
       setEditingReg(reg);
@@ -286,38 +242,6 @@ export default function Knife({ user, isMobile }) {
       });
     }
     setShowRegModal(true);
-  };
-
-  // CRUD Knife Master
-  const handleSaveKnife = async (e) => {
-    e.preventDefault();
-    if (!knifeForm.userLocation) {
-      toast.show("Vui lòng nhập vị trí sử dụng!", "warning");
-      return;
-    }
-    try {
-      const id = editingKnife ? editingKnife.id : `knife_${Date.now()}`;
-      await dbService.updateDoc("knives", id, knifeForm);
-      await fetchKnives();
-      toast.show("Đã lưu thông tin dao thành công!", "success");
-      setShowKnifeModal(false);
-    } catch (err) {
-      console.error(err);
-      toast.show("Lưu thông tin thất bại.", "error");
-    }
-  };
-
-  const handleDeleteKnife = async (id, name) => {
-    if (await confirm.askConfirm(`Bạn có chắc muốn xóa dao tại vị trí "${name}" không?`, "Xác nhận xóa dao")) {
-      try {
-        await dbService.deleteDoc("knives", id);
-        await fetchKnives();
-        toast.show("Đã xóa dao thành công.", "success");
-      } catch (err) {
-        console.error(err);
-        toast.show("Xóa thất bại.", "error");
-      }
-    }
   };
 
   // CRUD Registrations
@@ -640,8 +564,16 @@ export default function Knife({ user, isMobile }) {
         cell.border = borderThin;
       });
 
+      // Đếm số lượng theo loại dao từ kho master (knives) — độc lập với stats (vốn dựa trên đăng ký đã duyệt)
+      const exportTypeCount = {};
+      KNIFE_TYPES.forEach(t => { exportTypeCount[t] = 0; });
+      knives.forEach(k => {
+        const t = KNIFE_TYPES.includes(k.type) ? k.type : "Khác";
+        exportTypeCount[t] += k.quantity || 0;
+      });
+
       KNIFE_TYPES.forEach((type, idx) => {
-        const qty = stats.knivesByType[type] || 0;
+        const qty = exportTypeCount[type] || 0;
         wsSummary.addRow([type, qty]);
         const row = wsSummary.getRow(idx + 2);
         row.height = 20;
@@ -743,22 +675,21 @@ export default function Knife({ user, isMobile }) {
     }
   };
 
-  // Group master list by department for display
-  const knivesGroupedByDept = useMemo(() => {
+  // Nhóm danh sách dao đã duyệt theo bộ phận để hiển thị tab "Danh sách dao"
+  const approvedGroupedByDept = useMemo(() => {
     const grouped = {};
-    filteredKnives.forEach(k => {
-      const dept = k.department || "Other";
+    filteredApproved.forEach(r => {
+      const dept = r.department || "Other";
       if (!grouped[dept]) grouped[dept] = [];
-      grouped[dept].push(k);
+      grouped[dept].push(r);
     });
     return grouped;
-  }, [filteredKnives]);
+  }, [filteredApproved]);
 
-  // Determine departments code list present in master list
+  // Các bộ phận đang có dao đã duyệt (cho biểu đồ + bộ lọc)
   const activeDepts = useMemo(() => {
-    const set = new Set(knives.map(k => k.department));
-    return Array.from(set).sort();
-  }, [knives]);
+    return Object.keys(stats.knivesByDept).sort();
+  }, [stats.knivesByDept]);
 
   return (
     <div className="knife-container" style={{ padding: "8px 0", color: "var(--kf-text-primary)", width: "100%", boxSizing: "border-box" }}>
@@ -802,7 +733,7 @@ export default function Knife({ user, isMobile }) {
       {/* Title */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16, marginBottom: 20 }}>
         <div>
-          <h2 style={{ margin: 0, fontWeight: 800, color: "var(--kf-text-primary)", fontSize: "22px" }}>⚔️ Quản lý Dao an toàn (Martor & Knives)</h2>
+          <h2 style={{ margin: 0, fontWeight: 800, color: "var(--kf-text-primary)", fontSize: "22px" }}>✂️ Quản Lý Dao</h2>
           <p style={{ margin: "4px 0 0 0", color: "var(--kf-text-secondary)", fontSize: "13px" }}>Quản lý đăng ký sử dụng dao, kiểm soát danh mục và báo cáo tổng hợp</p>
         </div>
 
@@ -810,7 +741,7 @@ export default function Knife({ user, isMobile }) {
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
           <div style={{ background: "var(--kf-card-bg)", border: "1px solid var(--kf-card-border)", padding: "8px 16px", borderRadius: 12, textAlign: "center" }}>
             <div style={{ fontSize: "11px", color: "var(--kf-text-secondary)", fontWeight: "600" }}>TỔNG DAO ĐÃ ĐĂNG KÝ</div>
-            <div style={{ fontSize: "18px", fontWeight: "800", color: "var(--kf-text-primary)" }}>{stats.totalKnives}</div>
+            <div style={{ fontSize: "18px", fontWeight: "800", color: "var(--kf-text-primary)" }}>{stats.totalRegs}</div>
           </div>
           <div style={{ background: "var(--kf-badge-pending-bg)", border: "1px solid var(--kf-card-border)", padding: "8px 16px", borderRadius: 12, textAlign: "center" }}>
             <div style={{ fontSize: "11px", color: "var(--kf-badge-pending-text)", fontWeight: "600" }}>CHỜ XÁC NHẬN</div>
@@ -818,7 +749,7 @@ export default function Knife({ user, isMobile }) {
           </div>
           <div style={{ background: "var(--kf-badge-agree-bg)", border: "1px solid var(--kf-card-border)", padding: "8px 16px", borderRadius: 12, textAlign: "center" }}>
             <div style={{ fontSize: "11px", color: "var(--kf-badge-agree-text)", fontWeight: "600" }}>ĐỒNG Ý DÙNG DAO</div>
-            <div style={{ fontSize: "18px", fontWeight: "800", color: "var(--kf-badge-agree-text)" }}>{stats.agreeCount} / {stats.totalEvals} ({stats.agreeRate}%)</div>
+            <div style={{ fontSize: "18px", fontWeight: "800", color: "var(--kf-badge-agree-text)" }}>{stats.approvedCount} / {stats.totalRegs} ({stats.agreeRate}%)</div>
           </div>
         </div>
       </div>
@@ -863,7 +794,7 @@ export default function Knife({ user, isMobile }) {
               <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 20 }}>
                 {/* Panel 1: Thống kê loại dao */}
                 <div style={{ background: "var(--kf-card-bg)", border: "1.5px solid var(--kf-card-border)", borderRadius: 16, padding: "20px" }}>
-                  <h3 style={{ margin: "0 0 16px 0", color: colors.primary }}>Thống kê số lượng theo loại dao</h3>
+                  <h3 style={{ margin: "0 0 16px 0", color: colors.primary }}>Thống kê dao đã duyệt theo loại</h3>
                   <table style={{ width: "100%", borderCollapse: "collapse" }}>
                     <thead>
                       <tr style={{ borderBottom: `1.5px solid ${colors.border}` }}>
@@ -872,23 +803,27 @@ export default function Knife({ user, isMobile }) {
                       </tr>
                     </thead>
                     <tbody>
-                      {KNIFE_TYPES.map((type, idx) => {
-                        const qty = stats.knivesByType[type] || 0;
-                        if (qty === 0) return null;
-                        return (
-                          <tr key={idx} style={{ borderBottom: `1px solid var(--kf-card-border)` }}>
-                            <td style={{ padding: "8px 4px", fontSize: "14px", fontWeight: "600" }}>{type}</td>
-                            <td style={{ padding: "8px 4px", fontSize: "14px", textAlign: "center", fontWeight: "800", color: colors.primary }}>{qty}</td>
-                          </tr>
-                        );
-                      })}
+                      {Object.keys(stats.knivesByType).length === 0 ? (
+                        <tr>
+                          <td colSpan={2} style={{ padding: "16px 4px", fontSize: "13px", textAlign: "center", color: "var(--kf-text-secondary)" }}>Chưa có dao nào được duyệt.</td>
+                        </tr>
+                      ) : (
+                        Object.entries(stats.knivesByType)
+                          .sort((a, b) => b[1] - a[1])
+                          .map(([type, qty], idx) => (
+                            <tr key={idx} style={{ borderBottom: `1px solid var(--kf-card-border)` }}>
+                              <td style={{ padding: "8px 4px", fontSize: "14px", fontWeight: "600" }}>{type}</td>
+                              <td style={{ padding: "8px 4px", fontSize: "14px", textAlign: "center", fontWeight: "800", color: colors.primary }}>{qty}</td>
+                            </tr>
+                          ))
+                      )}
                     </tbody>
                   </table>
                 </div>
 
                 {/* Panel 2: Biểu đồ SVG Thống kê dao theo bộ phận */}
                 <div style={{ background: "var(--kf-card-bg)", border: "1.5px solid var(--kf-card-border)", borderRadius: 16, padding: "20px", display: "flex", flexDirection: "column" }}>
-                  <h3 style={{ margin: "0 0 16px 0", color: colors.primary }}>Biểu đồ số lượng dao theo bộ phận</h3>
+                  <h3 style={{ margin: "0 0 16px 0", color: colors.primary }}>Dao đã duyệt theo bộ phận</h3>
                   
                   <div style={{ flexGrow: 1, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 200 }}>
                     {/* SVG Chart */}
@@ -948,7 +883,7 @@ export default function Knife({ user, isMobile }) {
             </div>
           )}
 
-          {/* TAB 2: DANH SÁCH DAO MASTER */}
+          {/* TAB 2: DANH SÁCH DAO — các đăng ký đã được EHS duyệt (Đồng ý) */}
           {activeTab === "list" && (
             <div style={{ background: "var(--kf-card-bg)", border: "1.5px solid var(--kf-card-border)", borderRadius: 16, padding: "20px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: 16 }}>
@@ -958,7 +893,7 @@ export default function Knife({ user, isMobile }) {
                     <FaSearch style={{ position: "absolute", left: 10, top: 12, color: "var(--kf-text-muted)" }} />
                     <input
                       type="text"
-                      placeholder="Tìm vị trí, người quản lý, mã..."
+                      placeholder="Tìm nhân viên, vị trí, loại dao..."
                       value={searchQuery}
                       onChange={e => setSearchQuery(e.target.value)}
                       style={{ padding: "8px 12px 8px 30px", borderRadius: 8, border: "1px solid var(--kf-input-border)", background: "var(--kf-input-bg)", color: "var(--kf-input-text)", width: "100%", boxSizing: "border-box" }}
@@ -973,19 +908,10 @@ export default function Knife({ user, isMobile }) {
                   >
                     <option value="all">Tất cả bộ phận</option>
                     {activeDepts.map(d => (
-                      <option key={d} value={d}>{d}</option>
+                      <option key={d} value={d}>{DEPARTMENTS.find(x => x.code === d)?.name || d}</option>
                     ))}
                   </select>
                 </div>
-
-                {isEhsOrAdmin && (
-                  <button 
-                    onClick={() => openKnifeModal(null)}
-                    style={{ padding: "8px 16px", background: colors.primary, color: "#fff", border: "none", borderRadius: 8, fontWeight: "bold", cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}
-                  >
-                    <FaPlus /> Thêm dao
-                  </button>
-                )}
               </div>
 
               {/* Table list grouped by department */}
@@ -994,53 +920,51 @@ export default function Knife({ user, isMobile }) {
                   <thead>
                     <tr style={{ background: colors.primary, color: "#fff", height: "35px" }}>
                       <th style={{ padding: "8px 6px", width: 50, textAlign: "center" }}>No.</th>
+                      <th style={{ padding: "8px 6px", textAlign: "left" }}>Nhân viên sử dụng</th>
                       <th style={{ padding: "8px 6px", textAlign: "left" }}>Vị trí sử dụng</th>
-                      <th style={{ padding: "8px 6px", textAlign: "left" }}>Loại dao</th>
-                      <th style={{ padding: "8px 6px", width: 60, textAlign: "center" }}>SL</th>
-                      <th style={{ padding: "8px 6px", textAlign: "left" }}>Vị trí lưu trữ</th>
                       <th style={{ padding: "8px 6px", textAlign: "left" }}>Mục đích sử dụng</th>
-                      <th style={{ padding: "8px 6px", textAlign: "left" }}>Phụ trách</th>
-                      <th style={{ padding: "8px 6px", textAlign: "center" }}>Mã đăng ký</th>
-                      <th style={{ padding: "8px 6px", textAlign: "left" }}>Đánh giá Martor</th>
+                      <th style={{ padding: "8px 6px", textAlign: "left" }}>Giám sát xác nhận</th>
+                      <th style={{ padding: "8px 6px", textAlign: "left" }}>Loại dao</th>
+                      <th style={{ padding: "8px 6px", textAlign: "center" }}>Trạng thái</th>
                       {isEhsOrAdmin && <th style={{ padding: "8px 6px", width: 80, textAlign: "center" }}>Thao tác</th>}
                     </tr>
                   </thead>
                   <tbody>
-                    {Object.keys(knivesGroupedByDept).length === 0 ? (
+                    {Object.keys(approvedGroupedByDept).length === 0 ? (
                       <tr>
-                        <td colSpan={isEhsOrAdmin ? 10 : 9} style={{ padding: "20px", textAlign: "center", color: "var(--kf-text-secondary)" }}>
-                          Không tìm thấy dao nào phù hợp.
+                        <td colSpan={isEhsOrAdmin ? 8 : 7} style={{ padding: "20px", textAlign: "center", color: "var(--kf-text-secondary)" }}>
+                          Chưa có dao nào được duyệt.
                         </td>
                       </tr>
                     ) : (
-                      Object.keys(knivesGroupedByDept).map(dept => (
+                      Object.keys(approvedGroupedByDept).map(dept => (
                         <React.Fragment key={dept}>
                           {/* Department Title bar */}
                           <tr style={{ background: "var(--kf-grid-bg)" }}>
-                            <td colSpan={isEhsOrAdmin ? 10 : 9} style={{ padding: "8px 12px", fontWeight: "bold", color: colors.primaryDark, fontSize: "14px", borderBottom: `1px solid var(--kf-grid-border)` }}>
-                              📁 Bộ phận: {dept}
+                            <td colSpan={isEhsOrAdmin ? 8 : 7} style={{ padding: "8px 12px", fontWeight: "bold", color: colors.primaryDark, fontSize: "14px", borderBottom: `1px solid var(--kf-grid-border)` }}>
+                              📁 Bộ phận: {DEPARTMENTS.find(x => x.code === dept)?.name || dept}
                             </td>
                           </tr>
 
-                          {/* Knife items under department */}
-                          {knivesGroupedByDept[dept].map((k, idx) => (
-                            <tr key={k.id} style={{ borderBottom: `1px solid var(--kf-card-border)` }} className="hover-row">
-                              <td style={{ padding: "8px 6px", textAlign: "center", fontWeight: "600", fontSize: "13px" }}>{k.stt || (idx + 1)}</td>
-                              <td style={{ padding: "8px 6px", fontSize: "14px", fontWeight: "500" }}>{k.userLocation}</td>
-                              <td style={{ padding: "8px 6px", fontSize: "14px" }}>{k.type}</td>
-                              <td style={{ padding: "8px 6px", textAlign: "center", fontWeight: "bold", color: colors.primary }}>{k.quantity}</td>
-                              <td style={{ padding: "8px 6px", fontSize: "13px", color: "var(--kf-text-secondary)" }}>{k.storageLocation}</td>
-                              <td style={{ padding: "8px 6px", fontSize: "13px", color: "var(--kf-text-secondary)" }}>{k.intendedUse}</td>
-                              <td style={{ padding: "8px 6px", fontSize: "13px" }}>{k.responsiblePerson}</td>
-                              <td style={{ padding: "8px 6px", textAlign: "center", fontSize: "13px", fontFamily: "monospace", fontWeight: "bold" }}>
-                                {k.registrationCode ? k.registrationCode.split("\n").map((c, ci) => <div key={ci}>{c}</div>) : "-"}
+                          {/* Dao đã duyệt trong bộ phận */}
+                          {approvedGroupedByDept[dept].map((r, idx) => (
+                            <tr key={r.id} style={{ borderBottom: `1px solid var(--kf-card-border)` }} className="hover-row">
+                              <td style={{ padding: "8px 6px", textAlign: "center", fontWeight: "600", fontSize: "13px" }}>{r.stt || (idx + 1)}</td>
+                              <td style={{ padding: "8px 6px", fontSize: "14px", fontWeight: "600" }}>{r.employeeName}</td>
+                              <td style={{ padding: "8px 6px", fontSize: "13px" }}>{r.userLocation}</td>
+                              <td style={{ padding: "8px 6px", fontSize: "13px", color: "var(--kf-text-secondary)" }}>{r.intendedUse}</td>
+                              <td style={{ padding: "8px 6px", fontSize: "13px" }}>{r.supervisor}</td>
+                              <td style={{ padding: "8px 6px", fontSize: "13px", fontWeight: "500", color: colors.primary }}>{r.newKnifeType}</td>
+                              <td style={{ padding: "8px 6px", textAlign: "center" }}>
+                                <span style={{ padding: "4px 8px", borderRadius: 6, fontSize: "11px", fontWeight: "bold", background: "var(--kf-badge-agree-bg)", color: "var(--kf-badge-agree-text)" }}>
+                                  {r.agreement}
+                                </span>
                               </td>
-                              <td style={{ padding: "8px 6px", fontSize: "12px", fontStyle: "italic", color: "var(--kf-text-secondary)" }}>{k.martorStatus || "-"}</td>
                               {isEhsOrAdmin && (
                                 <td style={{ padding: "8px 6px", textAlign: "center" }}>
                                   <div style={{ display: "flex", gap: 6, justifyContent: "center" }}>
-                                    <button onClick={() => openKnifeModal(k)} style={{ border: "none", background: "transparent", cursor: "pointer", color: colors.primary }} title="Chỉnh sửa"><FaEdit /></button>
-                                    <button onClick={() => handleDeleteKnife(k.id, k.userLocation)} style={{ border: "none", background: "transparent", cursor: "pointer", color: colors.error }} title="Xóa"><FaTrash /></button>
+                                    <button onClick={() => openRegModal(r)} style={{ border: "none", background: "transparent", cursor: "pointer", color: colors.primary }} title="Xem / Chỉnh sửa"><FaEdit /></button>
+                                    <button onClick={() => handleDeleteReg(r.id, r.employeeName)} style={{ border: "none", background: "transparent", cursor: "pointer", color: colors.error }} title="Xóa"><FaTrash /></button>
                                   </div>
                                 </td>
                               )}
@@ -1115,7 +1039,7 @@ export default function Knife({ user, isMobile }) {
                     {filteredRegs.length === 0 ? (
                       <tr>
                         <td colSpan={11} style={{ padding: "20px", textAlign: "center", color: "var(--kf-text-secondary)" }}>
-                          Chưa có bản ghi đăng ký nào phù hợp.
+                          Không có đăng ký nào đang chờ duyệt.
                         </td>
                       </tr>
                     ) : (
@@ -1236,134 +1160,7 @@ export default function Knife({ user, isMobile }) {
       )}
 
       {/* ============================================================= */}
-      {/* MODAL 1: Thêm/Sửa Dao Master */}
-      {/* ============================================================= */}
-      {showKnifeModal && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 1002 }}>
-          <form onSubmit={handleSaveKnife} style={{ background: "var(--kf-card-bg)", padding: 22, borderRadius: 12, width: "90%", maxWidth: 500, display: "flex", flexDirection: "column", gap: 14, boxShadow: "0 4px 15px rgba(0,0,0,.2)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: `2px solid ${colors.primaryLight}`, paddingBottom: 10 }}>
-              <h3 style={{ margin: 0, color: colors.primary }}>{editingKnife ? "Chỉnh sửa dao" : "Thêm mới dao master"}</h3>
-              <button type="button" onClick={() => setShowKnifeModal(false)} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#888" }}>✕</button>
-            </div>
-
-            <div style={{ maxHeight: "400px", overflowY: "auto", paddingRight: 6, display: "flex", flexDirection: "column", gap: 12 }}>
-              <div>
-                <label style={{ display: "block", marginBottom: 4, fontWeight: "600", fontSize: "13px" }}>Bộ phận</label>
-                <select
-                  value={knifeForm.department}
-                  onChange={e => setKnifeForm({ ...knifeForm, department: e.target.value })}
-                  style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--kf-input-border)", background: "var(--kf-input-bg)", color: "var(--kf-input-text)" }}
-                >
-                  {DEPARTMENTS.map(d => (
-                    <option key={d.code} value={d.code}>{d.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label style={{ display: "block", marginBottom: 4, fontWeight: "600", fontSize: "13px" }}>Vị trí sử dụng *</label>
-                <input
-                  type="text"
-                  required
-                  value={knifeForm.userLocation}
-                  onChange={e => setKnifeForm({ ...knifeForm, userLocation: e.target.value })}
-                  placeholder="Ví dụ: Máy Sheet, Bàn Layup..."
-                  style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--kf-input-border)", background: "var(--kf-input-bg)", color: "var(--kf-input-text)", boxSizing: "border-box" }}
-                />
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 10 }}>
-                <div>
-                  <label style={{ display: "block", marginBottom: 4, fontWeight: "600", fontSize: "13px" }}>Loại dao</label>
-                  <select
-                    value={knifeForm.type}
-                    onChange={e => setKnifeForm({ ...knifeForm, type: e.target.value })}
-                    style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--kf-input-border)", background: "var(--kf-input-bg)", color: "var(--kf-input-text)" }}
-                  >
-                    {KNIFE_TYPES.map(t => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label style={{ display: "block", marginBottom: 4, fontWeight: "600", fontSize: "13px" }}>Số lượng</label>
-                  <input
-                    type="number"
-                    min="1"
-                    required
-                    value={knifeForm.quantity}
-                    onChange={e => setKnifeForm({ ...knifeForm, quantity: Number(e.target.value) || 1 })}
-                    style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--kf-input-border)", background: "var(--kf-input-bg)", color: "var(--kf-input-text)", boxSizing: "border-box" }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label style={{ display: "block", marginBottom: 4, fontWeight: "600", fontSize: "13px" }}>Vị trí lưu trữ</label>
-                <input
-                  type="text"
-                  value={knifeForm.storageLocation}
-                  onChange={e => setKnifeForm({ ...knifeForm, storageLocation: e.target.value })}
-                  placeholder="Ví dụ: Tại máy sheet, Tủ dụng cụ..."
-                  style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--kf-input-border)", background: "var(--kf-input-bg)", color: "var(--kf-input-text)", boxSizing: "border-box" }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: "block", marginBottom: 4, fontWeight: "600", fontSize: "13px" }}>Mục đích sử dụng</label>
-                <input
-                  type="text"
-                  value={knifeForm.intendedUse}
-                  onChange={e => setKnifeForm({ ...knifeForm, intendedUse: e.target.value })}
-                  placeholder="Ví dụ: Cắt thùng carton, Prepreg..."
-                  style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--kf-input-border)", background: "var(--kf-input-bg)", color: "var(--kf-input-text)", boxSizing: "border-box" }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: "block", marginBottom: 4, fontWeight: "600", fontSize: "13px" }}>Người phụ trách</label>
-                <input
-                  type="text"
-                  value={knifeForm.responsiblePerson}
-                  onChange={e => setKnifeForm({ ...knifeForm, responsiblePerson: e.target.value })}
-                  placeholder="Ví dụ: 2098 - Nguyễn Chí Long"
-                  style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--kf-input-border)", background: "var(--kf-input-bg)", color: "var(--kf-input-text)", boxSizing: "border-box" }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: "block", marginBottom: 4, fontWeight: "600", fontSize: "13px" }}>Mã đăng ký (Mỗi dòng một mã)</label>
-                <textarea
-                  value={knifeForm.registrationCode}
-                  onChange={e => setKnifeForm({ ...knifeForm, registrationCode: e.target.value })}
-                  placeholder="Ví dụ: GCT-01&#10;GCT-02"
-                  rows={2}
-                  style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--kf-input-border)", background: "var(--kf-input-bg)", color: "var(--kf-input-text)", boxSizing: "border-box", fontFamily: "monospace" }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: "block", marginBottom: 4, fontWeight: "600", fontSize: "13px" }}>Đánh giá Martor / Ghi chú</label>
-                <input
-                  type="text"
-                  value={knifeForm.martorStatus}
-                  onChange={e => setKnifeForm({ ...knifeForm, martorStatus: e.target.value })}
-                  placeholder="Ví dụ: Đồng ý sử dụng..."
-                  style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--kf-input-border)", background: "var(--kf-input-bg)", color: "var(--kf-input-text)", boxSizing: "border-box" }}
-                />
-              </div>
-            </div>
-
-            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 10 }}>
-              <button type="button" onClick={() => setShowKnifeModal(false)} style={{ padding: "8px 16px", borderRadius: 8, border: "1.5px solid var(--kf-card-border)", background: "transparent", cursor: "pointer", fontWeight: "bold" }}>Hủy</button>
-              <button type="submit" style={{ padding: "8px 20px", background: colors.primary, color: "#fff", border: "none", borderRadius: 8, fontWeight: "bold", cursor: "pointer" }}>Lưu lại</button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* ============================================================= */}
-      {/* MODAL 2: Đăng ký & Đánh giá sử dụng dao */}
+      {/* MODAL: Đăng ký & Đánh giá sử dụng dao */}
       {/* ============================================================= */}
       {showRegModal && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 1002 }}>
@@ -1439,23 +1236,44 @@ export default function Knife({ user, isMobile }) {
                 <div>
                   <label style={{ display: "block", marginBottom: 4, fontWeight: "600", fontSize: "13px" }}>Loại dao đang dùng</label>
                   <select
-                    value={regForm.currentKnifeType}
-                    onChange={e => setRegForm({ ...regForm, currentKnifeType: e.target.value })}
+                    value={isOtherValue(regForm.currentKnifeType, CURRENT_KNIFE_OPTIONS) ? "Khác" : regForm.currentKnifeType}
+                    onChange={e => setRegForm({ ...regForm, currentKnifeType: e.target.value === "Khác" ? "" : e.target.value })}
                     style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--kf-input-border)", background: "var(--kf-input-bg)", color: "var(--kf-input-text)" }}
                   >
-                    {KNIFE_TYPES.map(t => (
+                    {CURRENT_KNIFE_OPTIONS.map(t => (
                       <option key={t} value={t}>{t}</option>
                     ))}
                   </select>
+                  {isOtherValue(regForm.currentKnifeType, CURRENT_KNIFE_OPTIONS) && (
+                    <input
+                      type="text"
+                      value={regForm.currentKnifeType}
+                      onChange={e => setRegForm({ ...regForm, currentKnifeType: e.target.value })}
+                      placeholder="Nhập tên dao"
+                      style={{ width: "100%", marginTop: 6, padding: "8px 12px", borderRadius: 8, border: "1px solid var(--kf-input-border)", background: "var(--kf-input-bg)", color: "var(--kf-input-text)", boxSizing: "border-box" }}
+                    />
+                  )}
                 </div>
                 <div>
                   <label style={{ display: "block", marginBottom: 4, fontWeight: "600", fontSize: "13px" }}>Dao mới đề xuất</label>
-                  <input
-                    type="text"
-                    value={regForm.newKnifeType}
-                    onChange={e => setRegForm({ ...regForm, newKnifeType: e.target.value })}
-                    style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--kf-input-border)", background: "var(--kf-input-bg)", color: "var(--kf-input-text)", boxSizing: "border-box" }}
-                  />
+                  <select
+                    value={isOtherValue(regForm.newKnifeType, NEW_KNIFE_OPTIONS) ? "Khác" : regForm.newKnifeType}
+                    onChange={e => setRegForm({ ...regForm, newKnifeType: e.target.value === "Khác" ? "" : e.target.value })}
+                    style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--kf-input-border)", background: "var(--kf-input-bg)", color: "var(--kf-input-text)" }}
+                  >
+                    {NEW_KNIFE_OPTIONS.map(t => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                  {isOtherValue(regForm.newKnifeType, NEW_KNIFE_OPTIONS) && (
+                    <input
+                      type="text"
+                      value={regForm.newKnifeType}
+                      onChange={e => setRegForm({ ...regForm, newKnifeType: e.target.value })}
+                      placeholder="Nhập tên dao"
+                      style={{ width: "100%", marginTop: 6, padding: "8px 12px", borderRadius: 8, border: "1px solid var(--kf-input-border)", background: "var(--kf-input-bg)", color: "var(--kf-input-text)", boxSizing: "border-box" }}
+                    />
+                  )}
                 </div>
               </div>
 
@@ -1519,7 +1337,7 @@ export default function Knife({ user, isMobile }) {
 
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 10 }}>
               <button type="button" onClick={() => setShowRegModal(false)} style={{ padding: "8px 16px", borderRadius: 8, border: "1.5px solid var(--kf-card-border)", background: "transparent", cursor: "pointer", fontWeight: "bold" }}>Hủy</button>
-              <button type="submit" style={{ padding: "8px 20px", background: colors.secondary, color: "#fff", border: "none", borderRadius: 8, fontWeight: "bold", cursor: "pointer" }}>Gửi đăng ký</button>
+              <button type="submit" style={{ padding: "8px 20px", background: colors.secondary, color: "#fff", border: "none", borderRadius: 8, fontWeight: "bold", cursor: "pointer" }}>OK</button>
             </div>
           </form>
         </div>
