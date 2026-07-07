@@ -1,4 +1,5 @@
 import jwt from "jsonwebtoken";
+import JWT_SECRET from "../config/jwtSecret.js";
 
 export function authenticateToken(req, res, next) {
   const authHeader = req.headers["authorization"];
@@ -7,8 +8,6 @@ export function authenticateToken(req, res, next) {
   if (!token) {
     return res.status(401).json({ error: "Chưa đăng nhập" });
   }
-
-  const JWT_SECRET = process.env.JWT_SECRET;
 
   jwt.verify(token, JWT_SECRET, (err, decoded) => {
     if (err) {

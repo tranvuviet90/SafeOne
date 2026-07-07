@@ -27,6 +27,8 @@ dist-ssr
 .env
 .env.*
 !.env.example
+# Khóa JWT tự sinh khi không cấu hình JWT_SECRET (mỗi máy một khóa riêng)
+backend/.jwt_secret
 
 # Generated frontend build output (produced by `npm run build`)
 backend/public/assets/

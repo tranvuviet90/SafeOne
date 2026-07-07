@@ -4,6 +4,7 @@ import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import nodemailer from "nodemailer";
 import pool from "../config/db.js";
+import JWT_SECRET from "../config/jwtSecret.js";
 import { authenticateToken } from "../middleware/auth.js";
 import { rateLimit } from "../middleware/rateLimit.js";
 
@@ -106,7 +107,6 @@ router.post("/login", loginLimiter, async (req, res) => {
       meal_dept: user.meal_dept
     };
 
-    const JWT_SECRET = process.env.JWT_SECRET;
     const token = jwt.sign(payload, JWT_SECRET, { expiresIn: "30d" });
     res.status(200).json({ token, user: payload });
   } catch (error) {
