@@ -165,7 +165,8 @@ const normalizeEvent = (ev) => {
     // được ghi PHẲNG ở cấp cao nhất của document. Vì vậy phải phủ các trường
     // top-level LÊN TRÊN ev.error để những cập nhật này không bị bản gốc ghi đè
     // (nếu không, thông tin cải thiện đã lưu sẽ không hiển thị lại được).
-    const { error, ...top } = ev;
+    // Tách bỏ ev.error khỏi phần top-level (đặt tên _error để ESLint bỏ qua biến không dùng)
+    const { error: _error, ...top } = ev;
     return {
       ...ev.error,
       ...top,

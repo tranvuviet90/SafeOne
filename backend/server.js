@@ -52,9 +52,16 @@ app.use("/api/storage", storageRouter);
 app.use("/api/functions", functionsRouter);
 app.use("/api/notifications", notificationsRouter);
 
-// Serve React production build statically from public directory
+// Serve React production build statically from public directory.
+// LƯU Ý: chỉ index.html được commit; thư mục assets/ (bundle JS/CSS) do `npm run build`
+// sinh ra và bị gitignore. Vì vậy phải kiểm tra CẢ index.html LẪN assets/ — nếu thiếu
+// (quên build), báo rõ ràng thay vì phục vụ trang trắng trỏ tới /assets/*.js không tồn tại.
 const FRONTEND_DIST_DIR = path.join(__dirname, "public");
-if (fs.existsSync(FRONTEND_DIST_DIR)) {
+const INDEX_HTML = path.join(FRONTEND_DIST_DIR, "index.html");
+const ASSETS_DIR = path.join(FRONTEND_DIST_DIR, "assets");
+const hasBuiltFrontend = fs.existsSync(INDEX_HTML) && fs.existsSync(ASSETS_DIR);
+
+if (hasBuiltFrontend) {
   console.log("Serving static frontend files from:", FRONTEND_DIST_DIR);
   app.use(express.static(FRONTEND_DIST_DIR));
   app.get("*", (req, res, next) => {
@@ -62,12 +69,23 @@ if (fs.existsSync(FRONTEND_DIST_DIR)) {
     if (req.path.startsWith("/api") || req.path.startsWith("/uploads")) {
       return next();
     }
-    res.sendFile(path.join(FRONTEND_DIST_DIR, "index.html"));
+    res.sendFile(INDEX_HTML);
   });
 } else {
-  console.log("Frontend production build ('public') not found. Server running in API-only mode.");
-  app.get("/", (req, res) => {
-    res.status(200).json({ ok: true, message: "SafeOne API Server is running" });
+  console.warn("\n⚠️  ========================================================");
+  console.warn("⚠️  CHƯA BUILD FRONTEND — thiếu backend/public/index.html hoặc backend/public/assets/");
+  console.warn("⚠️  Hãy chạy 'npm run build' ở thư mục gốc để sinh giao diện, rồi khởi động lại.");
+  console.warn("⚠️  Backend vẫn chạy ở chế độ CHỈ API.");
+  console.warn("⚠️  ========================================================\n");
+  app.get("*", (req, res, next) => {
+    if (req.path.startsWith("/api") || req.path.startsWith("/uploads")) {
+      return next();
+    }
+    res.status(503).type("html").send(
+      "<h2>SafeOne: giao diện chưa được build</h2>" +
+      "<p>Máy chủ API đang chạy, nhưng chưa có bản build frontend.</p>" +
+      "<p>Chạy <code>npm run build</code> ở thư mục gốc rồi khởi động lại backend.</p>"
+    );
   });
 }
 
