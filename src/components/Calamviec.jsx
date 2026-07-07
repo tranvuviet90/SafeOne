@@ -207,25 +207,34 @@ function CaLamViec({ user, isMobile }) {
     [allUsers]
   );
 
+  // Chỉ cập nhật state khi nội dung THỰC SỰ đổi, giữ nguyên reference cũ nếu giống.
+  // Quan trọng: mỗi lần poll (30s) hoặc sự kiện realtime, dữ liệu về là một mảng MỚI.
+  // Nếu setTasks luôn nhận reference mới -> effect [weekId, tasks] chạy lại -> setLoading(true)
+  // -> màn hình rơi vào nhánh spinner (early-return) -> modal ghi chú đang mở bị unmount/remount
+  // -> con trỏ ô nhập nhảy về đầu, gõ bị đảo ngược. Dedupe theo nội dung để tránh điều đó.
+  const setTasksIfChanged = (next) => {
+    setTasks(prev => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next));
+  };
+
   // 1. Fetch Dynamic Tasks
   const fetchTasksConfig = async () => {
     try {
       const docSnap = await dbService.getDoc("weekly_assignments_v6", "config_tasks");
       if (docSnap && docSnap._exists !== false) {
         if (Array.isArray(docSnap.tasks)) {
-          setTasks(docSnap.tasks);
+          setTasksIfChanged(docSnap.tasks);
         } else {
-          setTasks(DEFAULT_TASKS);
+          setTasksIfChanged(DEFAULT_TASKS);
         }
       } else {
-        setTasks(DEFAULT_TASKS);
+        setTasksIfChanged(DEFAULT_TASKS);
         if (canPlanBoard) {
           await dbService.updateDoc("weekly_assignments_v6", "config_tasks", { tasks: DEFAULT_TASKS });
         }
       }
     } catch (err) {
       console.error("Lỗi lấy danh sách nhiệm vụ:", err);
-      setTasks(DEFAULT_TASKS);
+      setTasksIfChanged(DEFAULT_TASKS);
     }
   };
 
