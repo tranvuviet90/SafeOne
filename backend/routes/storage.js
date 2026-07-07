@@ -53,9 +53,11 @@ router.post("/upload", authenticateToken, (req, res) => {
       return res.status(400).json({ error: "Không tìm thấy file để upload" });
     }
 
-    const host = req.get("host");
-    const protocol = req.protocol;
-    const fileUrl = `${protocol}://${host}/uploads/${req.file.filename}`;
+    // Trả về URL TƯƠNG ĐỐI (không kèm host/cổng). Nhờ vậy ảnh luôn tải theo đúng
+    // origin đang mở: dev chạy 5173 sẽ đi qua proxy Vite -> 5000, production thì
+    // cùng origin với backend. Nếu trả absolute (vd http://localhost:5000/...) thì
+    // ảnh luôn trỏ cổng 5000 dù frontend chạy ở cổng khác.
+    const fileUrl = `/uploads/${req.file.filename}`;
 
     res.status(200).json({
       message: "Upload file thành công",

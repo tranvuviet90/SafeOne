@@ -370,7 +370,7 @@ function BoDam({ user, isMobile }) {
           })}
         </div>
       ) : (
-        <table style={{ borderCollapse: "separate", borderSpacing: 0, width: "100%", maxWidth: 820, background: "#fff", borderRadius: 14, overflow: "hidden", boxShadow: "0 1.5px 9px #E88E2E11", border: `1.2px solid ${orangeLight}` }}>
+        <table style={{ borderCollapse: "separate", borderSpacing: 0, width: "100%", background: "#fff", borderRadius: 14, overflow: "hidden", boxShadow: "0 1.5px 9px #E88E2E11", border: `1.2px solid ${orangeLight}` }}>
           <thead>
             <tr style={{ background: orangeLight }}>
               <th style={{ padding: "10px 14px", fontSize: 15, color: dark, textAlign: "left", whiteSpace: "nowrap", width: 110 }}>{t("bodam.col.name")}</th>
@@ -418,7 +418,7 @@ function BoDam({ user, isMobile }) {
                         {item.unavailable ? t("bodam.reopen") : t("bodam.markUnavailable")}
                       </button>
                       {!item.unavailable && (
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center', maxWidth: 360 }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center', width: '100%' }}>
                           {SHIFTS.map(sh => {
                             const val = assignedShifts[sh];
                             return (

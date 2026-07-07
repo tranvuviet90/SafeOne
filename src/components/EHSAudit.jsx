@@ -146,19 +146,30 @@ const formatDateStr = (d) => {
 
 // ===== Chuẩn hóa tương thích ngược =====
 // Hỗ trợ cả định dạng phẳng mới và định dạng lồng cũ { department, error: {...} }
+// Chuẩn hóa URL ảnh về dạng tương đối theo origin hiện tại. Dữ liệu cũ có thể đã
+// lưu absolute (vd http://localhost:5000/uploads/x.jpg) khiến ảnh luôn trỏ cổng
+// 5000; hàm này cắt bỏ phần host để ảnh tải đúng theo cổng đang mở (5173 dev qua
+// proxy, hoặc cùng origin ở production).
+const toRelativeUploadUrl = (url) => {
+  if (!url || typeof url !== "string") return url;
+  const idx = url.indexOf("/uploads/");
+  return idx >= 0 ? url.slice(idx) : url;
+};
+
 const normalizeEvent = (ev) => {
   if (!ev) return null;
   if (ev.error && typeof ev.error === 'object') {
-    // Định dạng cũ: dữ liệu vi phạm nằm trong ev.error
+    // Định dạng lồng (nested): dữ liệu vi phạm gốc nằm trong ev.error, nhưng các
+    // cập nhật về sau (cải thiện/khắc phục: pic, dueDate, progressNotes,
+    // ehsVerified, improvementImageUrl... và sửa lỗi: group/code/desc/note...)
+    // được ghi PHẲNG ở cấp cao nhất của document. Vì vậy phải phủ các trường
+    // top-level LÊN TRÊN ev.error để những cập nhật này không bị bản gốc ghi đè
+    // (nếu không, thông tin cải thiện đã lưu sẽ không hiển thị lại được).
+    const { error, ...top } = ev;
     return {
-      id: ev.id || ev.uid,
-      department: ev.department,
-      heSo: ev.heSo,
-      peopleCount: ev.peopleCount,
-      addedBy: ev.addedBy,
-      addedByUid: ev.addedByUid,
-      is_deleted: ev.is_deleted,
       ...ev.error,
+      ...top,
+      id: ev.id || ev.uid,
       timestamp: ev.timestamp || ev.error.timestamp,
     };
   }
@@ -561,7 +572,7 @@ function ExportModal({ onClose, departments }) {
 /* =========================
    CỬA SỔ (MODAL) CẢI THIỆN
    ========================= */
-function ImprovementModal({ modalData, onClose, onSave }) {
+function ImprovementModal({ modalData, onClose, onSave, canConfirm, onViewImage }) {
   const { t } = useI18n();
   const [pic, setPic] = useState(modalData.error?.pic || "");
   const [dueDate, setDueDate] = useState(modalData.error?.dueDate || "");
@@ -569,6 +580,7 @@ function ImprovementModal({ modalData, onClose, onSave }) {
   const [ehsVerified, setEhsVerified] = useState(modalData.error?.ehsVerified || false);
   const [improvementImageFile, setImprovementImageFile] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
+  const savedImageUrl = toRelativeUploadUrl(modalData.error?.improvementImageUrl);
 
   const handleImageChange = async (e) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -589,7 +601,7 @@ function ImprovementModal({ modalData, onClose, onSave }) {
 
   const handleSave = async () => {
     setIsSaving(true);
-    let imageUrl = modalData.error?.improvementImageUrl || null;
+    let imageUrl = toRelativeUploadUrl(modalData.error?.improvementImageUrl) || null;
     if (improvementImageFile) {
       try {
         const formData = new FormData();
@@ -635,29 +647,50 @@ function ImprovementModal({ modalData, onClose, onSave }) {
           </div>
           <div> <label style={labelStyle}>{t("ehs.improve.measure")}</label> <textarea value={progressNotes} onChange={e => setProgressNotes(e.target.value)} style={{...inputStyle, minHeight: 70}} /> </div>
           <div style={{ marginTop: 4 }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none', ...labelStyle }}>
-              <input
-                type="checkbox"
-                checked={ehsVerified}
-                onChange={e => setEhsVerified(e.target.checked)}
-                style={{ width: 18, height: 18, accentColor: colors.primary, cursor: 'pointer' }}
-              />
-              <span>{t("ehs.improve.ehsConfirm")}</span>
-            </label>
+            {canConfirm ? (
+              // Chỉ EHS/Admin mới có nút đóng lỗi (xác nhận đã hoàn thành). Đây là
+              // NÚT hành động, không phải checkbox — bấm để chuyển trạng thái hoàn
+              // thành, giá trị được ghi lại khi bấm "Lưu thay đổi".
+              <button
+                type="button"
+                onClick={() => setEhsVerified(v => !v)}
+                style={{
+                  width: '100%', padding: '10px 14px', borderRadius: 8, cursor: 'pointer',
+                  fontWeight: 700, fontSize: 14, display: 'flex', alignItems: 'center',
+                  justifyContent: 'center', gap: 8,
+                  border: ehsVerified ? '1px solid #388e3c' : `1px solid ${colors.border}`,
+                  background: ehsVerified ? '#4caf50' : colors.background,
+                  color: ehsVerified ? colors.white : colors.textPrimary,
+                }}
+              >
+                {ehsVerified ? `✓ ${t("ehs.improve.confirmedDone")}` : t("ehs.improve.confirmDone")}
+              </button>
+            ) : (
+              // Người không phải EHS chỉ xem trạng thái, không thể tự đóng lỗi.
+              <div style={{
+                padding: '10px 14px', borderRadius: 8, fontWeight: 700, fontSize: 14,
+                textAlign: 'center',
+                background: ehsVerified ? '#e8f5e9' : colors.background,
+                color: ehsVerified ? '#2e7d32' : colors.textSecondary,
+                border: `1px solid ${ehsVerified ? '#a5d6a7' : colors.border}`,
+              }}>
+                {ehsVerified ? `✓ ${t("ehs.improve.statusConfirmed")}` : t("ehs.improve.statusPending")}
+              </div>
+            )}
           </div>
           <div>
             <label style={labelStyle}>{t("ehs.improve.photo")}</label>
             <input type="file" accept="image/*" onChange={handleImageChange} style={{...inputStyle, padding: 5}} />
-            {modalData.error.improvementImageUrl && !improvementImageFile && (
+            {savedImageUrl && !improvementImageFile && (
               <div style={{ marginTop: 8 }}>
                 <span style={{ fontSize: 12, color: colors.textSecondary, display: 'block', marginBottom: 4 }}>{t("ehs.improve.photoSaved")}</span>
-                <a href={modalData.error.improvementImageUrl} target="_blank" rel="noopener noreferrer">
-                  <img
-                    src={modalData.error.improvementImageUrl}
-                    alt={t("ehs.improve.photo")}
-                    style={{ maxWidth: '100%', maxHeight: 150, borderRadius: 6, border: `1px solid ${colors.border}`, display: 'block', objectFit: 'contain' }}
-                  />
-                </a>
+                {/* Bấm để xem bằng lightbox chung của tab EHS Audit (zoom/tải/đóng). */}
+                <img
+                  src={savedImageUrl}
+                  alt={t("ehs.improve.photo")}
+                  onClick={() => onViewImage?.(savedImageUrl)}
+                  style={{ maxWidth: '100%', maxHeight: 150, borderRadius: 6, border: `1px solid ${colors.border}`, display: 'block', objectFit: 'contain', cursor: 'zoom-in' }}
+                />
               </div>
             )}
           </div>
@@ -1916,7 +1949,7 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
             isMobile={isMobile}
           />
         )}
-        {improvementModal.isOpen && <ImprovementModal modalData={improvementModal} onClose={() => setImprovementModal({ isOpen: false, error: null, logId: "" })} onSave={handleSaveImprovement} />}
+        {improvementModal.isOpen && <ImprovementModal modalData={improvementModal} onClose={() => setImprovementModal({ isOpen: false, error: null, logId: "" })} onSave={handleSaveImprovement} canConfirm={isAdminOrEhs} onViewImage={(url) => openViewer([url], 0)} />}
         {editModal.isOpen && <EditErrorModal modalData={editModal} onClose={() => setEditModal({ isOpen: false, error: null, logId: "", department: "" })} onSave={handleSaveEdit} />}
 
         {/* Popup xác nhận sửa chính tả */}
