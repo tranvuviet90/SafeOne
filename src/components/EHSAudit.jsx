@@ -109,19 +109,27 @@ async function makeThumbDataURL(url, maxW = 96, maxH = 96, quality = 0.55) {
 
 const safeTsToDate = (ts) => {
     if (!ts) return null;
-    if (ts.seconds) return new Date(ts.seconds * 1000);
-    if (ts instanceof Date) return ts;
-    if (typeof ts === 'string') {
+    let result = null;
+    if (ts.seconds) {
+        result = new Date(ts.seconds * 1000);
+    } else if (ts instanceof Date) {
+        result = ts;
+    } else if (typeof ts === 'string') {
         const d = new Date(ts);
-        if (!isNaN(d.getTime())) return d;
-        const parts = ts.match(/(\d+)/g);
-        if (parts && parts.length === 6) {
-            const [h, m, s, day, month, year] = parts.map(Number);
-            return new Date(year, month - 1, day, h, m, s);
+        if (!isNaN(d.getTime())) {
+            result = d;
+        } else {
+            const parts = ts.match(/(\d+)/g);
+            if (parts && parts.length === 6) {
+                const [h, m, s, day, month, year] = parts.map(Number);
+                result = new Date(year, month - 1, day, h, m, s);
+            }
         }
+    } else {
+        const n = Number(ts);
+        if (!Number.isNaN(n)) result = new Date(n);
     }
-    const n = Number(ts);
-    if (!Number.isNaN(n)) return new Date(n);
+    if (result && !isNaN(result.getTime())) return result;
     return null;
 };
 
@@ -144,12 +152,6 @@ const formatDateStr = (d) => {
   return `${y}-${m}-${day}`;
 };
 
-// ===== Chuẩn hóa tương thích ngược =====
-// Hỗ trợ cả định dạng phẳng mới và định dạng lồng cũ { department, error: {...} }
-// Chuẩn hóa URL ảnh về dạng tương đối theo origin hiện tại. Dữ liệu cũ có thể đã
-// lưu absolute (vd http://localhost:5000/uploads/x.jpg) khiến ảnh luôn trỏ cổng
-// 5000; hàm này cắt bỏ phần host để ảnh tải đúng theo cổng đang mở (5173 dev qua
-// proxy, hoặc cùng origin ở production).
 const toRelativeUploadUrl = (url) => {
   if (!url || typeof url !== "string") return url;
   const idx = url.indexOf("/uploads/");
@@ -159,13 +161,6 @@ const toRelativeUploadUrl = (url) => {
 const normalizeEvent = (ev) => {
   if (!ev) return null;
   if (ev.error && typeof ev.error === 'object') {
-    // Định dạng lồng (nested): dữ liệu vi phạm gốc nằm trong ev.error, nhưng các
-    // cập nhật về sau (cải thiện/khắc phục: pic, dueDate, progressNotes,
-    // ehsVerified, improvementImageUrl... và sửa lỗi: group/code/desc/note...)
-    // được ghi PHẲNG ở cấp cao nhất của document. Vì vậy phải phủ các trường
-    // top-level LÊN TRÊN ev.error để những cập nhật này không bị bản gốc ghi đè
-    // (nếu không, thông tin cải thiện đã lưu sẽ không hiển thị lại được).
-    // Tách bỏ ev.error khỏi phần top-level (đặt tên _error để ESLint bỏ qua biến không dùng)
     const { error: _error, ...top } = ev;
     return {
       ...ev.error,
@@ -174,7 +169,6 @@ const normalizeEvent = (ev) => {
       timestamp: ev.timestamp || ev.error.timestamp,
     };
   }
-  // Định dạng mới: phẳng
   return { id: ev.id || ev.uid, ...ev };
 };
 
@@ -208,7 +202,6 @@ function ExportModal({ onClose, departments }) {
     const ws = wb.getWorksheet("Sheet1") || wb.worksheets[0];
     if (!ws) throw new Error("Template CAP.xlsx thiếu Sheet1.");
     
-    // Explicitly enforce columns widths up to Column 20
     const baseWidths = [6, 30, 15, 18, 22, 20, 35, 15, 18, 20, 31.29, 31.29, 22, 20];
     for (let idx = 0; idx < 20; idx++) {
       ws.getColumn(idx + 1).width = idx < baseWidths.length ? baseWidths[idx] : 31.29;
@@ -237,7 +230,6 @@ function ExportModal({ onClose, departments }) {
         }
       }
 
-      // Calculate Progress Status and Comment dynamically
       let progressStatus = "Chưa tiến hành";
       let ehsComment = "";
 
@@ -270,18 +262,18 @@ function ExportModal({ onClose, departments }) {
         ehsComment = ehsComment ? `${ehsComment}\n${historyText}` : historyText;
       }
 
-      ws.getCell(rowIndex, 1).value = i + 1; // No.
-      ws.getCell(rowIndex, 2).value = findings; // Findings
-      ws.getCell(rowIndex, 3).value = r.ca ? `${r.dateISO}\nCa: ${r.ca}` : r.dateISO; // Audit date
-      ws.getCell(rowIndex, 4).value = r.addedBy || ""; // Auditor
-      ws.getCell(rowIndex, 5).value = r.department || ""; // Responsible Department
-      ws.getCell(rowIndex, 6).value = r.responsiblePerson || ""; // Information Recipient (Người nhận thông tin)
-      ws.getCell(rowIndex, 7).value = r.progressNotes || ""; // Corrective Action
-      ws.getCell(rowIndex, 8).value = r.pic || ""; // PIC (Người cải thiện)
-      ws.getCell(rowIndex, 9).value = progressStatus; // Progress Status
-      ws.getCell(rowIndex, 10).value = r.dueDate || ""; // Estimated Completion Date
-      ws.getCell(rowIndex, 13).value = ""; // EHS Assessment (blank)
-      ws.getCell(rowIndex, 14).value = ehsComment; // Comment (blank)
+      ws.getCell(rowIndex, 1).value = i + 1;
+      ws.getCell(rowIndex, 2).value = findings;
+      ws.getCell(rowIndex, 3).value = r.ca ? `${r.dateISO}\nCa: ${r.ca}` : r.dateISO;
+      ws.getCell(rowIndex, 4).value = r.addedBy || "";
+      ws.getCell(rowIndex, 5).value = r.department || "";
+      ws.getCell(rowIndex, 6).value = r.responsiblePerson || "";
+      ws.getCell(rowIndex, 7).value = r.progressNotes || "";
+      ws.getCell(rowIndex, 8).value = r.pic || "";
+      ws.getCell(rowIndex, 9).value = progressStatus;
+      ws.getCell(rowIndex, 10).value = r.dueDate || "";
+      ws.getCell(rowIndex, 13).value = "";
+      ws.getCell(rowIndex, 14).value = ehsComment;
 
       let imageAdded = false;
       const processImage = async (url, col) => {
@@ -292,7 +284,7 @@ function ExportModal({ onClose, departments }) {
           const img = new Image();
           await new Promise(resolve => { 
             img.onload = resolve; 
-            img.onerror = resolve; // Continue even if image is invalid
+            img.onerror = resolve;
             img.src = b64; 
           });
           if (img.width && img.height) {
@@ -306,19 +298,17 @@ function ExportModal({ onClose, departments }) {
         }
       };
 
-      // Process "Before" pictures: first goes to Col 11 (K), subsequent to 15 (O), 16 (P)...
       const beforeImages = r.imageUrls && r.imageUrls.length > 0 ? r.imageUrls : (r.beforeUrl ? [r.beforeUrl] : []);
       for (let j = 0; j < beforeImages.length; j++) {
         const url = beforeImages[j];
         if (j === 0) {
-          await processImage(url, 11); // Column 11 (K)
+          await processImage(url, 11);
         } else {
-          const col = 15 + (j - 1); // Column 15 (O), 16 (P), etc.
+          const col = 15 + (j - 1);
           await processImage(url, col);
         }
       }
       
-      // Process "After" picture in Column 12 (L)
       if (r.afterUrl) {
         await processImage(r.afterUrl, 12);
       }
@@ -339,8 +329,6 @@ function ExportModal({ onClose, departments }) {
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(buf);
 
-    // Layout cố định của template: mỗi nhóm có startRow và số dòng mặc định
-    // Khi vi phạm > defaultRows thì chèn thêm dòng và đẩy các nhóm dưới xuống
     const groupLayout = [
       { group: "Bảo hộ lao động (PPE)", startRow: 5,  defaultRows: 4 },
       { group: "5S",                     startRow: 9,  defaultRows: 3 },
@@ -354,12 +342,10 @@ function ExportModal({ onClose, departments }) {
       { group: "Nguyên vật liệu",        startRow: 33, defaultRows: 2 },
       { group: "Hành vi không an toàn",  startRow: 35, defaultRows: 3 },
       { group: "Thái độ hợp tác",        startRow: 38, defaultRows: 1 },
-      // Dòng 39: gộp cả "Khác" và "Lỗi Khác" (custom errors) vào chung
       { group: "__KHAC__",               startRow: 39, defaultRows: 1 },
     ];
     const ORIGINAL_TOTAL_ROW = 40;
 
-    // Gom dữ liệu theo bộ phận
     const byDeptWithErrors = new Map();
     rows.forEach(r => {
       if (!byDeptWithErrors.has(r.department)) byDeptWithErrors.set(r.department, []);
@@ -379,7 +365,6 @@ function ExportModal({ onClose, departments }) {
 
       const deptRows = byDeptWithErrors.get(depName) || [];
 
-      // Gom vi phạm theo nhóm, rồi trong nhóm gom theo code
       const violationsByGroup = new Map();
       deptRows.forEach(r => {
         const grp = r.group || "Khác";
@@ -391,25 +376,22 @@ function ExportModal({ onClose, departments }) {
         }
         const entry = codeMap.get(key);
         entry.count += 1;
-        entry.adjusted = r.adjusted; // lấy giá trị mới nhất
+        entry.adjusted = r.adjusted;
         if (r.note) entry.notes.push(r.note);
       });
 
-      // Chuyển thành danh sách theo nhóm
       const violationsListByGroup = new Map();
       violationsByGroup.forEach((codeMap, grp) => {
         violationsListByGroup.set(grp, Array.from(codeMap.values()));
       });
-      // Gộp "Khác" và "Lỗi Khác" (custom errors) vào __KHAC__
       const khacList = [
         ...(violationsListByGroup.get("Khác") || []),
         ...(violationsListByGroup.get("Lỗi Khác") || []),
       ];
       if (khacList.length > 0) violationsListByGroup.set("__KHAC__", khacList);
 
-      // Điền dữ liệu theo từng nhóm, chèn dòng khi cần
       let rowOffset = 0;
-      let lastDataRow = ORIGINAL_TOTAL_ROW - 1; // dòng dữ liệu cuối cùng = 39
+      let lastDataRow = ORIGINAL_TOTAL_ROW - 1;
 
       for (const layout of groupLayout) {
         const actualStartRow = layout.startRow + rowOffset;
@@ -417,7 +399,6 @@ function ExportModal({ onClose, departments }) {
         const extraRows = Math.max(0, violations.length - layout.defaultRows);
 
         if (extraRows > 0) {
-          // Chèn thêm dòng trống vào cuối phần của nhóm này
           const insertAt = actualStartRow + layout.defaultRows;
           for (let i = 0; i < extraRows; i++) {
             ws.spliceRows(insertAt + i, 0, []);
@@ -426,7 +407,6 @@ function ExportModal({ onClose, departments }) {
           lastDataRow += extraRows;
         }
 
-        // Điền vi phạm vào các dòng
         violations.forEach((v, idx) => {
           const targetRow = actualStartRow + idx;
           ws.getCell(`C${targetRow}`).value = v.count;
@@ -441,8 +421,8 @@ function ExportModal({ onClose, departments }) {
         });
       }
 
-      const totalRow = lastDataRow + 1;  // = 40 + rowOffset
-      const scoreRow = lastDataRow + 2;  // = 41 + rowOffset
+      const totalRow = lastDataRow + 1;
+      const scoreRow = lastDataRow + 2;
       ws.getCell(`G${totalRow}`).value = { formula: `SUM(G5:G${lastDataRow})` };
       ws.getCell(`G${scoreRow}`).value = { formula: `100-G${totalRow}` };
     }
@@ -460,7 +440,6 @@ function ExportModal({ onClose, departments }) {
     try {
       const { start, end, label } = getDateRange();
 
-      // T\u1ea3i d\u1eef li\u1ec7u vi ph\u1ea1m ph\u1eb3ng t\u1eeb gemba_events v\u00e0 chu\u1ea9n h\u00f3a
       const allEvents = await dbService.getDocs("gemba_events");
       const filteredEvents = allEvents.filter(ev => {
         if (ev.is_deleted) return false;
@@ -476,7 +455,6 @@ function ExportModal({ onClose, departments }) {
         setIsGenerating(false); return;
       }
 
-      // T\u1ea3i s\u1ed1 nh\u00e2n s\u1ef1 t\u1eeb gemba_scores (\u0111\u1ec3 xu\u1ea5t B\u1ea3ng ch\u1ea5m \u0111i\u1ec3m)
       const allScoresDocs = await dbService.getDocs("gemba_scores");
 
       const rows = [];
@@ -514,7 +492,6 @@ function ExportModal({ onClose, departments }) {
         });
         await exportCAP(rows, label, selectedDept);
       } else {
-        // X\u00e2y d\u1ef1ng allDeptData Map \u2013 ch\u1ec9 c\u1ea7n peopleCount cho exportBangChamDiem
         const allDeptData = new Map();
         departments.forEach(dept => {
           const deptDoc = allScoresDocs.find(d => (d.id || d.uid) === dept.name);
@@ -524,13 +501,12 @@ function ExportModal({ onClose, departments }) {
         await exportBangChamDiem(rows.filter(r => !r.isReminder), label, allDeptData);
       }
     } catch (err) {
-      console.error("C\u00f3 l\u1ed7i khi xu\u1ea5t b\u00e1o c\u00e1o:", err);
+      console.error("Có lỗi khi xuất báo cáo:", err);
       alert(`${t("gemba.alert.exportFail")} ${err.message}`);
     } finally {
       setIsGenerating(false);
     }
   };
-
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 1200 }}>
@@ -649,9 +625,6 @@ function ImprovementModal({ modalData, onClose, onSave, canConfirm, onViewImage 
           <div> <label style={labelStyle}>{t("ehs.improve.measure")}</label> <textarea value={progressNotes} onChange={e => setProgressNotes(e.target.value)} style={{...inputStyle, minHeight: 70}} /> </div>
           <div style={{ marginTop: 4 }}>
             {canConfirm ? (
-              // Chỉ EHS/Admin mới có nút đóng lỗi (xác nhận đã hoàn thành). Đây là
-              // NÚT hành động, không phải checkbox — bấm để chuyển trạng thái hoàn
-              // thành, giá trị được ghi lại khi bấm "Lưu thay đổi".
               <button
                 type="button"
                 onClick={() => setEhsVerified(v => !v)}
@@ -667,7 +640,6 @@ function ImprovementModal({ modalData, onClose, onSave, canConfirm, onViewImage 
                 {ehsVerified ? `✓ ${t("ehs.improve.confirmedDone")}` : t("ehs.improve.confirmDone")}
               </button>
             ) : (
-              // Người không phải EHS chỉ xem trạng thái, không thể tự đóng lỗi.
               <div style={{
                 padding: '10px 14px', borderRadius: 8, fontWeight: 700, fontSize: 14,
                 textAlign: 'center',
@@ -685,7 +657,6 @@ function ImprovementModal({ modalData, onClose, onSave, canConfirm, onViewImage 
             {savedImageUrl && !improvementImageFile && (
               <div style={{ marginTop: 8 }}>
                 <span style={{ fontSize: 12, color: colors.textSecondary, display: 'block', marginBottom: 4 }}>{t("ehs.improve.photoSaved")}</span>
-                {/* Bấm để xem bằng lightbox chung của tab EHS Audit (zoom/tải/đóng). */}
                 <img
                   src={savedImageUrl}
                   alt={t("ehs.improve.photo")}
@@ -714,13 +685,11 @@ function GembaReportDashboard({ onClose, onExport, departments, allDeptScores, s
   const [activeMonth, setActiveMonth] = useState(initialMonth);
   const [animated, setAnimated] = useState(false);
 
-  // Trigger grow animation on mount
   React.useEffect(() => {
     const t = setTimeout(() => setAnimated(true), 60);
     return () => clearTimeout(t);
   }, []);
 
-  // Re-animate when month changes
   React.useEffect(() => {
     setAnimated(false);
     const t = setTimeout(() => setAnimated(true), 60);
@@ -748,7 +717,6 @@ function GembaReportDashboard({ onClose, onExport, departments, allDeptScores, s
 
   const deptStats = calcStats(activeMonth).sort((a, b) => b.remaining - a.remaining);
 
-  // Cột "Trung bình" ở cuối chart: điểm trung bình + gộp thống kê nhóm lỗi toàn bộ bộ phận
   const averageEntry = (() => {
     const cnt = deptStats.length;
     const avgRemaining = cnt ? deptStats.reduce((s, d) => s + d.remaining, 0) / cnt : 0;
@@ -767,13 +735,8 @@ function GembaReportDashboard({ onClose, onExport, departments, allDeptScores, s
       isAverage: true,
     };
   })();
-  // Dữ liệu vẽ chart = các bộ phận + cột trung bình ở cuối (bảng chi tiết vẫn dùng deptStats)
   const chartStats = deptStats.length ? [...deptStats, averageEntry] : deptStats;
 
-  const CHART_H = isMobile ? 180 : 260;
-  const BAR_MAX = 100;
-
-  // Bảng màu riêng cho cột trung bình (xám) để phân biệt với cột bộ phận
   const AVG_COLORS = { main: '#90a4ae', top: '#b0bec5', side: '#607d8b', light: '#eceff1', score: '#ffffff' };
 
   const getColors = (score) => {
@@ -799,25 +762,21 @@ function GembaReportDashboard({ onClose, onExport, departments, allDeptScores, s
   const PAD_T = isMobile ? 16 : 20;   
   const PAD_B = isMobile ? 44 : 52;   
   const RPT_CHART_H = SVG_H - PAD_T - PAD_B;
-  const RPT_BAR_MAX = 100;          // thang điểm tối đa của biểu đồ báo cáo (100%)
-  const DX = isMobile ? 6 : 10;     // độ lệch chiều sâu khối 3D theo trục X
-  const DY = isMobile ? 6 : 10;     // độ lệch chiều sâu khối 3D theo trục Y
+  const RPT_BAR_MAX = 100;
+  const DX = isMobile ? 6 : 10;
+  const DY = isMobile ? 6 : 10;
   const CHART_W = SVG_W - PAD_L - PAD_R;
   const slotW = CHART_W / n;
   const barW = Math.min(isMobile ? 26 : 40, slotW * 0.62);
 
-  // Khối cột 3D đẳng cự — render bằng SVG polygon + animate (SMIL) y nguyên acp360
   const Bar3D = ({ x0, yBase, barH, c, score, deptName, idx, onEnter, onLeave, isAverage }) => {
     const animDelay = idx * 55;
     const animId = `gemba-clip-${idx}`;
-    // Mặt trước (rect)
     const fx0 = x0, fy0 = yBase - barH, fx1 = x0 + barW;
-    // Mặt trên (hình bình hành)
     const tx0 = fx0,       ty0 = fy0;
     const tx1 = fx1,       ty1 = fy0;
     const tx2 = fx1 + DX,  ty2 = fy0 - DY;
     const tx3 = fx0 + DX,  ty3 = fy0 - DY;
-    // Mặt phải
     const rx0 = fx1,       ry0 = fy0;
     const rx1 = fx1 + DX,  ry1 = fy0 - DY;
     const rx2 = fx1 + DX,  ry2 = yBase - DY;
@@ -845,6 +804,7 @@ function GembaReportDashboard({ onClose, onExport, departments, allDeptScores, s
                   from={yBase}
                   to={yBase - RPT_CHART_H - DY - 2}
                   dur="0.55s"
+                  body={null}
                   begin={`${animDelay}ms`}
                   fill="freeze"
                   calcMode="spline"
@@ -868,15 +828,11 @@ function GembaReportDashboard({ onClose, onExport, departments, allDeptScores, s
         </defs>
 
         <g clipPath={`url(#${animId})`}>
-          {/* Mặt phải */}
           <polygon points={`${rx0},${ry0} ${rx1},${ry1} ${rx2},${ry2} ${rx3},${ry3}`} fill={c.side} />
-          {/* Mặt trên */}
           <polygon points={`${tx0},${ty0} ${tx1},${ty1} ${tx2},${ty2} ${tx3},${ty3}`} fill={c.top} />
-          {/* Mặt trước */}
           <rect x={fx0} y={fy0} width={barW} height={barH} fill={`url(#gf${idx})`} stroke={isAverage ? '#ffffff' : 'none'} strokeWidth={isAverage ? 1.5 : 0} strokeDasharray={isAverage ? '4 3' : '0'} />
         </g>
 
-        {/* Số điểm — giữa mặt trước khi cột đủ cao */}
         {barH >= 22 && (
           <text
             x={fx0 + barW / 2}
@@ -891,7 +847,6 @@ function GembaReportDashboard({ onClose, onExport, departments, allDeptScores, s
             {score}
           </text>
         )}
-        {/* Số điểm phía trên cột khi cột quá thấp */}
         {barH < 22 && (
           <text
             x={fx0 + barW / 2}
@@ -907,7 +862,6 @@ function GembaReportDashboard({ onClose, onExport, departments, allDeptScores, s
           </text>
         )}
 
-        {/* Tên bộ phận dưới chân cột */}
         <text
           x={fx0 + barW / 2 + DX / 2}
           y={yBase + (isMobile ? 13 : 16)}
@@ -932,7 +886,6 @@ function GembaReportDashboard({ onClose, onExport, departments, allDeptScores, s
     >
       <div style={{ background: 'linear-gradient(160deg,#1a2540 0%,#0f1c38 100%)', borderRadius: 22, width: '100%', maxWidth: 1040, maxHeight: '94vh', overflowY: 'auto', overflowX: 'hidden', boxShadow: '0 16px 64px rgba(0,0,0,0.55)', padding: isMobile ? '16px 10px 20px' : '28px 36px 32px', position: 'relative' }}>
 
-        {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
           <div>
             <div style={{ fontWeight: 800, fontSize: isMobile ? 16 : 21, color: '#e8f0fe', letterSpacing: '-0.3px' }}>
@@ -956,7 +909,6 @@ function GembaReportDashboard({ onClose, onExport, departments, allDeptScores, s
           </div>
         </div>
 
-        {/* Legend */}
         <div style={{ display: 'flex', gap: 18, marginBottom: 20, flexWrap: 'wrap' }}>
           {[['#1565c0','#5b9bd5',t("ehs.report.legendHigh")], ['#f9a825','#fdd835',t("ehs.report.legendMid")], ['#c62828','#ef5350',t("ehs.report.legendLow")]].map(([c1, c2, label]) => (
             <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: '#8a9fc8' }}>
@@ -966,7 +918,6 @@ function GembaReportDashboard({ onClose, onExport, departments, allDeptScores, s
           ))}
         </div>
 
-        {/* SVG Chart */}
         <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 16, padding: '8px 4px 4px', overflowX: 'auto' }}>
           <svg
             width={SVG_W}
@@ -974,7 +925,6 @@ function GembaReportDashboard({ onClose, onExport, departments, allDeptScores, s
             viewBox={`0 0 ${SVG_W} ${SVG_H}`}
             style={{ display: 'block', minWidth: SVG_W }}
           >
-            {/* Lưới trục Y + nhãn */}
             {[0, 25, 50, 75, 100].map(v => {
               const gy = PAD_T + RPT_CHART_H - (v / RPT_BAR_MAX) * RPT_CHART_H;
               return (
@@ -998,7 +948,6 @@ function GembaReportDashboard({ onClose, onExport, departments, allDeptScores, s
               );
             })}
 
-            {/* Cột (gồm cả cột Trung bình ở cuối) */}
             {chartStats.map((stat, i) => {
               const c = stat.isAverage ? AVG_COLORS : getColors(stat.remaining);
               const barH = Math.max(4, (stat.remaining / RPT_BAR_MAX) * RPT_CHART_H);
@@ -1024,7 +973,6 @@ function GembaReportDashboard({ onClose, onExport, departments, allDeptScores, s
           </svg>
         </div>
 
-          {/* Details Grid */}
           <div style={{ marginTop: 24 }}>
             <div style={{ marginBottom: 12 }}>
               <div style={{ fontWeight: 800, color: '#e8f0fe', fontSize: 16 }}>{t("ehs.report.detailTable")}</div>
@@ -1066,7 +1014,6 @@ function GembaReportDashboard({ onClose, onExport, departments, allDeptScores, s
             </div>
           </div>
 
-        {/* Hover Tooltip — kiểu acp360 (giàu thông tin, nền tối) */}
         {tooltip.visible && tooltip.dept && (() => {
           const d = tooltip.dept;
           const c = d.isAverage ? AVG_COLORS : getColors(d.remaining);
@@ -1090,7 +1037,6 @@ function GembaReportDashboard({ onClose, onExport, departments, allDeptScores, s
               lineHeight: 1.65,
               border: `1.5px solid ${c.main}55`,
             }}>
-              {/* Dải màu trên cùng */}
               <div style={{ height: 4, background: `linear-gradient(90deg,${c.top},${c.main})`, margin: '-14px -18px 10px', borderRadius: '12px 12px 0 0' }} />
               <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 8, color: '#e8f0fe' }}>
                 {d.isAverage ? t("ehs.report.factoryAvg") : d.name}
@@ -1144,10 +1090,6 @@ function GembaReportDashboard({ onClose, onExport, departments, allDeptScores, s
 /* =========================
    Component chính DailyAudit
    ========================= */
-/* =========================
-   MODAL SỬA LỖI (Edit) — cho phép sửa group, desc, note, point.
-   KHÔNG cho sửa department / timestamp / addedBy.
-   ========================= */
 function EditErrorModal({ modalData, onClose, onSave }) {
   const { t } = useI18n();
   const err = modalData.error || {};
@@ -1159,7 +1101,6 @@ function EditErrorModal({ modalData, onClose, onSave }) {
   const [ca, setCa] = useState(err.ca || "S1");
   const [responsiblePerson, setResponsiblePerson] = useState(err.responsiblePerson || "");
   const [severity, setSeverity] = useState(err.severity || "Nhẹ");
-  // Tách timestamp thành ngày + giờ để chỉnh sửa
   const initDate = err.timestamp ? safeTsToDate(err.timestamp) : new Date();
   const [editDate, setEditDate] = useState(initDate || new Date());
   const [editTime, setEditTime] = useState(
@@ -1170,7 +1111,6 @@ function EditErrorModal({ modalData, onClose, onSave }) {
   const isOther = group === "Lỗi Khác";
   const codeItems = (errorGroups.find(g => g.group === group)?.items) || [];
 
-  // Chọn nhóm → reset chi tiết lỗi cho khớp nhóm mới
   const handleGroupChange = (g) => {
     setGroup(g);
     if (g === "Lỗi Khác") {
@@ -1181,7 +1121,6 @@ function EditErrorModal({ modalData, onClose, onSave }) {
     }
   };
 
-  // Chọn chi tiết lỗi → tự điền mô tả + điểm trừ cơ bản (vẫn cho admin chỉnh tay điểm sau)
   const handleCodeChange = (c) => {
     setCode(c);
     const item = codeItems.find(it => it.code === c);
@@ -1221,12 +1160,10 @@ function EditErrorModal({ modalData, onClose, onSave }) {
       <div style={{ background: '#fff', padding: 26, borderRadius: 16, width: '92%', maxWidth: 520, boxShadow: '0 6px 32px rgba(0,0,0,.25)', maxHeight: '90vh', overflowY: 'auto' }}>
         <h3 style={{ marginTop: 0, color: colors.primary, display: 'flex', alignItems: 'center', gap: 8 }}>{t("ehs.edit.title")}</h3>
 
-        {/* Thông tin KHÔNG cho sửa */}
         <div style={{ fontSize: 12, color: '#888', marginBottom: 16, lineHeight: 1.6 }}>
           {t("ehs.edit.dept")}: <b>{modalData.department || ''}</b> · {t("ehs.edit.recorder")}: <b>{err.addedBy || ''}</b>
         </div>
 
-        {/* Ngày + Giờ phát hiện */}
         <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
           <div style={{ flex: 1 }}>
             <div style={labelStyle}>{t("ehs.edit.dateDetected")}</div>
@@ -1244,7 +1181,6 @@ function EditErrorModal({ modalData, onClose, onSave }) {
           </div>
         </div>
 
-        {/* Người nhận + Ca */}
         <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
           <div style={{ flex: 1 }}>
             <div style={labelStyle}>{t("ehs.recipientShort")}</div>
@@ -1258,7 +1194,6 @@ function EditErrorModal({ modalData, onClose, onSave }) {
           </div>
         </div>
 
-        {/* Nhóm lỗi */}
         <div style={{ marginBottom: 14 }}>
           <div style={labelStyle}>{t("gemba.table.group")}</div>
           <select value={group} onChange={e => handleGroupChange(e.target.value)} style={fieldStyle}>
@@ -1267,7 +1202,6 @@ function EditErrorModal({ modalData, onClose, onSave }) {
           </select>
         </div>
 
-        {/* Chi tiết lỗi (dropdown code) — chỉ khi không phải "Lỗi Khác" */}
         {!isOther && (
           <div style={{ marginBottom: 14 }}>
             <div style={labelStyle}>{t("ehs.edit.errorDetail")}</div>
@@ -1279,7 +1213,6 @@ function EditErrorModal({ modalData, onClose, onSave }) {
           </div>
         )}
 
-        {/* Mức độ nghiêm trọng */}
         <div style={{ marginBottom: 14 }}>
           <div style={labelStyle}>{t("ehs.edit.severity")}</div>
           <select value={severity} onChange={e => setSeverity(e.target.value)} style={{ ...fieldStyle, width: 200 }}>
@@ -1287,19 +1220,16 @@ function EditErrorModal({ modalData, onClose, onSave }) {
           </select>
         </div>
 
-        {/* Mô tả lỗi */}
         <div style={{ marginBottom: 14 }}>
           <div style={labelStyle}>{t("ehs.edit.errorDesc")}</div>
           <textarea value={desc} onChange={e => setDesc(e.target.value)} style={{ ...fieldStyle, minHeight: 60 }} />
         </div>
 
-        {/* Ghi chú */}
         <div style={{ marginBottom: 14 }}>
           <div style={labelStyle}>{t("gemba.table.note")}</div>
           <textarea value={note} onChange={e => setNote(e.target.value)} style={{ ...fieldStyle, minHeight: 50 }} />
         </div>
 
-        {/* Điểm trừ cơ bản */}
         <div style={{ marginBottom: 22 }}>
           <div style={labelStyle}>{t("ehs.edit.basePoint")}</div>
           <input type="number" value={point} min={0} onChange={e => setPoint(e.target.value)} style={{ ...fieldStyle, width: 120 }} />
@@ -1352,8 +1282,6 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
   const isEhsCommitteeOnly = isEhsCommittee && !isAdminOrEhs;
   const userRole = isAdminOrEhs ? 'admin' : (userRolesList[0] || "");
 
-  // === Tự sửa chính tả ===
-  const CLOUD_FUNCTION_URL = 'https://askai-zvblqnzylq-as.a.run.app';
   const [autoCorrect, setAutoCorrect] = useState(true);
   const [isCorrecting, setIsCorrecting] = useState(false);
   const [showCorrectModal, setShowCorrectModal] = useState(false);
@@ -1381,23 +1309,20 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
     if (!dep) return;
     try {
       const defaultPeople = dep.defaultPeople || 0;
-      // Tải số nhân sự từ gemba_scores
       const scoreDoc = await dbService.getDoc("gemba_scores", dep.name).catch(() => null);
       const people = (scoreDoc && scoreDoc.people !== undefined) ? scoreDoc.people : defaultPeople;
       setPeopleCount(people);
 
-      // Tải tất cả sự kiện từ gemba_events và lọc theo bộ phận
       const allEvents = await dbService.getDocs("gemba_events");
       const deptEvents = allEvents
         .filter(ev => ev.department === dep.name && !ev.is_deleted)
         .map(normalizeEvent)
         .filter(Boolean);
 
-      // Tương thích ngược: bổ sung các bản ghi cũ từ gemba_scores.scores[] chưa được lưu vào gemba_events
       if (scoreDoc && Array.isArray(scoreDoc.scores) && scoreDoc.scores.length > 0) {
-        const existingTs = new Set(deptEvents.map(e => e.timestamp));
+        const existingTs = new Set(deptEvents.map(e => safeTsToDate(e.timestamp)?.getTime()).filter(Boolean));
         const legacyScores = scoreDoc.scores
-          .filter(s => !s.is_deleted && !existingTs.has(s.timestamp))
+          .filter(s => !s.is_deleted && !existingTs.has(safeTsToDate(s.timestamp)?.getTime()))
           .map(s => ({
             id: `legacy-${dep.name}-${safeTsToDate(s.timestamp)?.getTime() || Date.now()}`,
             department: dep.name,
@@ -1428,14 +1353,12 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
       unsub();
       clearInterval(interval);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchScores ổn định, chạy lại theo dep
   }, [dep]);
 
   useEffect(() => {
     runCleanup();
   }, []);
 
-  // Load tất cả điểm bộ phận cho dashboard báo cáo
   useEffect(() => {
     if (!showReportDashboard) return;
     const fetchAllDeptScores = async () => {
@@ -1451,18 +1374,16 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
           const deptDoc = allScoresDocs.find(d => (d.id || d.uid) === deptName);
           const people = deptDoc?.people !== undefined ? deptDoc.people : dept.defaultPeople;
 
-          // Tập hợp sự kiện phẳng từ gemba_events
           const flatEvents = allEventsDocs
             .filter(ev => ev.department === deptName && !ev.is_deleted)
             .map(normalizeEvent)
             .filter(Boolean);
 
-          // Tương thích ngược: bổ sung bản ghi cũ từ gemba_scores.scores[]
           const scores = [...flatEvents];
           if (deptDoc && Array.isArray(deptDoc.scores)) {
-            const existingTs = new Set(flatEvents.map(e => e.timestamp));
+            const existingTs = new Set(flatEvents.map(e => safeTsToDate(e.timestamp)?.getTime()).filter(Boolean));
             deptDoc.scores
-              .filter(s => !s.is_deleted && !existingTs.has(s.timestamp))
+              .filter(s => !s.is_deleted && !existingTs.has(safeTsToDate(s.timestamp)?.getTime()))
               .forEach(s => scores.push({
                 id: `legacy-${deptName}-${safeTsToDate(s.timestamp)?.getTime()}`,
                 department: deptName,
@@ -1505,7 +1426,6 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
       }
     };
     run();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ tạo lại thumbnail khi allScores đổi
   }, [allScores]);
   
   const handleSelectDepartment = (index) => {
@@ -1547,17 +1467,24 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
       }
       const opt = { maxSizeMB: 2, maxWidthOrHeight: 1920, useWebWorker: true };
       try {
-        const processedFiles = await Promise.all(files.map(file => 
-          file.size > opt.maxSizeMB * 1024 * 1024 ? imageCompression(file, opt) : file
-        ));
+        const processedFiles = await Promise.all(files.map(async (file) => {
+          if (file.size <= opt.maxSizeMB * 1024 * 1024) return file;
+          try {
+            return await imageCompression(file, opt);
+          } catch (err) {
+            // Nén lỗi (hay gặp trên mobile / trình duyệt in-app do web worker) -> dùng ảnh gốc
+            // thay vì bỏ, để vẫn gửi được lỗi. Firebase Storage nhận ảnh gốc bình thường.
+            console.warn("Nén ảnh thất bại, dùng ảnh gốc:", err?.message || err);
+            return file;
+          }
+        }));
         setImageFiles(processedFiles);
         setImageFileNames(processedFiles.map(f => f.name));
       } catch (err) {
-        console.error("Lỗi nén ảnh:", err);
-        alert(t("ehs.improve.imageProcessError"));
-        setImageFiles([]);
-        setImageFileNames([]);
-        if (fileRef.current) fileRef.current.value = "";
+        // Không xóa sạch ảnh khi lỗi -> giữ ảnh gốc để không chặn việc gửi trên mobile.
+        console.error("Lỗi xử lý ảnh, dùng ảnh gốc:", err);
+        setImageFiles(files);
+        setImageFileNames(files.map(f => f.name));
       }
     } else { 
       setImageFiles([]); 
@@ -1576,9 +1503,19 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
     if (autoCorrect && note.trim()) {
       setIsCorrecting(true);
       try {
-        const corrected = await callSpellCheckService(note.trim());
-        if (corrected && corrected.toLowerCase() !== note.trim().toLowerCase()) {
-          setCorrectedNote(corrected);
+        // Giới hạn thời gian sửa chính tả: trên mobile mạng yếu, gọi AI trực tiếp có thể
+        // treo vô hạn (không có timeout) -> nút kẹt "Đang sửa..." và KHÔNG bao giờ gửi được lỗi.
+        // Quá 6s thì bỏ qua bước sửa và lưu luôn.
+        const spellResult = await Promise.race([
+          callSpellCheckService(note.trim()),
+          new Promise((resolve) => setTimeout(() => resolve(null), 6000)),
+        ]);
+        // callSpellCheckService trả về { response } (object), không phải string.
+        const corrected = typeof spellResult === "string"
+          ? spellResult
+          : (spellResult && spellResult.response ? String(spellResult.response) : "");
+        if (corrected && corrected.trim() && corrected.trim().toLowerCase() !== note.trim().toLowerCase()) {
+          setCorrectedNote(corrected.trim());
           setShowCorrectModal(true);
           setIsCorrecting(false);
           return;
@@ -1690,17 +1627,25 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
     const errorToDelete = allScores.find(s => s.id === logId);
     if (!errorToDelete) return;
     if (await askConfirm(t("gemba.delete.confirm").replace("{desc}", errorToDelete.desc), t("ehs.confirm.deleteTitle"))) {
-        // Xóa khỏi gemba_events (bản ghi mới phẳng)
         if (!String(logId).startsWith("legacy-")) {
           try {
             await dbService.updateDoc("gemba_events", logId, { is_deleted: true });
+            // Dual-write compat: gỡ luôn bản sao trong gemba_scores.scores[] để lỗi đã
+            // xóa không tái xuất hiện dưới dạng "legacy" và không còn tính vào điểm/báo cáo.
+            const scoreDoc = await dbService.getDoc("gemba_scores", dep.name).catch(() => null);
+            if (scoreDoc && Array.isArray(scoreDoc.scores)) {
+              const targetTs = safeTsToDate(errorToDelete.timestamp)?.getTime();
+              const newScores = scoreDoc.scores.filter(s => !(s.timestamp === errorToDelete.timestamp || (targetTs && safeTsToDate(s.timestamp)?.getTime() === targetTs)));
+              if (newScores.length !== scoreDoc.scores.length) {
+                await dbService.updateDoc("gemba_scores", dep.name, { scores: newScores });
+              }
+            }
           } catch (err) {
             console.error("Lỗi đánh dấu gemba_events:", err);
             alert(t("ehs.alert.deleteViolationFail"));
             return;
           }
         } else {
-          // Bản ghi cũ (legacy) — loại khỏi gemba_scores.scores[]
           try {
             const docSnap = await dbService.getDoc("gemba_scores", dep.name).catch(() => null);
             if (docSnap && Array.isArray(docSnap.scores)) {
@@ -1714,7 +1659,6 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
           }
         }
 
-        // Xóa bình luận liên quan (cả ID mới lẫn ID tổng hợp cũ)
         const oldSyntheticId = `${dep.name}_${errorToDelete.code || 'custom'}_${safeTsToDate(errorToDelete.timestamp)?.getTime() || 'notime'}`;
         try {
           const allComments = await dbService.getDocs("audit_comments");
@@ -1796,7 +1740,6 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
             deleteRequestedAt: new Date().toLocaleString("vi-VN")
           });
         } else {
-          // Legacy: thao tác trên mảng gemba_scores.scores[]
           const docSnap = await dbService.getDoc("gemba_scores", dep.name).catch(() => null);
           if (docSnap && Array.isArray(docSnap.scores)) {
             const idx = docSnap.scores.findIndex(s => s.timestamp === errorToDelete.timestamp);
@@ -1828,7 +1771,10 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
       } else if (errorToUpdate) {
         const docSnap = await dbService.getDoc("gemba_scores", dep.name).catch(() => null);
         if (docSnap && Array.isArray(docSnap.scores)) {
-          const idx = docSnap.scores.findIndex(s => s.timestamp === errorToUpdate.timestamp);
+          // So khớp theo GIÁ TRỊ thời gian: Firestore Timestamp là object nên `===`
+          // giữa hai instance (dữ liệu vừa fetch vs record đang hiển thị) luôn false.
+          const targetTs = safeTsToDate(errorToUpdate.timestamp)?.getTime();
+          const idx = docSnap.scores.findIndex(s => s.timestamp === errorToUpdate.timestamp || (targetTs && safeTsToDate(s.timestamp)?.getTime() === targetTs));
           if (idx !== -1) {
             const newScores = [...docSnap.scores];
             delete newScores[idx].deleteRequested;
@@ -1860,16 +1806,17 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
 
     try {
       if (!String(logId).startsWith("legacy-")) {
-        // Bản ghi mới (phẳng) — cập nhật trực tiếp vào gemba_events
         await dbService.updateDoc("gemba_events", logId, {
           ...improvementData,
           dueDateHistory: newDueDateHistory
         });
       } else {
-        // Legacy: cập nhật mảng gemba_scores.scores[]
         const docSnap = await dbService.getDoc("gemba_scores", dep.name).catch(() => null);
         if (docSnap && Array.isArray(docSnap.scores)) {
-          const idx = docSnap.scores.findIndex(s => s.timestamp === errorToUpdate.timestamp);
+          // So khớp theo GIÁ TRỊ thời gian: Firestore Timestamp là object nên `===`
+          // giữa hai instance (dữ liệu vừa fetch vs record đang hiển thị) luôn false.
+          const targetTs = safeTsToDate(errorToUpdate.timestamp)?.getTime();
+          const idx = docSnap.scores.findIndex(s => s.timestamp === errorToUpdate.timestamp || (targetTs && safeTsToDate(s.timestamp)?.getTime() === targetTs));
           if (idx !== -1) {
             const newScores = [...docSnap.scores];
             newScores[idx] = { ...newScores[idx], ...improvementData, dueDateHistory: newDueDateHistory };
@@ -1884,7 +1831,6 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
     }
   };
   
-  // Sửa lỗi: cập nhật trực tiếp vào gemba_events (không cần thử thuật timestamp đồng bộ nữa)
   const handleSaveEdit = async (logId, updated) => {
     try {
       if (!String(logId).startsWith("legacy-")) {
@@ -1899,8 +1845,19 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
           severity: updated.severity,
           timestamp: updated.timestamp,
         });
+        // Dual-write compat: ghi đè thông tin mới lên bản sao trong gemba_scores.scores[]
+        const errorToEdit = allScores.find(s => s.id === logId);
+        const scoreDoc = await dbService.getDoc("gemba_scores", dep.name).catch(() => null);
+        if (errorToEdit && scoreDoc && Array.isArray(scoreDoc.scores)) {
+          const targetTs = safeTsToDate(errorToEdit.timestamp)?.getTime();
+          const idx = scoreDoc.scores.findIndex(s => s.timestamp === errorToEdit.timestamp || (targetTs && safeTsToDate(s.timestamp)?.getTime() === targetTs));
+          if (idx !== -1) {
+            const newScores = [...scoreDoc.scores];
+            newScores[idx] = { ...newScores[idx], ...updated };
+            await dbService.updateDoc("gemba_scores", dep.name, { scores: newScores });
+          }
+        }
       } else {
-        // Legacy: cập nhật mảng gemba_scores.scores[]
         const errorToEdit = allScores.find(s => s.id === logId);
         if (!errorToEdit) return;
         const docSnap = await dbService.getDoc("gemba_scores", dep.name).catch(() => null);
@@ -1953,7 +1910,6 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
         {improvementModal.isOpen && <ImprovementModal modalData={improvementModal} onClose={() => setImprovementModal({ isOpen: false, error: null, logId: "" })} onSave={handleSaveImprovement} canConfirm={isAdminOrEhs} onViewImage={(url) => openViewer([url], 0)} />}
         {editModal.isOpen && <EditErrorModal modalData={editModal} onClose={() => setEditModal({ isOpen: false, error: null, logId: "", department: "" })} onSave={handleSaveEdit} />}
 
-        {/* Popup xác nhận sửa chính tả */}
         {showCorrectModal && (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1002 }}>
             <div style={{ background: '#fff', padding: 26, borderRadius: 16, width: '92%', maxWidth: 540, boxShadow: '0 6px 32px rgba(0,0,0,.25)' }}>
@@ -2007,7 +1963,7 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
               </div>
               <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
                   <input type="month" value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} style={{ padding: 8, borderRadius: 6, border: `1px solid ${colors.border}` }} />
-                  <button onClick={() => setShowReportDashboard(true)} style={{ background: '#1565c0', color: colors.white, border: "none", padding: "8px 15px", borderRadius: 6, fontWeight: "bold", cursor: "pointer", marginTop: isMobile ? 10 : 0 }}>
+                  <button onClick={() => setShowReportDashboard(true)} style={{ background: '#1565c0', color: colors.white, border: "none", padding: "8px 15px", borderRadius: 6, fontWeight: "bold", cursor: isMobile ? "pointer" : "pointer", marginTop: isMobile ? 0 : 0 }}>
                     {t("ehs.report.btn")}
                   </button>
               </div>
@@ -2066,7 +2022,6 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
                 <div style={{ fontSize: 15, color: colors.textPrimary, marginBottom: 5 }}>{t("gemba.note.label")}</div>
                 <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder={isCustomError ? t("gemba.note.custom.placeholder") : t("gemba.note.placeholder")} style={{ width: "100%", minHeight: 60, boxSizing: "border-box", padding: "8px 12px", borderRadius: 8, border: `1.5px solid ${colors.primaryLight}`, fontSize: 15, fontFamily: "sans-serif" }} />
             </div>
-            {/* Checkbox tự sửa chính tả và Nhắc nhở */}
             <div style={{ display: 'flex', gap: 20, marginBottom: 18, flexWrap: 'wrap' }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' }}>
                 <input
@@ -2130,7 +2085,7 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
                            {e.ehsVerified && (
                              <div style={{ fontSize: '12px', color: '#2e7d32', fontWeight: 700, background: '#e8f5e9', padding: '2px 8px', borderRadius: 6, marginTop: 4, display: 'inline-block' }}>
                                {t("ehs.confirmedDone")}
-</div>
+                             </div>
                            )}
                            {e.deleteRequested && (
                              <div style={{ fontSize: '12px', color: '#c62828', fontWeight: 'bold', background: '#ffebee', padding: '4px 8px', borderRadius: 6, marginTop: 6, display: 'inline-block' }}>
@@ -2141,7 +2096,7 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
                         {images.length > 0 && (
                           <div style={{ marginTop: 8 }}>
                             <div style={{ position:'relative', display:'inline-block', cursor:'pointer' }} onClick={() => openViewer(images, 0)}>
-                              <img src={thumbMap[images[0]] || images[0]} alt="ảnh lỗi" style={{ width: 56, height: 56, borderRadius: 6, objectFit:'cover' }}/>
+                              <img src={thumbMap[images[0]] || images[0]} alt="" onError={(e) => { e.currentTarget.style.display = 'none'; }} style={{ width: 56, height: 56, borderRadius: 6, objectFit:'cover' }}/>
                               {images.length > 1 && (
                                 <span style={{ position:'absolute', top:-6, right:-6, background:'rgba(0,0,0,0.7)', color:'#fff', borderRadius:'50%', width:20, height:20, fontSize:12, display:'flex', alignItems:'center', justifyContent:'center' }}>+{images.length-1}</span>
                               )}
@@ -2224,7 +2179,7 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
                         {e.ehsVerified && (
                           <div style={{ fontSize: '11px', color: '#2e7d32', fontWeight: 700, background: '#e8f5e9', padding: '2px 6px', borderRadius: 4, marginTop: 4, display: 'inline-block' }}>
                             {t("ehs.confirmedDone")}
-</div>
+                          </div>
                         )}
                         {e.deleteRequested && (
                           <div style={{ fontSize: '11px', color: '#c62828', fontWeight: 'bold', background: '#ffebee', padding: '2px 6px', borderRadius: 4, marginTop: 4, display: 'inline-block' }}>
@@ -2235,7 +2190,7 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
                       <td style={{ padding: "10px 8px", textAlign: "center" }}>
                         {images.length > 0 && (
                           <div style={{ position: 'relative', display: 'inline-block', cursor: 'pointer' }} onClick={() => openViewer(images, 0)}>
-                            <img src={thumbMap[images[0]] || images[0]} alt="ảnh lỗi" style={{ width: 40, height: 40, borderRadius: 4, objectFit: "cover" }}/>
+                            <img src={thumbMap[images[0]] || images[0]} alt="" onError={(e) => { e.currentTarget.style.display = 'none'; }} style={{ width: 40, height: 40, borderRadius: 4, objectFit: "cover" }}/>
                             {images.length > 1 && (
                               <span style={{ position: 'absolute', top: -5, right: -5, background: 'rgba(0,0,0,0.7)', color: 'white', borderRadius: '50%', width: 18, height: 18, fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                 +{images.length - 1}
@@ -2248,16 +2203,15 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
                       <td style={{ padding: "10px 8px", fontWeight: 700, color: colors.primary, textAlign: "center", fontSize: e.isReminder ? 12 : 14 }}>{e.isReminder ? t("ehs.reminderShort") : ((e.point + heSo) / 2).toFixed(2)}</td>
                       <td style={{ textAlign: "center" }}>
                           <div style={{display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 4}}>
-                            <ActionButton 
+                            <button 
                               onClick={() => {
                                 setCommentModal({ isOpen: true, eventId: e.id, error: e });
                               }} 
                               title={t("ehs.title.discussShort")}
-                              color={colors.white} 
-                              bg={colors.primary}
+                              style={{ border: "none", background: colors.primary, color: colors.white, borderRadius: '50%', width: 28, height: 28, cursor: 'pointer', fontWeight: 800, fontSize: 16, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', margin: '0 2px', padding: 0 }}
                             >
                               💬
-                            </ActionButton>
+                            </button>
                             <ActionButton onClick={() => setImprovementModal({ isOpen: true, error: e, logId: e.id })} title={t("gemba.improve.action")} color={colors.white} bg={isImproved ? "#4caf50" : "#f44336"}> <ImprovementIcon /> </ActionButton>
                             {isEhsCommitteeOnly && (e.addedByUid === user.uid || e.addedBy === user.name) && !e.deleteRequested && (
                               <ActionButton onClick={() => handleDeleteRequest(e.id)} title={t("ehs.title.requestDelete")} color="#d32f2f" bg="transparent">x</ActionButton>
@@ -2314,7 +2268,6 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
         </div>
       </div>
       
-      {/* Real-time Comment Modal */}
       <CommentModal 
         isOpen={commentModal.isOpen} 
         onClose={() => setCommentModal({ isOpen: false, eventId: "", error: null })} 
@@ -2354,7 +2307,6 @@ function CommentModal({ isOpen, onClose, eventId, user, error }) {
     fetchComments().finally(() => setLoadingComments(false));
     const interval = setInterval(fetchComments, 10000);
     return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- chạy lại khi mở/đổi sự kiện
   }, [isOpen, eventId]);
 
   useEffect(() => {
@@ -2377,7 +2329,6 @@ function CommentModal({ isOpen, onClose, eventId, user, error }) {
         timestamp: nowStr
       });
 
-      // Gửi thông báo cho người tạo lỗi nếu người comment khác người tạo lỗi
       const creatorUid = error?.addedByUid;
       if (creatorUid && creatorUid !== user.uid) {
         const errorDesc = error?.desc || "Lỗi vi phạm";

@@ -34,13 +34,20 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response && error.response.status === 401) {
+    const reqUrl = error.config?.url || "";
+    // A 401 from the login endpoint is a wrong-email/password result that the
+    // Login form handles and displays itself. It must NOT clear tokens or hard
+    // redirect — doing so reloads the page and swallows the "sai mật khẩu"
+    // message, making every failed login look like a blank flash.
+    const isLoginAttempt = reqUrl.includes("/api/auth/login");
+
+    if (error.response && error.response.status === 401 && !isLoginAttempt) {
       localStorage.removeItem("safeone_jwt_token");
       sessionStorage.removeItem("safeone_jwt_token");
-      
+
       // Check if this was the initial session recovery request
-      const isAuthCheck = error.config.url && error.config.url.includes("/api/auth/me");
-      
+      const isAuthCheck = reqUrl.includes("/api/auth/me");
+
       if (isAuthCheck) {
         // Dispatch silent event so App.jsx sets state cleanly (no hard reloads)
         window.dispatchEvent(new CustomEvent("safeone-auth-failed"));

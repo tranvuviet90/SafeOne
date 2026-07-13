@@ -45,12 +45,6 @@ const errorGroups = [
   { group: "Lỗi Khác", items: [] },
 ];
 
-const Timestamp = {
-  fromDate(date) {
-    return date.toISOString();
-  }
-};
-
 /* =========================
    Hàm hỗ trợ ảnh và thời gian
    ========================= */
@@ -95,19 +89,29 @@ async function makeThumbDataURL(url, maxW = 96, maxH = 96, quality = 0.55) {
 
 const safeTsToDate = (ts) => {
     if (!ts) return null;
-    if (ts.seconds) return new Date(ts.seconds * 1000);
-    if (ts instanceof Date) return ts;
-    if (typeof ts === 'string') {
+    let result = null;
+    if (typeof ts.toDate === 'function') {
+        result = ts.toDate();
+    } else if (ts.seconds) {
+        result = new Date(ts.seconds * 1000);
+    } else if (ts instanceof Date) {
+        result = ts;
+    } else if (typeof ts === 'string') {
         const d = new Date(ts);
-        if (!isNaN(d.getTime())) return d;
-        const parts = ts.match(/(\d+)/g);
-        if (parts && parts.length === 6) {
-            const [h, m, s, day, month, year] = parts.map(Number);
-            return new Date(year, month - 1, day, h, m, s);
+        if (!isNaN(d.getTime())) {
+            result = d;
+        } else {
+            const parts = ts.match(/(\d+)/g);
+            if (parts && parts.length === 6) {
+                const [h, m, s, day, month, year] = parts.map(Number);
+                result = new Date(year, month - 1, day, h, m, s);
+            }
         }
+    } else {
+        const n = Number(ts);
+        if (!Number.isNaN(n)) result = new Date(n);
     }
-    const n = Number(ts);
-    if (!Number.isNaN(n)) return new Date(n);
+    if (result && !isNaN(result.getTime())) return result;
     return null;
 };
 
@@ -670,7 +674,6 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
   const userRole = isAdminOrEhs ? 'admin' : (userRolesList[0] || "");
 
   // === Tự sửa chính tả ===
-  const CLOUD_FUNCTION_URL = 'https://askai-zvblqnzylq-as.a.run.app';
   const [autoCorrect, setAutoCorrect] = useState(true);
   const [isCorrecting, setIsCorrecting] = useState(false);
   const [showCorrectModal, setShowCorrectModal] = useState(false);
@@ -772,17 +775,23 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
       }
       const opt = { maxSizeMB: 2, maxWidthOrHeight: 1920, useWebWorker: true };
       try {
-        const processedFiles = await Promise.all(files.map(file => 
-          file.size > opt.maxSizeMB * 1024 * 1024 ? imageCompression(file, opt) : file
-        ));
+        const processedFiles = await Promise.all(files.map(async (file) => {
+          if (file.size <= opt.maxSizeMB * 1024 * 1024) return file;
+          try {
+            return await imageCompression(file, opt);
+          } catch (err) {
+            // Nén lỗi (hay gặp trên mobile / trình duyệt in-app) -> dùng ảnh gốc thay vì bỏ.
+            console.warn("Nén ảnh thất bại, dùng ảnh gốc:", err?.message || err);
+            return file;
+          }
+        }));
         setImageFiles(processedFiles);
         setImageFileNames(processedFiles.map(f => f.name));
       } catch (err) {
-        console.error("Lỗi nén ảnh:", err);
-        alert("Đã xảy ra lỗi xử lý ảnh.");
-        setImageFiles([]);
-        setImageFileNames([]);
-        if (fileRef.current) fileRef.current.value = "";
+        // Không xóa sạch ảnh khi lỗi -> giữ ảnh gốc để không chặn việc gửi trên mobile.
+        console.error("Lỗi xử lý ảnh, dùng ảnh gốc:", err);
+        setImageFiles(files);
+        setImageFileNames(files.map(f => f.name));
       }
     } else { 
       setImageFiles([]); 
@@ -801,7 +810,16 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
     if (autoCorrect && note.trim()) {
       setIsCorrecting(true);
       try {
-        const corrected = (await callSpellCheckService(note.trim()) || "").trim();
+        // Giới hạn thời gian sửa chính tả: trên mobile mạng yếu, gọi AI trực tiếp có thể treo
+        // vô hạn -> nút kẹt "Đang sửa..." và KHÔNG bao giờ gửi được lỗi. Quá 6s thì lưu luôn.
+        const spellResult = await Promise.race([
+          callSpellCheckService(note.trim()),
+          new Promise((resolve) => setTimeout(() => resolve(null), 6000)),
+        ]);
+        // callSpellCheckService trả về { response } (object), không phải string.
+        const corrected = (typeof spellResult === "string"
+          ? spellResult
+          : (spellResult && spellResult.response ? String(spellResult.response) : "")).trim();
         if (corrected && corrected.toLowerCase() !== note.trim().toLowerCase()) {
           setCorrectedNote(corrected);
           setShowCorrectModal(true);
@@ -812,7 +830,6 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
         }
       } catch (e) {
         console.error("Lỗi khi gọi AI sửa chính tả:", e);
-        alert("Không thể kết nối dịch vụ AI để tự động sửa chính tả. Hệ thống sẽ tiếp tục lưu với ghi chú gốc của bạn.");
       }
       setIsCorrecting(false);
     }
