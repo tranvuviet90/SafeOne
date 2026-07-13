@@ -2,6 +2,7 @@
 import express from "express";
 import http from "http";
 import cors from "cors";
+import helmet from "helmet";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
@@ -37,13 +38,27 @@ initSocket(server);
 const allowedOrigins = (process.env.CORS_ORIGIN || "")
   .split(",").map(s => s.trim()).filter(Boolean);
 app.use(cors(allowedOrigins.length ? { origin: allowedOrigins } : {}));
-// Raise the body-size limit well above the 100kb default so bulk Excel imports
-// (the /api/db/batch endpoint) don't get rejected with 413 Payload Too Large.
-app.use(express.json({ limit: "25mb" }));
-app.use(express.urlencoded({ extended: true, limit: "25mb" }));
+// Security headers. CSP tắt vì React bundle dùng inline style/blob (bật CSP sẽ
+// trắng trang); các header còn lại (nosniff, frame-deny, HSTS sau proxy...) vẫn áp dụng.
+app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
+// Body-size limits: chỉ /api/db/batch (import Excel hàng loạt) cần payload lớn.
+// Các route còn lại giữ 5mb (đủ cho markdown tài liệu/trainedDocs) để hạn chế DoS.
+app.use("/api/db/batch", express.json({ limit: "25mb" }));
+app.use(express.json({ limit: "5mb" }));
+app.use(express.urlencoded({ extended: true, limit: "5mb" }));
 
 // Serve uploaded files statically at /uploads
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
+// Health check cho pm2/nginx/monitoring: xác nhận cả tiến trình lẫn kết nối DB.
+app.get("/api/health", async (req, res) => {
+  try {
+    await pool.query("SELECT 1");
+    res.status(200).json({ ok: true, db: true, uptime: Math.round(process.uptime()) });
+  } catch {
+    res.status(503).json({ ok: false, db: false });
+  }
+});
 
 // Mount API Routers
 app.use("/api/auth", authRouter);
@@ -89,6 +104,23 @@ if (hasBuiltFrontend) {
   });
 }
 
+// API 404 + error handler tập trung: mọi lỗi (kể cả body quá lớn / JSON hỏng
+// từ body-parser) trả về JSON thay vì trang HTML mặc định của Express.
+app.use("/api", (req, res) => {
+  res.status(404).json({ error: "API không tồn tại" });
+});
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+  if (err?.type === "entity.too.large") {
+    return res.status(413).json({ error: "Dữ liệu gửi lên quá lớn" });
+  }
+  if (err?.type === "entity.parse.failed") {
+    return res.status(400).json({ error: "Dữ liệu JSON không hợp lệ" });
+  }
+  console.error("Unhandled error:", err);
+  res.status(500).json({ error: "Lỗi máy chủ" });
+});
+
 // Ensure uploads folder exists
 const uploadsDir = path.join(__dirname, "uploads");
 if (!fs.existsSync(uploadsDir)) {
@@ -111,6 +143,58 @@ async function initializeDatabaseSchema() {
       }
     } catch (e) {
       console.error("⚠️ Không thể kiểm tra hoặc thêm cột 'related_id' vào bảng 'notifications':", e.message);
+    }
+
+    // Ensure firestore_mock table exists. Đây là bảng xương sống chứa mọi
+    // "generic collection" (documents, settings, lockers, licenses...) mà
+    // routes/db.js đọc/ghi. Trước đây bảng này KHÔNG nằm trong schema.sql nên
+    // deploy trên DB mới sẽ sập toàn bộ module generic — tạo tự động ở đây.
+    try {
+      await connection.query(`
+        CREATE TABLE IF NOT EXISTS firestore_mock (
+          collection VARCHAR(128) NOT NULL,
+          id VARCHAR(191) NOT NULL,
+          data LONGTEXT,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          PRIMARY KEY (collection, id)
+        ) ENGINE=InnoDB
+      `);
+    } catch (e) {
+      console.error("⚠️ Không thể tạo bảng 'firestore_mock':", e.message);
+    }
+
+    // Ensure uploads table exists — ghi lại ai upload file nào để routes/storage.js
+    // kiểm quyền khi xóa (chủ file hoặc admin/ehs mới được xóa).
+    try {
+      await connection.query(`
+        CREATE TABLE IF NOT EXISTS uploads (
+          filename VARCHAR(255) NOT NULL PRIMARY KEY,
+          uid VARCHAR(128) DEFAULT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB
+      `);
+    } catch (e) {
+      console.error("⚠️ Không thể tạo bảng 'uploads':", e.message);
+    }
+
+    // Ensure doc_chunks table exists (embedding RAG cho chatbot). Có trong schema.sql
+    // nhưng schema.sql chỉ chạy khi DB trống hoàn toàn — DB nâng cấp từ bản cũ sẽ thiếu.
+    try {
+      await connection.query(`
+        CREATE TABLE IF NOT EXISTS doc_chunks (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          doc_id VARCHAR(191) NOT NULL,
+          doc_title VARCHAR(255) DEFAULT NULL,
+          doc_type VARCHAR(50) DEFAULT NULL,
+          chunk_index INT NOT NULL,
+          content MEDIUMTEXT NOT NULL,
+          embedding JSON NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_doc (doc_id)
+        ) ENGINE=InnoDB
+      `);
+    } catch (e) {
+      console.error("⚠️ Không thể tạo bảng 'doc_chunks':", e.message);
     }
 
     // Ensure password_resets table exists (one-time tokens for "forgot password").
@@ -174,9 +258,11 @@ async function initializeDatabaseSchema() {
 }
 
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, async () => {
-  console.log(`SafeOne local server successfully listening on port ${PORT}`);
-  
-  // Verify database schema configurations
+// Khởi tạo/migrate schema XONG rồi mới nhận request — tránh race lúc mới bật
+// (request đến trong lúc bảng chưa kịp tạo).
+(async () => {
   await initializeDatabaseSchema();
-});
+  server.listen(PORT, () => {
+    console.log(`SafeOne local server successfully listening on port ${PORT}`);
+  });
+})();

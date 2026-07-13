@@ -1,4 +1,6 @@
 import { Server } from "socket.io";
+import jwt from "jsonwebtoken";
+import JWT_SECRET from "../config/jwtSecret.js";
 import { setIoInstance } from "../routes/db.js";
 
 let ioInstance = null;
@@ -11,6 +13,21 @@ export function initSocket(server) {
       origin: allowedOrigins.length ? allowedOrigins : "*",
       methods: ["GET", "POST"]
     }
+  });
+
+  // Bắt buộc JWT hợp lệ khi handshake. Không có bước này thì BẤT KỲ AI biết địa chỉ
+  // server đều subscribe được mọi path (users, chat, settings...) và nhận toàn bộ
+  // dữ liệu broadcast mà không cần đăng nhập.
+  io.use((socket, next) => {
+    const token =
+      socket.handshake.auth?.token ||
+      (socket.handshake.headers.authorization || "").split(" ")[1];
+    if (!token) return next(new Error("unauthorized"));
+    jwt.verify(token, JWT_SECRET, (err, decoded) => {
+      if (err) return next(new Error("unauthorized"));
+      socket.user = decoded;
+      next();
+    });
   });
 
   setIoInstance(io);

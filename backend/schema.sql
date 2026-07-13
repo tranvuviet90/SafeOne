@@ -123,5 +123,33 @@ CREATE TABLE IF NOT EXISTS doc_chunks (
   INDEX idx_doc (doc_id)
 ) ENGINE=InnoDB;
 
+-- 11. Bảng generic-collection (kiểu Firestore): chứa documents, settings, lockers,
+-- licenses, knife, gemba_scores... — mọi collection KHÔNG có bảng riêng ở trên.
+-- routes/db.js phụ thuộc hoàn toàn vào bảng này.
+CREATE TABLE IF NOT EXISTS firestore_mock (
+  collection VARCHAR(128) NOT NULL,
+  id VARCHAR(191) NOT NULL,
+  data LONGTEXT,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (collection, id)
+) ENGINE=InnoDB;
+
+-- 12. Token đặt lại mật khẩu dùng một lần (quên mật khẩu qua email)
+CREATE TABLE IF NOT EXISTS password_resets (
+  token VARCHAR(255) NOT NULL PRIMARY KEY,
+  uid VARCHAR(255) NOT NULL,
+  email VARCHAR(255) NOT NULL,
+  expires_at BIGINT NOT NULL,
+  used TINYINT(1) NOT NULL DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- 13. Sổ theo dõi file upload: ai upload file nào (kiểm quyền khi xóa file)
+CREATE TABLE IF NOT EXISTS uploads (
+  filename VARCHAR(255) NOT NULL PRIMARY KEY,
+  uid VARCHAR(128) DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
 -- Không gieo sẵn tài khoản admin. Khi bảng users trống, ứng dụng hiện form khởi tạo
 -- để người dùng tự tạo tài khoản admin đầu tiên (qua endpoint /api/auth/init-admin).

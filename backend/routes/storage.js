@@ -4,6 +4,7 @@ import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
 import { authenticateToken } from "../middleware/auth.js";
+import pool from "../config/db.js";
 
 const router = express.Router();
 
@@ -45,12 +46,23 @@ const uploadMiddleware = multer({
 
 // 1. POST /upload
 router.post("/upload", authenticateToken, (req, res) => {
-  uploadMiddleware(req, res, (err) => {
+  uploadMiddleware(req, res, async (err) => {
     if (err) {
       return res.status(400).json({ error: err.message || "Upload thất bại" });
     }
     if (!req.file) {
       return res.status(400).json({ error: "Không tìm thấy file để upload" });
+    }
+
+    // Ghi lại chủ sở hữu để kiểm quyền khi xóa. Best-effort: lỗi ghi sổ không
+    // được làm hỏng upload (file đã nằm trên đĩa thành công).
+    try {
+      await pool.query(
+        "INSERT INTO uploads (filename, uid) VALUES (?, ?) ON DUPLICATE KEY UPDATE uid = VALUES(uid)",
+        [req.file.filename, req.user?.uid || null]
+      );
+    } catch (e) {
+      console.error("Không ghi được sổ uploads:", e.message);
     }
 
     // Trả về URL TƯƠNG ĐỐI (không kèm host/cổng). Nhờ vậy ảnh luôn tải theo đúng
@@ -67,15 +79,35 @@ router.post("/upload", authenticateToken, (req, res) => {
   });
 });
 
-// 2. DELETE /:filename (New / Corrected)
-router.delete("/:filename", authenticateToken, (req, res) => {
+// 2. DELETE /:filename — chỉ CHỦ FILE hoặc admin/ehs được xóa. Trước đây bất kỳ
+// user đăng nhập nào cũng xóa được mọi file (ảnh hiện trường, tài liệu) của người khác.
+router.delete("/:filename", authenticateToken, async (req, res) => {
   const { filename } = req.params;
-  
+
   // Prevent directory traversal attacks
   const safeFilename = path.basename(filename);
   const filePath = path.join(UPLOADS_DIR, safeFilename);
 
-  fs.unlink(filePath, (err) => {
+  const rawRole = req.user?.role;
+  const roles = (Array.isArray(rawRole) ? rawRole : String(rawRole || "").split(","))
+    .map(r => r.trim().toLowerCase());
+  const isPrivileged = roles.includes("admin") || roles.includes("ehs");
+
+  if (!isPrivileged) {
+    try {
+      const [rows] = await pool.query("SELECT uid FROM uploads WHERE filename = ?", [safeFilename]);
+      // File cũ (upload trước khi có sổ uploads) không xác định được chủ —
+      // chỉ admin/ehs xóa được.
+      if (rows.length === 0 || rows[0].uid !== req.user?.uid) {
+        return res.status(403).json({ error: "Bạn chỉ có thể xóa file do chính mình tải lên" });
+      }
+    } catch (e) {
+      console.error("Không kiểm tra được chủ sở hữu file:", e.message);
+      return res.status(500).json({ error: "Xóa file thất bại" });
+    }
+  }
+
+  fs.unlink(filePath, async (err) => {
     if (err) {
       if (err.code === "ENOENT") {
         return res.status(404).json({ error: "Không tìm thấy file để xóa" });
@@ -83,6 +115,9 @@ router.delete("/:filename", authenticateToken, (req, res) => {
       console.error("Delete file error:", err);
       return res.status(500).json({ error: "Xóa file thất bại" });
     }
+    try {
+      await pool.query("DELETE FROM uploads WHERE filename = ?", [safeFilename]);
+    } catch { /* sổ uploads lệch không ảnh hưởng kết quả xóa */ }
     res.status(200).json({ success: true, message: "Xóa file thành công" });
   });
 });

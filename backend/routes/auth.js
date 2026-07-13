@@ -12,6 +12,11 @@ const router = express.Router();
 
 // Throttle credential-guessing on the login endpoint.
 const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10 });
+// Throttle quên/đặt lại mật khẩu (chặn dò token & spam email).
+const forgotLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10 });
+const resetLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20 });
+
+const MIN_PASSWORD_LENGTH = 6;
 
 // Lazily build a single SMTP transporter from environment configuration.
 // Returns null when SMTP is not configured (dev fallback logs the reset link).
@@ -48,6 +53,9 @@ router.post("/init-admin", async (req, res) => {
   const { email, password, name } = req.body;
   if (!email || !password || !name) {
     return res.status(400).json({ error: "Vui lòng điền đầy đủ thông tin: Tên, Email và Mật khẩu" });
+  }
+  if (String(password).length < MIN_PASSWORD_LENGTH) {
+    return res.status(400).json({ error: `Mật khẩu phải có ít nhất ${MIN_PASSWORD_LENGTH} ký tự` });
   }
 
   try {
@@ -170,6 +178,9 @@ router.post("/update-password", authenticateToken, async (req, res) => {
   if (!newPassword) {
     return res.status(400).json({ error: "Thiếu mật khẩu mới" });
   }
+  if (String(newPassword).length < MIN_PASSWORD_LENGTH) {
+    return res.status(400).json({ error: `Mật khẩu phải có ít nhất ${MIN_PASSWORD_LENGTH} ký tự` });
+  }
 
   try {
     const passwordHash = await bcrypt.hash(newPassword, 12);
@@ -184,7 +195,7 @@ router.post("/update-password", authenticateToken, async (req, res) => {
 // 7. forgot-password (public) — emails a one-time reset link.
 // Always responds with a generic success message so the endpoint can't be used
 // to enumerate which emails have accounts.
-router.post("/forgot-password", loginLimiter, async (req, res) => {
+router.post("/forgot-password", forgotLimiter, async (req, res) => {
   const { email } = req.body;
   if (!email) {
     return res.status(400).json({ error: "Vui lòng nhập email" });
@@ -205,6 +216,10 @@ router.post("/forgot-password", loginLimiter, async (req, res) => {
     const u = rows[0];
     const token = crypto.randomBytes(32).toString("hex");
     const expiresAt = Date.now() + 60 * 60 * 1000; // valid for 1 hour
+
+    // Dọn token đã hết hạn >24h để bảng không phình vô hạn.
+    pool.query("DELETE FROM password_resets WHERE expires_at < ?", [Date.now() - 24 * 60 * 60 * 1000])
+      .catch(() => { /* dọn dẹp best-effort */ });
 
     await pool.query(
       "INSERT INTO password_resets (token, uid, email, expires_at, used) VALUES (?, ?, ?, ?, 0)",
@@ -265,13 +280,13 @@ router.post("/forgot-password", loginLimiter, async (req, res) => {
 });
 
 // 8. reset-password (public) — consumes a one-time token and sets a new password.
-router.post("/reset-password", async (req, res) => {
+router.post("/reset-password", resetLimiter, async (req, res) => {
   const { token, newPassword } = req.body;
   if (!token || !newPassword) {
     return res.status(400).json({ error: "Thiếu token hoặc mật khẩu mới" });
   }
-  if (String(newPassword).length < 6) {
-    return res.status(400).json({ error: "Mật khẩu phải có ít nhất 6 ký tự" });
+  if (String(newPassword).length < MIN_PASSWORD_LENGTH) {
+    return res.status(400).json({ error: `Mật khẩu phải có ít nhất ${MIN_PASSWORD_LENGTH} ký tự` });
   }
 
   try {

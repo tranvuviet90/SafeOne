@@ -2,14 +2,18 @@
 // Suitable for a single-instance deployment. If you scale to multiple instances,
 // replace the in-memory Map with a shared store (e.g. Redis).
 const buckets = new Map();
+let limiterSeq = 0;
 
 export function rateLimit({
   windowMs = 15 * 60 * 1000,
   max = 10,
   message = "Quá nhiều yêu cầu. Vui lòng thử lại sau ít phút."
 } = {}) {
+  // Mỗi limiter một namespace riêng: trước đây mọi limiter dùng chung bucket theo IP,
+  // nên số lần thử login bị cộng dồn vào cả forgot-password (và ngược lại).
+  const ns = `l${limiterSeq++}:`;
   return (req, res, next) => {
-    const key = req.ip || req.socket?.remoteAddress || "unknown";
+    const key = ns + (req.ip || req.socket?.remoteAddress || "unknown");
     const now = Date.now();
     let entry = buckets.get(key);
     if (!entry || now > entry.resetAt) {

@@ -1,8 +1,14 @@
 import express from "express";
+import path from "path";
+import fs from "fs";
+import { fileURLToPath } from "url";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import bcrypt from "bcrypt";
 import pool from "../config/db.js";
-import { authenticateToken, requireAdmin } from "../middleware/auth.js";
+import { authenticateToken, requireAdmin, invalidateUserStatus } from "../middleware/auth.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const UPLOADS_DIR = path.join(__dirname, "../uploads");
 
 const router = express.Router();
 
@@ -403,12 +409,28 @@ router.post("/extractMarkdown", authenticateToken, async (req, res) => {
   }
 
   try {
-    const response = await fetch(fileUrl);
-    if (!response.ok) {
-      throw new Error(`Failed to download PDF: ${response.statusText}`);
+    // Chống SSRF: KHÔNG fetch URL tùy ý do client gửi (kẻ xấu có thể ép server
+    // gọi vào mạng nội bộ VPS). Chỉ chấp nhận file đã upload lên chính app
+    // (/uploads/...) và đọc thẳng từ đĩa.
+    let pathname;
+    try {
+      pathname = String(fileUrl).startsWith("/") ? String(fileUrl) : new URL(fileUrl).pathname;
+    } catch {
+      return res.status(400).json({ error: "Đường dẫn tài liệu không hợp lệ." });
     }
-    const arrayBuffer = await response.arrayBuffer();
-    const pdfBase64 = Buffer.from(arrayBuffer).toString("base64");
+    if (!pathname.startsWith("/uploads/")) {
+      return res.status(400).json({ error: "Chỉ hỗ trợ tài liệu đã tải lên hệ thống (/uploads)." });
+    }
+    const localPath = path.join(UPLOADS_DIR, path.basename(pathname));
+    let pdfBase64;
+    try {
+      pdfBase64 = (await fs.promises.readFile(localPath)).toString("base64");
+    } catch (e) {
+      if (e.code === "ENOENT") {
+        return res.status(404).json({ error: "Không tìm thấy file tài liệu trên máy chủ." });
+      }
+      throw e;
+    }
 
     const apiKey = await getApiKey();
     if (!apiKey) {
@@ -625,6 +647,9 @@ router.post("/adminUserAction", authenticateToken, requireAdmin, async (req, res
         if (!data || !data.email || !data.password || !data.role) {
           return res.status(400).json({ error: "Thiếu thông tin tạo tài khoản" });
         }
+        if (String(data.password).length < 6) {
+          return res.status(400).json({ error: "Mật khẩu phải có ít nhất 6 ký tự" });
+        }
         const uid = "user-" + Date.now() + Math.random().toString(36).substr(2, 9);
         
         // Hashing via bcrypt with 12 salt rounds (Rule 5)
@@ -641,7 +666,10 @@ router.post("/adminUserAction", authenticateToken, requireAdmin, async (req, res
       }
       case "resetPassword": {
         if (!data || !data.newPassword) return res.status(400).json({ error: "Thiếu mật khẩu mới" });
-        
+        if (String(data.newPassword).length < 6) {
+          return res.status(400).json({ error: "Mật khẩu phải có ít nhất 6 ký tự" });
+        }
+
         // Hashing via bcrypt with 12 salt rounds (Rule 5)
         const newPasswordHash = await bcrypt.hash(data.newPassword, 12);
         
@@ -656,12 +684,16 @@ router.post("/adminUserAction", authenticateToken, requireAdmin, async (req, res
       }
       case "disable":
         await pool.query("UPDATE users SET disabled = 1 WHERE uid = ?", [targetUid]);
+        // Xóa cache trạng thái để lệnh khóa có hiệu lực ngay (không đợi hết TTL 60s).
+        invalidateUserStatus(targetUid);
         break;
       case "enable":
         await pool.query("UPDATE users SET disabled = 0 WHERE uid = ?", [targetUid]);
+        invalidateUserStatus(targetUid);
         break;
       case "delete":
         await pool.query("DELETE FROM users WHERE uid = ?", [targetUid]);
+        invalidateUserStatus(targetUid);
         break;
       case "changeName":
         if (!data || !data.newName) return res.status(400).json({ error: "Thiếu tên mới" });

@@ -81,6 +81,14 @@ function redactGenericDoc(collection, id, data) {
   return out;
 }
 
+// Chuẩn hóa danh sách role của user từ JWT (string "a,b" hoặc array).
+function userRoles(reqUser) {
+  const raw = reqUser?.role;
+  return (Array.isArray(raw) ? raw : String(raw || "").split(","))
+    .map(r => r.trim().toLowerCase())
+    .filter(Boolean);
+}
+
 // Per-collection write policy. Collections NOT listed keep the legacy behavior
 // (any authenticated user may read/write) so existing modules keep working.
 const COLLECTION_POLICY = {
@@ -89,6 +97,16 @@ const COLLECTION_POLICY = {
     writableFields: ["notificationSettings"],  // ...and only these fields
     denyCreate: true,                          // creating users must go through admin functions
     denyDelete: true                           // deleting users must go through admin functions
+  },
+  // settings chứa ai_config (API key, system prompt) và password_recovery (nội dung
+  // email đặt lại mật khẩu) — user thường sửa được sẽ thành lỗ hổng chiếm quyền/phishing.
+  settings: {
+    writeRoles: ["admin"]
+  },
+  // Kho tài liệu nội bộ (nguồn tri thức RAG): chỉ các role quản lý tài liệu được ghi/xóa,
+  // khớp với nhóm role được đọc trong hasDocAccess (routes/functions.js).
+  documents: {
+    writeRoles: ["admin", "ehs", "ehs committee", "trainer", "manager"]
   }
 };
 
@@ -98,6 +116,22 @@ const COLLECTION_POLICY = {
 function checkMutationPolicy(collection, id, method, payload, reqUser) {
   const policy = COLLECTION_POLICY[collection];
   if (!policy) return { ok: true };
+
+  // Giới hạn ghi theo role (áp dụng cho mọi method, kể cả CREATE/DELETE).
+  if (policy.writeRoles) {
+    const roles = userRoles(reqUser);
+    if (!policy.writeRoles.some(r => roles.includes(r))) {
+      return { ok: false, status: 403, error: "Không có quyền chỉnh sửa dữ liệu này" };
+    }
+  }
+
+  // CREATE (thêm mới với auto-ID qua POST /:collection)
+  if (method === "CREATE") {
+    if (policy.denyCreate) {
+      return { ok: false, status: 403, error: "Không được phép tạo bản ghi trong collection này" };
+    }
+    return { ok: true };
+  }
 
   if (method === "DELETE") {
     if (policy.denyDelete) return { ok: false, status: 403, error: "Không được phép xóa bản ghi này" };
@@ -140,6 +174,29 @@ const JSON_COLUMNS = {
 
 function isJsonCol(table, col) {
   return JSON_COLUMNS[table] && JSON_COLUMNS[table].includes(col);
+}
+
+// Cột TIMESTAMP/DATETIME của các bảng mapped có nhận giá trị từ client.
+// Client gửi ISO string UTC (vd "2026-07-13T02:58:35.740Z"); nếu truyền thẳng chuỗi
+// này cho MySQL thì hậu tố "Z" bị bỏ qua → giờ UTC bị lưu như giờ địa phương, đọc lại
+// lệch -7h (múi giờ VN) — mọi thông báo mới đều hiện "7 giờ trước". Chuyển thành Date
+// object để mysql2 tự format theo múi giờ kết nối (round-trip ghi/đọc khớp nhau).
+const DATETIME_COLUMNS = {
+  notifications: ["timestamp"],
+  chat_messages: ["timestamp"],
+  gemba_reports: ["timestamp"],
+  smoking_violations: ["timestamp"]
+};
+
+function toDbValue(table, col, val) {
+  if (
+    DATETIME_COLUMNS[table] && DATETIME_COLUMNS[table].includes(col) &&
+    typeof val === "string" && /^\d{4}-\d{2}-\d{2}T/.test(val)
+  ) {
+    const d = new Date(val);
+    if (!isNaN(d.getTime())) return d;
+  }
+  return val;
 }
 
 // Convert DB row to frontend object
@@ -610,7 +667,7 @@ async function updateDocumentHandler(req, res) {
         } catch { /* ignore parse error */ }
       }
       const processed = processFieldUpdate(curVal, payload[key]);
-      dbPayload[key] = isJsonCol(cfg.table, key) ? JSON.stringify(processed) : processed;
+      dbPayload[key] = isJsonCol(cfg.table, key) ? JSON.stringify(processed) : toDbValue(cfg.table, key, processed);
     }
 
     if (rowExists) {
@@ -645,9 +702,9 @@ router.post("/:collection", authenticateToken, async (req, res) => {
   const payload = mapPayloadKeys(collection, req.body);
   const id = "doc-" + Date.now() + Math.random().toString(36).substr(2, 9);
 
-  const policy = COLLECTION_POLICY[collection];
-  if (policy && policy.denyCreate) {
-    return res.status(403).json({ error: "Không được phép tạo bản ghi trong collection này" });
+  const createCheck = checkMutationPolicy(collection, id, "CREATE", payload, req.user);
+  if (!createCheck.ok) {
+    return res.status(createCheck.status).json({ error: createCheck.error });
   }
   if (cfg) {
     const bad = unsafeColumns(Object.keys(payload));
@@ -675,7 +732,7 @@ router.post("/:collection", authenticateToken, async (req, res) => {
     const dbPayload = {};
     for (const key of Object.keys(payload)) {
       const processed = processFieldUpdate(null, payload[key]);
-      dbPayload[key] = isJsonCol(cfg.table, key) ? JSON.stringify(processed) : processed;
+      dbPayload[key] = isJsonCol(cfg.table, key) ? JSON.stringify(processed) : toDbValue(cfg.table, key, processed);
     }
 
     const isAutoIncrementId = cfg.key === "id" && ["notifications", "role_requests", "chat_messages"].includes(collection);
@@ -847,7 +904,7 @@ async function batchHandler(req, res) {
             } catch { /* ignore parse error */ }
           }
           const processed = processFieldUpdate(curVal, mappedBody[key]);
-          dbPayload[key] = isJsonCol(cfg.table, key) ? JSON.stringify(processed) : processed;
+          dbPayload[key] = isJsonCol(cfg.table, key) ? JSON.stringify(processed) : toDbValue(cfg.table, key, processed);
         }
 
         if (rowExists) {
