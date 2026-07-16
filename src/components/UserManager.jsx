@@ -302,7 +302,7 @@ export default function UserManager({ isMobile }) {
           setSaveStatus('Huấn luyện thành công!');
         } catch (embErr) {
           console.error('Lỗi tạo embedding tài liệu:', embErr);
-          pushToast('Đã lưu tài liệu nhưng tạo embedding thất bại. Hãy bấm "Đồng bộ embedding" để thử lại.', 'error');
+          pushToast('Đã lưu tài liệu nhưng tạo embedding thất bại. Hãy xóa tài liệu và nạp lại.', 'error');
         }
       };
       
@@ -320,24 +320,6 @@ export default function UserManager({ isMobile }) {
     } finally {
       setUploadingDoc(false);
       e.target.value = '';
-    }
-  };
-
-  const [isSyncingEmbed, setIsSyncingEmbed] = useState(false);
-  const handleSyncEmbeddings = async () => {
-    setIsSyncingEmbed(true);
-    setSaveStatus('Đang đồng bộ embedding cho dữ liệu cũ...');
-    try {
-      const res = await apiClient.post('/api/functions/backfillChunks', {});
-      const { processed = 0, chunks = 0 } = res.data || {};
-      pushToast(`Đồng bộ xong: ${processed} tài liệu, ${chunks} đoạn embedding.`, 'success');
-      setSaveStatus('Đồng bộ embedding thành công!');
-    } catch (err) {
-      console.error('Lỗi đồng bộ embedding:', err);
-      pushToast(err.response?.data?.error || 'Lỗi khi đồng bộ embedding.', 'error');
-      setSaveStatus('Lỗi đồng bộ embedding.');
-    } finally {
-      setIsSyncingEmbed(false);
     }
   };
 
@@ -940,20 +922,11 @@ export default function UserManager({ isMobile }) {
               <h4 style={{ margin: 0, color: '#333', fontSize: 15, fontWeight: 700 }}>
                 2. Quản lý tài liệu huấn luyện AI hiện tại
               </h4>
-              <button
-                type="button"
-                onClick={handleSyncEmbeddings}
-                disabled={isSyncingEmbed}
-                title="Tạo lại embedding cho các tài liệu đã huấn luyện trước đây nhưng chưa có embedding"
-                style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid ' + colors.primary, background: 'white', color: colors.primary, fontWeight: 600, fontSize: 13, cursor: isSyncingEmbed ? 'default' : 'pointer', opacity: isSyncingEmbed ? 0.6 : 1 }}
-              >
-                {isSyncingEmbed ? '⏳ Đang đồng bộ...' : '🔄 Đồng bộ embedding'}
-              </button>
             </div>
             <p style={{ margin: '0 0 16px 0', fontSize: 13, color: '#555' }}>
               Bật/tắt trạng thái "Huấn luyện AI" cho các tài liệu (MSDS, SOP, Quy trình, Biểu mẫu) để Chatbot tự động nạp tri thức từ tài liệu đó. Để tải lên tài liệu mới, vui lòng vào tab <strong>Tài liệu</strong>.
               <br />
-              <span style={{ color: '#888' }}>* Chatbot chỉ gửi vài đoạn liên quan nhất tới AI mỗi câu hỏi (RAG) để tiết kiệm token. Nếu tài liệu cũ trả lời thiếu, hãy bấm <strong>Đồng bộ embedding</strong>.</span>
+              <span style={{ color: '#888' }}>* Chatbot chỉ gửi vài đoạn liên quan nhất tới AI mỗi câu hỏi (RAG) để tiết kiệm token.</span>
             </p>
 
             {/* List of Documents */}

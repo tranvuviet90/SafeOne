@@ -22,10 +22,17 @@ function invalidateChunkCache() {
   lastChunksCacheTime = 0;
 }
 
-// Model dùng để tạo embedding (rẻ, gần như miễn phí so với generate)
-const EMBEDDING_MODEL = "text-embedding-004";
+// Model dùng để tạo embedding (rẻ, gần như miễn phí so với generate).
+// text-embedding-004 đã bị Google gỡ (trả 404) — dùng gemini-embedding-001 thay thế.
+const EMBEDDING_MODEL = "gemini-embedding-001";
+// gemini-embedding-001 mặc định trả vector 3072 chiều; rút xuống 768 cho nhẹ DB và
+// nhanh khi tính cosine, chất lượng truy xuất gần như không đổi.
+const EMBEDDING_DIMENSIONS = 768;
 // Số chunk liên quan nhất gửi cho AI mỗi câu hỏi (giữ thấp để tiết kiệm token)
 const TOP_K_CHUNKS = 5;
+
+// Model sửa lỗi chính tả (EHS Audit + Gemba): rẻ và nhanh, đủ cho tác vụ này.
+const SPELLCHECK_MODEL = "gemini-flash-lite-latest";
 
 /**
  * Retrieve the active Gemini API Key, prioritizing environment variables
@@ -145,7 +152,8 @@ async function embedTexts(texts, apiKey, taskType = "RETRIEVAL_DOCUMENT") {
     const resp = await model.batchEmbedContents({
       requests: slice.map(t => ({
         content: { role: "user", parts: [{ text: t }] },
-        taskType
+        taskType,
+        outputDimensionality: EMBEDDING_DIMENSIONS
       }))
     });
     (resp.embeddings || []).forEach(e => results.push(e.values || []));
@@ -237,7 +245,10 @@ router.post("/askAI", authenticateToken, async (req, res) => {
       const allChunks = await getAllChunks();
       const accessible = allChunks.filter(c => {
         const t = (c.type || "").toLowerCase();
-        if (t === "global" || t === "") return true; // tài liệu chung, không giới hạn quyền
+        if (t === "global") return true; // tài liệu huấn luyện chung, không giới hạn quyền
+        // Chunk không rõ loại thì cấm mặc định: nếu một tài liệu hạn chế (vd MSDS)
+        // lọt vào đây do thiếu type, cho phép mặc định sẽ lộ nội dung cho mọi role.
+        if (!t) return userRoles.some(r => ["admin", "ehs"].includes(r));
         return hasDocAccess(t, userRoles);
       });
 
@@ -246,7 +257,11 @@ router.post("/askAI", authenticateToken, async (req, res) => {
         if (qVec && qVec.length > 0) {
           topChunks = accessible
             .map(c => ({ chunk: c, score: cosineSimilarity(qVec, c.embedding) }))
-            .filter(item => item.score > 0.5) // ngưỡng liên quan tối thiểu
+            // Ngưỡng liên quan tối thiểu. gemini-embedding-001 cho điểm nền cao hơn
+            // text-embedding-004: đo trên dữ liệu thật thì câu hỏi đúng chủ đề đạt
+            // ~0.74-0.76, còn chào hỏi ~0.63-0.64 và lạc đề ~0.57-0.60. Lấy 0.7 để
+            // không đính kèm tài liệu vào những câu như "xin chào".
+            .filter(item => item.score > 0.7)
             .sort((a, b) => b.score - a.score)
             .slice(0, TOP_K_CHUNKS)
             .map(item => item.chunk);
@@ -316,6 +331,14 @@ router.post("/askAI", authenticateToken, async (req, res) => {
       parts: Array.isArray(h.parts) ? h.parts : [{ text: h.text || "" }]
     }));
 
+    // Gemini bắt buộc lịch sử hội thoại phải mở đầu bằng lượt của user, nếu không sẽ
+    // báo "First content should be with role 'user'". Giao diện chatbot hiển thị sẵn
+    // một lời chào của bot, nên lượt đầu client gửi lên là role "model" — bỏ các lượt
+    // model ở đầu, nếu không MỌI câu hỏi đầu tiên đều lỗi.
+    while (cleanHistory.length > 0 && cleanHistory[0].role !== "user") {
+      cleanHistory.shift();
+    }
+
     const chat = model.startChat({
       history: cleanHistory,
       generationConfig: {
@@ -380,8 +403,10 @@ router.post("/checkSpelling", authenticateToken, async (req, res) => {
     const systemInstruction = "Hãy sửa lỗi chính tả và ngữ pháp tiếng Việt cho văn bản sau (nếu có). Chỉ trả về văn bản kết quả đã sửa, không giải thích, không thêm bất kỳ văn bản nào khác. Nếu văn bản gốc không có lỗi, hãy trả về chính xác văn bản gốc.";
 
     // Dùng model lite cho sửa chính tả: rẻ & nhanh hơn, đủ cho tác vụ đơn giản này.
+    // Dùng alias "-latest" thay vì bản ghim (vd gemini-2.5-flash-lite): Google gỡ model
+    // cũ theo thời gian và bản ghim sẽ đột ngột trả 404, làm chết tính năng này.
     const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash-lite",
+      model: SPELLCHECK_MODEL,
       systemInstruction: systemInstruction
     });
 
@@ -389,12 +414,22 @@ router.post("/checkSpelling", authenticateToken, async (req, res) => {
       contents: [{ role: "user", parts: [{ text: text }] }],
       generationConfig: {
         temperature: 0,
-        maxOutputTokens: 200
+        // Kết quả dài xấp xỉ văn bản gốc. Giới hạn quá thấp làm câu trả về bị cắt cụt
+        // giữa chừng và người dùng bị gợi ý thay ghi chú bằng một câu mất phần đuôi.
+        maxOutputTokens: 4096
       }
     });
 
+    // Nếu model vẫn bị cắt vì chạm trần token thì trả lại văn bản gốc: thà không sửa
+    // còn hơn gợi ý một câu cụt.
+    const finishReason = result.response.candidates?.[0]?.finishReason;
+    if (finishReason && finishReason !== "STOP") {
+      console.warn("checkSpelling: bỏ qua kết quả do finishReason =", finishReason);
+      return res.status(200).json({ response: text });
+    }
+
     const responseText = result.response.text().trim();
-    res.status(200).json({ response: responseText });
+    res.status(200).json({ response: responseText || text });
   } catch (error) {
     console.error("Spelling service error:", error);
     res.status(500).json({ error: "Lỗi kiểm tra chính tả" });
