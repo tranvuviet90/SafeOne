@@ -398,6 +398,7 @@ export const DICTS = {
 
     // UserSettings
     "settings.title": "Cài đặt cá nhân",
+    "settings.theme": "Giao diện tối",
     "settings.changePassword": "Thay đổi mật khẩu",
     "settings.requestRole": "Yêu cầu đổi chức vụ",
     "settings.oldPassword": "Mật khẩu hiện tại",
@@ -827,6 +828,7 @@ export const DICTS = {
 
     // UserSettings
     "settings.title": "Personal Settings",
+    "settings.theme": "Dark mode",
     "settings.changePassword": "Change Password",
     "settings.requestRole": "Request Role Change",
     "settings.oldPassword": "Current Password",

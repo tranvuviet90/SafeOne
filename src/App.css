@@ -1,8 +1,8 @@
 /* ===== NỀN & BỐ CỤC CHUNG ===== */
 body {
   margin: 0;
-  background: #F4FAF9;
-  color: #2B3A3C;
+  background: var(--so-background);
+  color: var(--so-text-primary);
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, "Helvetica Neue", sans-serif;
 }
 .page-wrap { width: 100%; }

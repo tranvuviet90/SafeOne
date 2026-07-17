@@ -6,7 +6,7 @@ import apiClient from "../services/apiClient";
 import imageCompression from "browser-image-compression";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
-import { colors } from "../theme";
+import { colors, alpha } from "../theme";
 import { useI18n } from "../i18n/I18nProvider";
 import LightboxSwipeOnly, { useConfirm } from "./LightboxSwipeOnly";
 import { callSpellCheckService } from "../utils/aiAdapter";
@@ -1234,7 +1234,7 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
                     const images = e.imageUrls || (e.imageUrl ? [e.imageUrl] : []);
                     const isImproved = e.ehsVerified === true;
                     return (
-                      <div key={e.id || idx} style={{ border: '1.2px solid ' + colors.primaryLight, borderRadius: 12, padding: 12, background: colors.surface, boxShadow: `0 1.5px 10px ${colors.primary}11` }}>
+                      <div key={e.id || idx} style={{ border: '1.2px solid ' + colors.primaryLight, borderRadius: 12, padding: 12, background: colors.surface, boxShadow: `0 1.5px 10px ${alpha("primary", 0.07)}` }}>
                         <div style={{ display:'flex', justifyContent:'space-between', gap:8, flexWrap:'wrap' }}>
                           <div style={{ fontSize: 12, color: colors.textSecondary }}>{safeTsToDate(e.timestamp)?.toLocaleString('vi-VN')}{e.ca ? ` | Ca: ${e.ca}` : ''}</div>
                           <div style={{ fontWeight: 700, color: colors.primary }}>{e.group}</div>
@@ -1308,7 +1308,7 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
                   )}
                 </div>
               ) : (
-                <table style={{ marginTop: 10, width: "100%", borderCollapse: "separate", borderSpacing: 0, boxShadow: `0 1.5px 10px ${colors.primary}11`, border: `1.2px solid ${colors.primaryLight}`, background: colors.surface, borderRadius: 12, overflow: "hidden" }}>
+                <table style={{ marginTop: 10, width: "100%", borderCollapse: "separate", borderSpacing: 0, boxShadow: `0 1.5px 10px ${alpha("primary", 0.07)}`, border: `1.2px solid ${colors.primaryLight}`, background: colors.surface, borderRadius: 12, overflow: "hidden" }}>
                   <thead>
                     <tr style={{ background: colors.primaryLight }}>
                         <th style={{ padding: "10px 14px", color: colors.textPrimary }}>{t("gemba.table.time")}</th>
@@ -1412,11 +1412,11 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
                   </select>
               </div>
               ) : (
-              <div style={{ padding: 18, background: colors.primaryLight, borderRadius: 14, boxShadow: `0 1.5px 10px ${colors.primary}11` }}>
+              <div style={{ padding: 18, background: colors.primaryLight, borderRadius: 14, boxShadow: `0 1.5px 10px ${alpha("primary", 0.07)}` }}>
                   <div style={{ fontWeight: 700, color: colors.primary, marginBottom: 14, fontSize: 17 }}>Bộ phận</div>
                   <div>
                   {departments.map((d, i) => (
-                      <button key={d.name} style={{ display: "block", width: "100%", marginBottom: 10, padding: "10px 15px", borderRadius: 8, border: "none", fontWeight: 600, fontSize: 15, background: depIndex === i ? colors.primary : colors.backgroundLight, color: depIndex === i ? colors.white : colors.primary, boxShadow: depIndex === i ? `0 1.5px 7px ${colors.primary}33` : "none", cursor: "pointer", transition: "all .13s", position: 'relative' }} onClick={() => handleSelectDepartment(i)}>
+                      <button key={d.name} style={{ display: "block", width: "100%", marginBottom: 10, padding: "10px 15px", borderRadius: 8, border: "none", fontWeight: 600, fontSize: 15, background: depIndex === i ? colors.primary : colors.backgroundLight, color: depIndex === i ? colors.white : colors.primary, boxShadow: depIndex === i ? `0 1.5px 7px ${alpha("primary", 0.2)}` : "none", cursor: "pointer", transition: "all .13s", position: 'relative' }} onClick={() => handleSelectDepartment(i)}>
                       {d.name}
                       {newLogCounts && newLogCounts[d.name] > 0 && (
                         <span style={{ position: 'absolute', top: 5, right: 8, background: 'red', color: 'white', borderRadius: '50%', width: 20, height: 20, fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>

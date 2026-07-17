@@ -46,7 +46,7 @@ const deleteDoc = async (docRef) => {
 };
 const serverTimestamp = () => new Date().toISOString();
 import { useToast, useConfirm } from "./LightboxSwipeOnly";
-import { colors } from "../theme";
+import { colors, alpha } from "../theme";
 import { 
   IoDocumentsOutline, 
   IoCloudUploadOutline, 
@@ -876,7 +876,7 @@ export default function DocumentManager({ user, isMobile }) {
         <div style={{
           padding: isMobile ? "32px 16px" : 60,
           textAlign: "center",
-          border: `2px dashed ${colors.error}44`,
+          border: `2px dashed ${alpha("error", 0.27)}`,
           borderRadius: 16,
           background: "#fff5f5",
           color: colors.error,
@@ -1054,7 +1054,7 @@ export default function DocumentManager({ user, isMobile }) {
                     title="Phân tích nội dung AI"
                     style={{
                       background: "none",
-                      border: `1.5px solid ${colors.primary}44`,
+                      border: `1.5px solid ${alpha("primary", 0.27)}`,
                       borderRadius: 8,
                       width: 36,
                       height: 36,
@@ -1088,7 +1088,7 @@ export default function DocumentManager({ user, isMobile }) {
                     title="Chỉnh sửa tài liệu"
                     style={{
                       background: "none",
-                      border: `1.5px solid ${colors.primary}44`,
+                      border: `1.5px solid ${alpha("primary", 0.27)}`,
                       borderRadius: 8,
                       width: 36,
                       height: 36,
@@ -1119,7 +1119,7 @@ export default function DocumentManager({ user, isMobile }) {
                     title="Xóa tài liệu"
                     style={{
                       background: "none",
-                      border: `1.5px solid ${colors.error}44`,
+                      border: `1.5px solid ${alpha("error", 0.27)}`,
                       borderRadius: 8,
                       width: 36,
                       height: 36,
@@ -1152,7 +1152,7 @@ export default function DocumentManager({ user, isMobile }) {
                   title="Tải về file PDF"
                   style={{
                     background: "none",
-                    border: `1.5px solid ${colors.primary}44`,
+                    border: `1.5px solid ${alpha("primary", 0.27)}`,
                     borderRadius: 8,
                     width: 36,
                     height: 36,

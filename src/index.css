@@ -1,11 +1,82 @@
+/* ==== Bảng màu SafeOne ====
+   Nguồn sự thật duy nhất cho màu sắc. src/theme.js chỉ ánh xạ các biến này thành
+   var(--so-*) để dùng trong inline style, nên đổi màu ở đây là đổi toàn app.
+   Tông tối kích hoạt bằng thuộc tính data-theme trên <html> (xem ThemeProvider.jsx). */
+:root {
+  --so-primary: #466E73;
+  --so-primary-light: #A9D9D4;
+  --so-primary-dark: #2C494C;
+
+  --so-secondary: #207335;
+  --so-accent: #6EBF49;
+  --so-accent-light: #EAF6E3;
+
+  --so-text-primary: #2B3A3C;
+  --so-text-secondary: #5A6F72;
+  --so-text-disabled: #A0B0B2;
+
+  --so-background: #F4FAF9;
+  --so-surface: #ffffff;
+  --so-background-light: #EBF5F4;
+
+  --so-error: #D9534F;
+  --so-success: #207335;
+  --so-warning: #E29E2B;
+
+  --so-border: #D0E2E0;
+  --so-white: #ffffff;
+  --so-black: #1C292A;
+
+  /* Dạng RGB cho hàm alpha() trong theme.js. Chỉ 2 màu này cần, vì chỉ chúng
+     được pha trong suốt (đổ bóng, viền mờ). */
+  --so-primary-rgb: 70, 110, 115;
+  --so-error-rgb: 217, 83, 79;
+}
+
+:root[data-theme="dark"] {
+  /* Teal dung hòa: colors.primary vừa làm nền thanh menu vừa làm màu chữ, nên
+     giá trị này là thỏa hiệp giữa hai vai, không tối ưu cho riêng vai nào. */
+  --so-primary: #5F949A;
+  --so-primary-light: #A9D9D4;
+  /* "dark" ở đây mang nghĩa "biến thể nhấn mạnh" (đang dùng làm màu tiêu đề),
+     không phải nghĩa đen, nên ở tông tối nó phải SÁNG hơn nền. */
+  --so-primary-dark: #CDE7E4;
+
+  --so-secondary: #4CA664;
+  --so-accent: #6EBF49;
+  --so-accent-light: #1F3320;
+
+  --so-text-primary: #E4EDEC;
+  --so-text-secondary: #9FB3B5;
+  --so-text-disabled: #67797B;
+
+  --so-background: #0F1819;
+  --so-surface: #172426;
+  --so-background-light: #1E2E30;
+
+  --so-error: #E9736F;
+  --so-success: #4CA664;
+  --so-warning: #E0A94A;
+
+  --so-border: #2E4447;
+  /* white/black giữ nguyên literal ở cả hai tông: colors.white vừa là nền thẻ vừa
+     là chữ trên nút teal. Ánh xạ nó sang màu tối sẽ làm chữ trên nút biến mất —
+     hỏng nặng hơn là để vài nền thẻ còn sáng. Các nền đó đổi sang colors.surface
+     trong đợt quét từng tab. */
+  --so-white: #ffffff;
+  --so-black: #1C292A;
+
+  --so-primary-rgb: 95, 148, 154;
+  --so-error-rgb: 233, 115, 111;
+}
+
 :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+  color: var(--so-text-primary);
+  background-color: var(--so-background);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -15,25 +86,47 @@
 
 a {
   font-weight: 500;
-  color: #646cff;
+  color: var(--so-primary);
   text-decoration: inherit;
 }
 a:hover {
-  color: #535bf2;
+  color: var(--so-primary-dark);
 }
 
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
+  /* Bỏ flex-centering mặc định của Vite: nó làm app bị co cụm thay vì fit trang.
+     Việc căn giữa nội dung do app shell đảm nhiệm (khung maxWidth 1100, margin auto). */
+  display: block;
+  min-width: 0;
   min-height: 100vh;
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+/* ==== Responsive toàn cục: nội dung ở giữa, fit & co giãn theo trang (PC lẫn mobile) ==== */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  width: 100%;
+  max-width: 100%;
+  /* Chặn cuộn ngang toàn trang khi 1 khối có nội dung rộng.
+     Dùng clip (kèm fallback hidden) để không tạo scroll container phá position:sticky của thanh menu. */
+  overflow-x: hidden;
+  overflow-x: clip;
 }
+
+#root { width: 100%; }
+
+/* Luôn chừa sẵn chỗ cho thanh cuộn dọc -> trang không bị lệch/nhảy ngang
+   khi thanh cuộn xuất hiện hay biến mất (lúc chuyển tab ngắn <-> dài). */
+html { scrollbar-gutter: stable; }
+
+/* Ảnh/media không bao giờ tràn khung chứa. Không ép height lên svg để khỏi vỡ icon. */
+img, video, canvas { max-width: 100%; height: auto; }
+svg { max-width: 100%; }
+
+/* Bảng rộng: cuộn ngang TRONG khung của nó thay vì đẩy tràn cả trang. */
+table { max-width: 100%; }
+.table-wrap, .table-scroll { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
 button {
   border-radius: 8px;
@@ -42,27 +135,15 @@ button {
   font-size: 1em;
   font-weight: 500;
   font-family: inherit;
-  background-color: #1a1a1a;
+  background-color: var(--so-surface);
+  color: var(--so-text-primary);
   cursor: pointer;
   transition: border-color 0.25s;
 }
 button:hover {
-  border-color: #646cff;
+  border-color: var(--so-primary);
 }
 button:focus,
 button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
-}
-
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
 }
