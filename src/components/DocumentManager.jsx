@@ -796,7 +796,7 @@ export default function DocumentManager({ user, isMobile }) {
 
             {/* Progress Bar */}
             {uploading && (
-              <div style={{ width: "100%", background: "#e0e0e0", borderRadius: 4, height: 8, overflow: "hidden" }}>
+              <div style={{ width: "100%", background: colors.backgroundLight, borderRadius: 4, height: 8, overflow: "hidden" }}>
                 <div style={{ 
                   width: `${uploadProgress}%`, 
                   background: colors.primary, 
@@ -878,7 +878,7 @@ export default function DocumentManager({ user, isMobile }) {
           textAlign: "center",
           border: `2px dashed ${alpha("error", 0.27)}`,
           borderRadius: 16,
-          background: "#fff5f5",
+          background: alpha('error', 0.08),
           color: colors.error,
           display: "flex",
           flexDirection: "column",
@@ -887,8 +887,8 @@ export default function DocumentManager({ user, isMobile }) {
         }}>
           <div style={{ fontSize: 48 }}>🔒</div>
           <div>
-            <h3 style={{ margin: "0 0 4px 0", color: "#c92a2a", fontSize: 16, fontWeight: 700 }}>Quyền truy cập bị giới hạn</h3>
-            <p style={{ margin: 0, fontSize: 14, color: "#e03131" }}>
+            <h3 style={{ margin: "0 0 4px 0", color: colors.error, fontSize: 16, fontWeight: 700 }}>Quyền truy cập bị giới hạn</h3>
+            <p style={{ margin: 0, fontSize: 14, color: colors.error }}>
               Chỉ người dùng có vai trò <strong>Admin, EHS</strong> hoặc <strong>Manager</strong> mới được phép xem tài liệu MSDS.
             </p>
           </div>
@@ -971,6 +971,7 @@ export default function DocumentManager({ user, isMobile }) {
               <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
                 {/* PDF Icon Badge */}
                 <div style={{
+                  // Ô icon MSDS: gradient đỏ trang trí cố định — độc lập theme, giữ hex.
                   background: "linear-gradient(135deg, #FF6B6B 0%, #E63946 100%)",
                   borderRadius: 10,
                   width: 44,
@@ -1215,25 +1216,8 @@ export default function DocumentManager({ user, isMobile }) {
 
       {/* Edit Document Modal Overlay - Admin only */}
       {isAdmin && editingDoc && (
-        <div style={{
-          position: "fixed",
-          top: 0, left: 0, right: 0, bottom: 0,
-          background: "rgba(0,0,0,0.5)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          zIndex: 9999,
-          padding: 16
-        }}>
-          <div style={{
-            background: "white",
-            padding: 24,
-            borderRadius: 14,
-            width: "100%",
-            maxWidth: 550,
-            boxShadow: "0 10px 25px rgba(0,0,0,0.2)",
-            animation: "fadeIn 0.2s ease"
-          }}>
+        <div className="so-modal-overlay" style={{ zIndex: 9999 }}>
+          <div className="so-modal" style={{ maxWidth: 550 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18, borderBottom: `1px solid ${colors.border}`, paddingBottom: 12 }}>
               <h3 style={{ margin: 0, color: colors.primaryDark, fontSize: 18, fontWeight: 700 }}>✏️ Chỉnh sửa tài liệu</h3>
               <button
@@ -1334,7 +1318,7 @@ export default function DocumentManager({ user, isMobile }) {
 
               {/* Progress bar */}
               {editUploading && (
-                <div style={{ width: "100%", background: "#e0e0e0", borderRadius: 4, height: 8, overflow: "hidden" }}>
+                <div style={{ width: "100%", background: colors.backgroundLight, borderRadius: 4, height: 8, overflow: "hidden" }}>
                   <div style={{ 
                     width: `${editProgress}%`, 
                     background: colors.primary, 
