@@ -333,8 +333,8 @@ function ExportModal({ onClose, departments }) {
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 1000 }}>
-      <div style={{ background: colors.surface, padding: 22, borderRadius: 12, width: 520, boxShadow: "0 4px 15px rgba(0,0,0,.2)" }}>
+    <div className="so-modal-overlay" style={{ zIndex: 1000 }}>
+      <div className="so-modal" style={{ maxWidth: 520 }}>
         <h3 style={{ marginTop: 0, color: colors.primary }}>Xuất báo cáo CAP (Gemba)</h3>
         <div style={{ display: 'grid', gap: '15px' }}>
           <div>
@@ -361,8 +361,8 @@ function ExportModal({ onClose, departments }) {
         </div>
         <style>{`.date-picker-wrapper{width:100%}.date-picker-input{width:100%;padding:8px;border-radius:6px;border:1px solid ${colors.border};box-sizing:border-box}`}</style>
         <div style={{ display: "flex", gap: 12, marginTop: 20, justifyContent: "flex-end", flexWrap: "wrap" }}>
-          <button onClick={onClose} disabled={isGenerating} style={{ padding: "8px 16px", borderRadius: 6, border: `1px solid ${colors.border}`, background: colors.background, cursor: "pointer" }}>Hủy</button>
-          <button onClick={handleExport} disabled={isGenerating || !startDate || !endDate} style={{ padding: "8px 16px", borderRadius: 6, border: "none", background: "#1f80e0", color: colors.white, fontWeight: 700, cursor: "pointer" }}>{isGenerating ? "Đang xử lý..." : "Xuất CAP"}</button>
+          <button onClick={onClose} disabled={isGenerating} className="so-btn">Hủy</button>
+          <button className="so-btn" onClick={handleExport} disabled={isGenerating || !startDate || !endDate} style={{ background: colors.info, borderColor: colors.info, color: colors.white }}>{isGenerating ? "Đang xử lý..." : "Xuất CAP"}</button>
         </div>
       </div>
     </div>
@@ -424,12 +424,12 @@ function ImprovementModal({ modalData, onClose, onSave }) {
     onClose();
   };
 
-  const inputStyle = { width: '100%', padding: 8, borderRadius: 6, border: `1px solid ${colors.border}`, marginTop: 5, boxSizing: 'border-box' };
-  const labelStyle = { fontWeight: 600, color: '#333' };
+  const inputStyle = { width: '100%', padding: 8, borderRadius: 'var(--so-radius-sm)', border: `1px solid ${colors.border}`, background: colors.surface, color: colors.textPrimary, marginTop: 5, boxSizing: 'border-box' };
+  const labelStyle = { fontWeight: 600, color: colors.textPrimary };
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 1001 }}>
-      <div style={{ background: colors.surface, padding: 22, borderRadius: 12, width: '90%', maxWidth: 550, boxShadow: "0 4px 15px rgba(0,0,0,.2)" }}>
+    <div className="so-modal-overlay" style={{ zIndex: 1001 }}>
+      <div className="so-modal" style={{ maxWidth: 550 }}>
         <h3 style={{ marginTop: 0, color: colors.primary, borderBottom: `2px solid ${colors.primaryLight}`, paddingBottom: 10 }}>Cập nhật Cải thiện & Khắc phục</h3>
         <p><b>Lỗi:</b> {modalData.error.desc}</p>
         <div style={{ display: 'grid', gap: 12 }}>
@@ -475,8 +475,8 @@ function ImprovementModal({ modalData, onClose, onSave }) {
           </div>
         </div>
         <div style={{ display: "flex", gap: 12, marginTop: 20, justifyContent: "flex-end" }}>
-          <button onClick={onClose} disabled={isSaving} style={{ padding: "8px 16px", borderRadius: 6, border: `1px solid ${colors.border}`, background: colors.background, cursor: "pointer" }}>Hủy</button>
-          <button onClick={handleSave} disabled={isSaving} style={{ padding: "8px 16px", borderRadius: 6, border: "none", background: colors.primary, color: colors.white, fontWeight: 700, cursor: "pointer" }}> {isSaving ? "Đang lưu..." : "Lưu thay đổi"} </button>
+          <button onClick={onClose} disabled={isSaving} className="so-btn">Hủy</button>
+          <button onClick={handleSave} disabled={isSaving} className="so-btn so-btn--primary"> {isSaving ? "Đang lưu..." : "Lưu thay đổi"} </button>
         </div>
       </div>
     </div>
@@ -542,12 +542,12 @@ function EditErrorModal({ modalData, onClose, onSave }) {
     onClose();
   };
 
-  const inputStyle = { width: '100%', padding: 8, borderRadius: 6, border: `1px solid ${colors.border}`, marginTop: 5, boxSizing: 'border-box' };
-  const labelStyle = { fontWeight: 600, color: '#333', fontSize: 14 };
+  const inputStyle = { width: '100%', padding: 8, borderRadius: 'var(--so-radius-sm)', border: `1px solid ${colors.border}`, background: colors.surface, color: colors.textPrimary, marginTop: 5, boxSizing: 'border-box' };
+  const labelStyle = { fontWeight: 600, color: colors.textPrimary, fontSize: 14 };
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 1002 }}>
-      <div style={{ background: colors.surface, padding: 22, borderRadius: 12, width: '90%', maxWidth: 500, maxHeight: '90vh', overflowY: 'auto', boxShadow: "0 4px 15px rgba(0,0,0,.2)" }}>
+    <div className="so-modal-overlay" style={{ zIndex: 1002 }}>
+      <div className="so-modal" style={{ maxWidth: 500 }}>
         <h3 style={{ marginTop: 0, color: colors.primary, borderBottom: `2px solid ${colors.primaryLight}`, paddingBottom: 10 }}>Điều chỉnh thông tin lỗi đã đăng</h3>
         
         <div style={{ display: 'grid', gap: 12, marginTop: 15 }}>
@@ -627,8 +627,8 @@ function EditErrorModal({ modalData, onClose, onSave }) {
         </div>
 
         <div style={{ display: "flex", gap: 12, marginTop: 20, justifyContent: "flex-end" }}>
-          <button onClick={onClose} disabled={isSaving} style={{ padding: "8px 16px", borderRadius: 6, border: `1px solid ${colors.border}`, background: colors.background, cursor: "pointer" }}>Hủy</button>
-          <button onClick={handleSave} disabled={isSaving} style={{ padding: "8px 16px", borderRadius: 6, border: "none", background: colors.primary, color: colors.white, fontWeight: 700, cursor: "pointer" }}>
+          <button onClick={onClose} disabled={isSaving} className="so-btn">Hủy</button>
+          <button onClick={handleSave} disabled={isSaving} className="so-btn so-btn--primary">
             {isSaving ? "Đang lưu..." : "Lưu thay đổi"}
           </button>
         </div>
@@ -1072,7 +1072,7 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
     await fetchLogs();
   };
   
-  const ActionButton = ({ onClick, title, children, color = "#555", bg = "#f0f0f0" }) => (
+  const ActionButton = ({ onClick, title, children, color = colors.textSecondary, bg = "transparent" }) => (
     <button onClick={onClick} title={title} style={{ border: `1px solid ${color === colors.white ? 'transparent' : color}`, background: bg, color: color, borderRadius: '50%', width: 28, height: 28, cursor: 'pointer', fontWeight: 800, fontSize: 16, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', margin: '0 2px', lineHeight: 1, padding: 0 }}>
       {children}
     </button>
@@ -1092,29 +1092,30 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
 
         {/* Popup xác nhận sửa chính tả */}
         {showCorrectModal && (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1002 }}>
-            <div style={{ background: '#fff', padding: 26, borderRadius: 16, width: '92%', maxWidth: 540, boxShadow: '0 6px 32px rgba(0,0,0,.25)' }}>
+          <div className="so-modal-overlay" style={{ zIndex: 1002 }}>
+            <div className="so-modal" style={{ maxWidth: 540 }}>
               <h3 style={{ marginTop: 0, color: colors.primary, display: 'flex', alignItems: 'center', gap: 8 }}>
                 ✍️ Đề xuất sửa ghi chú
               </h3>
               <div style={{ marginBottom: 14 }}>
-                <div style={{ fontWeight: 600, color: '#888', marginBottom: 6, fontSize: 13 }}>Bản gốc:</div>
-                <div style={{ background: '#fff8e1', border: '1px solid #ffe082', borderRadius: 8, padding: '10px 14px', fontSize: 14, lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{note}</div>
+                <div style={{ fontWeight: 600, color: colors.textSecondary, marginBottom: 6, fontSize: 13 }}>Bản gốc:</div>
+                <div style={{ background: alpha('warning', 0.12), border: `1px solid ${alpha('warning', 0.5)}`, borderRadius: 'var(--so-radius-sm)', padding: '10px 14px', fontSize: 14, lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{note}</div>
               </div>
               <div style={{ marginBottom: 22 }}>
-                <div style={{ fontWeight: 600, color: '#2e7d32', marginBottom: 6, fontSize: 13 }}>✨ Đã sửa:</div>
-                <div style={{ background: '#f1f8e9', border: '1px solid #a5d6a7', borderRadius: 8, padding: '10px 14px', fontSize: 14, lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{correctedNote}</div>
+                <div style={{ fontWeight: 600, color: colors.success, marginBottom: 6, fontSize: 13 }}>✨ Đã sửa:</div>
+                <div style={{ background: alpha('success', 0.12), border: `1px solid ${alpha('success', 0.45)}`, borderRadius: 'var(--so-radius-sm)', padding: '10px 14px', fontSize: 14, lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{correctedNote}</div>
               </div>
               <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                 <button
                   onClick={async () => { setShowCorrectModal(false); await doSaveError(note); }}
-                  style={{ padding: '8px 18px', borderRadius: 8, border: `1px solid ${colors.border}`, background: '#f5f5f5', cursor: 'pointer', fontWeight: 600, fontSize: 14 }}
+                  className="so-btn"
                 >
                   Dùng bản gốc
                 </button>
                 <button
                   onClick={async () => { setShowCorrectModal(false); await doSaveError(correctedNote); }}
-                  style={{ padding: '8px 22px', borderRadius: 8, border: 'none', background: '#2e7d32', color: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: 14 }}
+                  className="so-btn"
+                  style={{ background: colors.success, borderColor: colors.success, color: colors.white }}
                 >
                   ✓ Dùng bản đã sửa
                 </button>
@@ -1139,7 +1140,7 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
                 Gemba: {departments[depIndex].name}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <input type="month" value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} style={{ padding: 8, borderRadius: 6, border: `1px solid ${colors.border}` }} />
+                  <input type="month" value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="so-input" style={{ width: 'auto' }} />
                   <button onClick={() => setShowExportModal(true)} style={{ background: colors.success, color: colors.white, border: "none", padding: "8px 15px", borderRadius: 6, fontWeight: "bold", cursor: "pointer", marginTop: isMobile ? 10 : 0 }}>
                     {t("report.export.cap")}
                   </button>
@@ -1147,7 +1148,7 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
             </div>
             <div style={{ marginBottom: 15 }}>
                 <div style={{ fontSize: 15, color: colors.textPrimary, marginBottom: 5 }}>{t("gemba.group.label")}</div>
-                <select value={selectedGroup} onChange={(e) => { setSelectedGroup(e.target.value); setSelectedError(""); }} style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: `1.5px solid ${colors.primaryLight}`, fontSize: 15 }}>
+                <select value={selectedGroup} onChange={(e) => { setSelectedGroup(e.target.value); setSelectedError(""); }} style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: `1.5px solid ${colors.primaryLight}`, background: colors.surface, color: colors.textPrimary, fontSize: 15 }}>
                 <option value="">{t("gemba.group.placeholder")}</option>
                 {errorGroups.map((g) => <option key={g.group} value={g.group}>{g.group}</option>)}
                 </select>
@@ -1155,7 +1156,7 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
             {selectedGroup && selectedGroup !== "Lỗi Khác" && (
               <div style={{ marginBottom: 15 }}>
                   <div style={{ fontSize: 15, color: colors.textPrimary, marginBottom: 5 }}>{t("gemba.error.label")}</div>
-                  <select value={selectedError} onChange={(e) => setSelectedError(e.target.value)} style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: `1.5px solid ${colors.primaryLight}`, fontSize: 15 }}>
+                  <select value={selectedError} onChange={(e) => setSelectedError(e.target.value)} style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: `1.5px solid ${colors.primaryLight}`, background: colors.surface, color: colors.textPrimary, fontSize: 15 }}>
                   <option value="">{t("gemba.error.placeholder")}</option>
                   {(errorGroups.find(g => g.group === selectedGroup)?.items || []).map(e => <option key={e.code} value={e.code}>{e.code} - {e.desc}</option>)}
                   </select>
@@ -1164,7 +1165,7 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
             {isCustomError && (
                 <div style={{ border: `1.5px solid ${colors.primaryLight}`, borderRadius: 8, padding: 15, marginBottom: 15 }}>
                      <div style={{ fontSize: 15, color: colors.textPrimary, fontWeight: 700, marginBottom: 10 }}>{t("gemba.custom.detail")}</div>
-                     <div style={{ fontSize: 14, color: "#666" }}>
+                     <div style={{ fontSize: 14, color: colors.textSecondary }}>
                        Vui lòng nhập chi tiết lỗi phát hiện ở phần ghi chú bên dưới và tải lên ảnh bằng chứng.
                      </div>
                 </div>
@@ -1177,7 +1178,7 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
                   value={responsiblePerson}
                   onChange={(e) => setResponsiblePerson(e.target.value)}
                   placeholder={t("gemba.recipient.placeholder")}
-                  style={{ width: "100%", boxSizing: "border-box", padding: "8px 12px", borderRadius: 8, border: `1.5px solid ${colors.primaryLight}`, fontSize: 15 }}
+                  style={{ width: "100%", boxSizing: "border-box", padding: "8px 12px", borderRadius: 8, border: `1.5px solid ${colors.primaryLight}`, background: colors.surface, color: colors.textPrimary, fontSize: 15 }}
                 />
               </div>
               <div style={{ width: 120 }}>
@@ -1185,7 +1186,7 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
                 <select
                   value={ca}
                   onChange={(e) => setCa(e.target.value)}
-                  style={{ width: "100%", boxSizing: "border-box", padding: "8px 12px", borderRadius: 8, border: `1.5px solid ${colors.primaryLight}`, fontSize: 15 }}
+                  style={{ width: "100%", boxSizing: "border-box", padding: "8px 12px", borderRadius: 8, border: `1.5px solid ${colors.primaryLight}`, background: colors.surface, color: colors.textPrimary, fontSize: 15 }}
                 >
                   <option value="">{t("gemba.shift.placeholder")}</option>
                   <option value="S1">S1</option>
@@ -1197,7 +1198,7 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
             </div>
             <div style={{ marginBottom: 8 }}>
                 <div style={{ fontSize: 15, color: colors.textPrimary, marginBottom: 5 }}>{t("gemba.note.label")}</div>
-                <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder={isCustomError ? t("gemba.note.custom.placeholder") : t("gemba.note.placeholder")} style={{ width: "100%", minHeight: 60, boxSizing: "border-box", padding: "8px 12px", borderRadius: 8, border: `1.5px solid ${colors.primaryLight}`, fontSize: 15, fontFamily: "sans-serif" }} />
+                <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder={isCustomError ? t("gemba.note.custom.placeholder") : t("gemba.note.placeholder")} style={{ width: "100%", minHeight: 60, boxSizing: "border-box", padding: "8px 12px", borderRadius: 8, border: `1.5px solid ${colors.primaryLight}`, background: colors.surface, color: colors.textPrimary, fontSize: 15, fontFamily: "inherit" }} />
             </div>
             {/* Checkbox tự sửa chính tả */}
             <div style={{ display: 'flex', gap: 20, marginBottom: 18, flexWrap: 'wrap' }}>
@@ -1216,13 +1217,13 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
 
             <div style={{ marginBottom: 24, display: 'flex', alignItems: 'center', gap: 10, flexWrap: "wrap" }}>
                 <input id="imageUploadTuGemba" type="file" accept="image/*" onChange={handleImageChange} ref={fileRef} style={{ display: 'none' }} multiple />
-                <label htmlFor="imageUploadTuGemba" style={{background: 'white', color: colors.primary, border: `1.2px solid ${colors.primaryLight}`, borderRadius: 8, padding: '8px 15px', cursor: 'pointer', fontWeight: 600}}>
+                <label htmlFor="imageUploadTuGemba" style={{background: colors.surface, color: colors.primary, border: `1.2px solid ${colors.primaryLight}`, borderRadius: 'var(--so-radius-sm)', padding: '8px 15px', cursor: 'pointer', fontWeight: 600}}>
                     {t("gemba.attach", { count: imageFiles.length }).replace("{count}", imageFiles.length)}
                 </label>
-                <span style={{fontStyle: 'italic', fontSize: 14, color: '#555', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
+                <span style={{fontStyle: 'italic', fontSize: 14, color: colors.textSecondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
                     {imageFileNames.length > 0 ? imageFileNames.join(', ') : t("common.noImage")}
                 </span>
-                <button onClick={handleAddError} disabled={isUploading || isCorrecting} style={{ marginLeft: 'auto', height: 38, background: isCorrecting ? '#888' : colors.primary, color: colors.white, borderRadius: 9, border: "none", padding: "0 26px", fontWeight: 700, fontSize: 16, cursor: "pointer", opacity: (isUploading || isCorrecting) ? 0.7 : 1 }}>
+                <button className="so-btn so-btn--primary" onClick={handleAddError} disabled={isUploading || isCorrecting} style={{ marginLeft: 'auto', height: 38, padding: "0 26px", fontSize: 16, background: isCorrecting ? colors.textDisabled : undefined, borderColor: isCorrecting ? colors.textDisabled : undefined }}>
                     {isCorrecting ? t("gemba.correcting") : isUploading ? t("gemba.uploading") : t("gemba.add")}
                 </button>
             </div>
@@ -1250,13 +1251,13 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
                             ) : null;
                           })()}
                           {e.responsiblePerson && (
-                            <div style={{ fontSize: '12px', color: '#b94a48', fontWeight: 600, marginTop: 4 }}>
+                            <div style={{ fontSize: '12px', color: colors.error, fontWeight: 600, marginTop: 4 }}>
                               Người nhận Thông tin: {e.responsiblePerson}
                             </div>
                           )}
                           {e.addedBy && <div style={{fontSize: 11, color: colors.textSecondary, fontStyle:'italic', marginTop: 2}}>{t("gemba.by")} {e.addedBy}</div>}
                           {e.deleteRequested && (
-                            <div style={{ fontSize: '12px', color: '#c62828', fontWeight: 'bold', background: '#ffebee', padding: '4px 8px', borderRadius: 6, marginTop: 6, display: 'inline-block' }}>
+                            <div style={{ fontSize: '12px', color: colors.error, fontWeight: 'bold', background: alpha('error', 0.12), padding: '4px 8px', borderRadius: 6, marginTop: 6, display: 'inline-block' }}>
                               ⚠️ Chờ duyệt xóa (Yêu cầu bởi: {e.deleteRequestedBy})
                             </div>
                           )}
@@ -1266,7 +1267,7 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
                             <div style={{ position:'relative', display:'inline-block', cursor:'pointer' }} onClick={() => openViewer(images, 0)}>
                               <img src={thumbMap[images[0]] || images[0]} alt="ảnh lỗi" style={{ width: 56, height: 56, borderRadius: 6, objectFit:'cover' }}/>
                               {images.length > 1 && (
-                                <span style={{ position:'absolute', top:-6, right:-6, background:'rgba(0,0,0,0.7)', color:'#fff', borderRadius:'50%', width:20, height:20, fontSize:12, display:'flex', alignItems:'center', justifyContent:'center' }}>+{images.length-1}</span>
+                                <span style={{ position:'absolute', top:-6, right:-6, background:'rgba(0,0,0,0.7)', color: colors.white, borderRadius:'50%', width:20, height:20, fontSize:12, display:'flex', alignItems:'center', justifyContent:'center' }}>+{images.length-1}</span>
                               )}
                             </div>
                           </div>
@@ -1282,21 +1283,21 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
                           >
                             💬
                           </ActionButton>
-                          <ActionButton onClick={() => setImprovementModal({ isOpen: true, error: e, logId: e.id })} title={t("gemba.improve.action")} color={colors.white} bg={isImproved ? '#4caf50' : '#f44336'}><ImprovementIcon /></ActionButton>
+                          <ActionButton onClick={() => setImprovementModal({ isOpen: true, error: e, logId: e.id })} title={t("gemba.improve.action")} color={colors.white} bg={isImproved ? colors.success : colors.error}><ImprovementIcon /></ActionButton>
                           {isEhsCommitteeOnly && e.userId === user.uid && !e.deleteRequested && (
-                            <ActionButton onClick={() => handleDeleteRequest(e.id)} title="Yêu cầu xóa lỗi" color="#d32f2f" bg="transparent">x</ActionButton>
+                            <ActionButton onClick={() => handleDeleteRequest(e.id)} title="Yêu cầu xóa lỗi" color={colors.error} bg="transparent">x</ActionButton>
                           )}
                           {isAdminOrEhs && e.deleteRequested && (
                             <>
-                              <ActionButton onClick={() => handleDelete(e.id)} title="Duyệt xóa" color="#fff" bg="#2e7d32">✅</ActionButton>
-                              <ActionButton onClick={() => handleCancelDeleteRequest(e.id)} title="Từ chối xóa" color="#fff" bg="#e65100">❌</ActionButton>
+                              <ActionButton onClick={() => handleDelete(e.id)} title="Duyệt xóa" color={colors.white} bg={colors.success}>✅</ActionButton>
+                              <ActionButton onClick={() => handleCancelDeleteRequest(e.id)} title="Từ chối xóa" color={colors.white} bg={colors.warning}>❌</ActionButton>
                             </>
                           )}
                           {(userRole === 'admin' || userRole === 'ehs') && (
                             <>
-                              <ActionButton onClick={() => setEditModal({ isOpen: true, error: e, logId: e.id })} title="Sửa lỗi" color={colors.white} bg="#ff9800">✏️</ActionButton>
+                              <ActionButton onClick={() => setEditModal({ isOpen: true, error: e, logId: e.id })} title="Sửa lỗi" color={colors.white} bg={colors.warning}>✏️</ActionButton>
                               {!e.deleteRequested && (
-                                <ActionButton onClick={() => handleDelete(e.id)} title={t("gemba.delete.action")} color="#d32f2f" bg="transparent">x</ActionButton>
+                                <ActionButton onClick={() => handleDelete(e.id)} title={t("gemba.delete.action")} color={colors.error} bg="transparent">x</ActionButton>
                               )}
                             </>
                           )}
@@ -1327,13 +1328,13 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
                       <tr key={e.id || idx}>
                       <td style={{ padding: "10px 14px", fontSize: 12 }}>
                         <div>{safeTsToDate(e.timestamp)?.toLocaleString("vi-VN")}</div>
-                        {e.ca && <div style={{ fontWeight: 'bold', color: '#666', marginTop: 4 }}>Ca: {e.ca}</div>}
+                        {e.ca && <div style={{ fontWeight: 'bold', color: colors.textSecondary, marginTop: 4 }}>Ca: {e.ca}</div>}
                       </td>
                       <td style={{ padding: "10px 14px" }}>{e.group}</td>
                       <td style={{ padding: "10px 14px" }}>
                         <div>{e.group === 'Lỗi Khác' ? 'Lỗi khác' : e.desc}</div>
                         {e.responsiblePerson && (
-                          <div style={{ fontSize: '12px', color: '#b94a48', fontWeight: 600, marginTop: 4 }}>
+                          <div style={{ fontSize: '12px', color: colors.error, fontWeight: 600, marginTop: 4 }}>
                             Người nhận Thông tin: {e.responsiblePerson}
                           </div>
                         )}
@@ -1343,7 +1344,7 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
                           </div>
                         )}
                         {e.deleteRequested && (
-                          <div style={{ fontSize: '11px', color: '#c62828', fontWeight: 'bold', background: '#ffebee', padding: '2px 6px', borderRadius: 4, marginTop: 4, display: 'inline-block' }}>
+                          <div style={{ fontSize: '11px', color: colors.error, fontWeight: 'bold', background: alpha('error', 0.12), padding: '2px 6px', borderRadius: 4, marginTop: 4, display: 'inline-block' }}>
                             ⚠️ Chờ duyệt xóa (Yêu cầu bởi: {e.deleteRequestedBy})
                           </div>
                         )}
@@ -1353,7 +1354,7 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
                           <div style={{ position: 'relative', display: 'inline-block', cursor: 'pointer' }} onClick={() => openViewer(images, 0)}>
                             <img src={thumbMap[images[0]] || images[0]} alt="ảnh lỗi" style={{ width: 40, height: 40, borderRadius: 4, objectFit: "cover" }}/>
                             {images.length > 1 && (
-                              <span style={{ position: 'absolute', top: -5, right: -5, background: 'rgba(0,0,0,0.7)', color: 'white', borderRadius: '50%', width: 18, height: 18, fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <span style={{ position: 'absolute', top: -5, right: -5, background: 'rgba(0,0,0,0.7)', color: colors.white, borderRadius: '50%', width: 18, height: 18, fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                 +{images.length - 1}
                               </span>
                             )}
@@ -1373,21 +1374,21 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
                             >
                               💬
                             </ActionButton>
-                            <ActionButton onClick={() => setImprovementModal({ isOpen: true, error: e, logId: e.id })} title="Cải thiện/Khắc phục" color={colors.white} bg={isImproved ? "#4caf50" : "#f44336"}> <ImprovementIcon /> </ActionButton>
+                            <ActionButton onClick={() => setImprovementModal({ isOpen: true, error: e, logId: e.id })} title="Cải thiện/Khắc phục" color={colors.white} bg={isImproved ? colors.success : colors.error}> <ImprovementIcon /> </ActionButton>
                             {isEhsCommitteeOnly && e.userId === user.uid && !e.deleteRequested && (
-                              <ActionButton onClick={() => handleDeleteRequest(e.id)} title="Yêu cầu xóa lỗi" color="#d32f2f" bg="transparent">x</ActionButton>
+                              <ActionButton onClick={() => handleDeleteRequest(e.id)} title="Yêu cầu xóa lỗi" color={colors.error} bg="transparent">x</ActionButton>
                             )}
                             {isAdminOrEhs && e.deleteRequested && (
                               <>
-                                <ActionButton onClick={() => handleDelete(e.id)} title="Duyệt xóa" color="#fff" bg="#2e7d32">✅</ActionButton>
-                                <ActionButton onClick={() => handleCancelDeleteRequest(e.id)} title="Từ chối xóa" color="#fff" bg="#e65100">❌</ActionButton>
+                                <ActionButton onClick={() => handleDelete(e.id)} title="Duyệt xóa" color={colors.white} bg={colors.success}>✅</ActionButton>
+                                <ActionButton onClick={() => handleCancelDeleteRequest(e.id)} title="Từ chối xóa" color={colors.white} bg={colors.warning}>❌</ActionButton>
                               </>
                             )}
                             {(userRole === "admin" || userRole === "ehs") && (
                               <>
-                                <ActionButton onClick={() => setEditModal({ isOpen: true, error: e, logId: e.id })} title="Sửa lỗi" color={colors.white} bg="#ff9800">✏️</ActionButton>
+                                <ActionButton onClick={() => setEditModal({ isOpen: true, error: e, logId: e.id })} title="Sửa lỗi" color={colors.white} bg={colors.warning}>✏️</ActionButton>
                                 {!e.deleteRequested && (
-                                  <ActionButton onClick={() => handleDelete(e.id)} title="Xóa lỗi" color="#d32f2f" bg="transparent">x</ActionButton>
+                                  <ActionButton onClick={() => handleDelete(e.id)} title="Xóa lỗi" color={colors.error} bg="transparent">x</ActionButton>
                                 )}
                               </>
                             )}
@@ -1419,7 +1420,7 @@ function Gemba({ user, isMobile, newLogCounts, setTuGembaNotifCounts }) {
                       <button key={d.name} style={{ display: "block", width: "100%", marginBottom: 10, padding: "10px 15px", borderRadius: 8, border: "none", fontWeight: 600, fontSize: 15, background: depIndex === i ? colors.primary : colors.backgroundLight, color: depIndex === i ? colors.white : colors.primary, boxShadow: depIndex === i ? `0 1.5px 7px ${alpha("primary", 0.2)}` : "none", cursor: "pointer", transition: "all .13s", position: 'relative' }} onClick={() => handleSelectDepartment(i)}>
                       {d.name}
                       {newLogCounts && newLogCounts[d.name] > 0 && (
-                        <span style={{ position: 'absolute', top: 5, right: 8, background: 'red', color: 'white', borderRadius: '50%', width: 20, height: 20, fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
+                        <span style={{ position: 'absolute', top: 5, right: 8, background: colors.error, color: colors.white, borderRadius: '50%', width: 20, height: 20, fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
                           {newLogCounts[d.name]}
                         </span>
                       )}
@@ -1520,18 +1521,18 @@ function CommentModal({ isOpen, onClose, eventId, user, error }) {
   if (!isOpen) return null;
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 1002 }}>
-      <div style={{ background: colors.surface, padding: 22, borderRadius: 12, width: '90%', maxWidth: 500, height: 500, display: 'flex', flexDirection: 'column', boxShadow: "0 4px 15px rgba(0,0,0,.2)" }}>
+    <div className="so-modal-overlay" style={{ zIndex: 1002 }}>
+      <div className="so-modal" style={{ maxWidth: 500, height: 500, display: 'flex', flexDirection: 'column' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: `2.5px solid ${colors.primaryLight}`, paddingBottom: 10, marginBottom: 12 }}>
           <h3 style={{ margin: 0, color: colors.primary }}>Ý kiến phản hồi / Thảo luận (Gemba)</h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#888' }}>✕</button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: colors.textSecondary }}>✕</button>
         </div>
         
         <div ref={scrollRef} style={{ flexGrow: 1, overflowY: 'auto', marginBottom: 15, paddingRight: 5 }}>
           {loadingComments ? (
-            <div style={{ textAlign: 'center', color: '#888', marginTop: 20 }}>Đang tải bình luận...</div>
+            <div style={{ textAlign: 'center', color: colors.textSecondary, marginTop: 20 }}>Đang tải bình luận...</div>
           ) : comments.length === 0 ? (
-            <div style={{ textAlign: 'center', color: '#888', marginTop: 20 }}>Chưa có bình luận nào cho lỗi này.</div>
+            <div style={{ textAlign: 'center', color: colors.textSecondary, marginTop: 20 }}>Chưa có bình luận nào cho lỗi này.</div>
           ) : (
             comments.map(c => {
               const isMe = c.userId === user.uid;
@@ -1541,7 +1542,7 @@ function CommentModal({ isOpen, onClose, eventId, user, error }) {
                 <div key={c.id} style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start', marginBottom: 12 }}>
                   <div style={{ fontSize: 11, color: colors.textSecondary, marginBottom: 2 }}>{c.userName} • {dateStr}</div>
                   <div style={{
-                    background: isMe ? colors.primary : '#f1f1f1',
+                    background: isMe ? colors.primary : colors.backgroundLight,
                     color: isMe ? colors.white : colors.textPrimary,
                     padding: '8px 14px',
                     borderRadius: 14,
@@ -1567,11 +1568,12 @@ function CommentModal({ isOpen, onClose, eventId, user, error }) {
             onChange={e => setNewComment(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') handleSend(); }}
             placeholder="Nhập nội dung phản hồi..."
-            style={{ flexGrow: 1, padding: '8px 12px', borderRadius: 8, border: `1.5px solid ${colors.primaryLight}`, fontSize: 14, outline: 'none' }}
+            className="so-input"
+            style={{ flexGrow: 1, width: 'auto' }}
           />
           <button
+            className="so-btn so-btn--primary"
             onClick={handleSend}
-            style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: colors.primary, color: colors.white, fontWeight: 700, cursor: 'pointer' }}
           >
             Gửi
           </button>
