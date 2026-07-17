@@ -129,7 +129,9 @@ Bao gồm tên tài liệu, danh mục và trạng thái quyền truy cập củ
         setInputValue('');
         setIsLoading(true);
 
-        const history = messages.map(msg => ({
+        // Chỉ gửi 10 tin gần nhất (5 cặp hỏi-đáp): hội thoại dài không làm token input
+        // phình dần. Backend cũng tự cắt cùng mức, cắt ở đây thêm để payload nhỏ.
+        const history = messages.slice(-10).map(msg => ({
             role: msg.type === 'ai' ? 'model' : 'user',
             parts: [{ text: msg.text }],
         }));

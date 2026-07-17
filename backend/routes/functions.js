@@ -30,6 +30,9 @@ const EMBEDDING_MODEL = "gemini-embedding-001";
 const EMBEDDING_DIMENSIONS = 768;
 // Số chunk liên quan nhất gửi cho AI mỗi câu hỏi (giữ thấp để tiết kiệm token)
 const TOP_K_CHUNKS = 5;
+// Số tin nhắn lịch sử tối đa gửi kèm mỗi câu hỏi (5 cặp hỏi-đáp gần nhất).
+// Không giới hạn thì token input phình dần theo độ dài hội thoại.
+const MAX_HISTORY_MESSAGES = 10;
 
 // Model sửa lỗi chính tả (EHS Audit + Gemba): rẻ và nhanh, đủ cho tác vụ này.
 const SPELLCHECK_MODEL = "gemini-flash-lite-latest";
@@ -326,10 +329,12 @@ router.post("/askAI", authenticateToken, async (req, res) => {
       systemInstruction: systemInstruction
     });
 
+    // Cắt lịch sử TRƯỚC khi dọn lượt mở đầu: sau khi cắt, tin đầu có thể là lượt
+    // model và vòng while bên dưới sẽ dọn nốt (cắt sau sẽ tái tạo lỗi role model).
     const cleanHistory = history.map(h => ({
       role: h.role === "assistant" || h.role === "model" ? "model" : "user",
       parts: Array.isArray(h.parts) ? h.parts : [{ text: h.text || "" }]
-    }));
+    })).slice(-MAX_HISTORY_MESSAGES);
 
     // Gemini bắt buộc lịch sử hội thoại phải mở đầu bằng lượt của user, nếu không sẽ
     // báo "First content should be with role 'user'". Giao diện chatbot hiển thị sẵn
