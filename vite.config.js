@@ -15,6 +15,9 @@ export default defineConfig(() => {
     },
     server: {
       host: true,
+      // Nhận cổng do môi trường cấp (vd. preview harness đặt PORT khi 5173 bận);
+      // không có thì giữ 5173 quen thuộc. Backend vẫn cố định :5000 (xem dev-with-backend.mjs).
+      port: Number(process.env.PORT) || 5173,
       proxy: {
         '/api': {
           target: 'http://localhost:5000',

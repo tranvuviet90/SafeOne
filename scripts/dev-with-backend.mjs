@@ -25,8 +25,8 @@ const backendNodemon = path.join(backendDir, "node_modules", "nodemon", "bin", "
 const procs = [];
 let shuttingDown = false;
 
-function run(name, args, cwd, color) {
-  const child = spawn(process.execPath, args, { cwd, env: process.env });
+function run(name, args, cwd, color, env = process.env) {
+  const child = spawn(process.execPath, args, { cwd, env });
   const prefix = `\x1b[${color}m[${name}]\x1b[0m `;
 
   const pipe = (stream, out) => {
@@ -61,10 +61,15 @@ process.on("SIGINT", () => shutdown(0));
 process.on("SIGTERM", () => shutdown(0));
 
 // Backend: ưu tiên nodemon (tự reload khi sửa .js); nếu không có thì chạy node server.js.
+// Xóa PORT khỏi env của backend: biến này (nếu có) là cổng cấp cho VITE — server.js
+// cũng đọc process.env.PORT nên nếu để lan sang, hai tiến trình con bind cùng một cổng.
+// Backend luôn ở :5000 vì proxy trong vite.config.js trỏ cứng tới đó.
+const backendEnv = { ...process.env };
+delete backendEnv.PORT;
 if (fs.existsSync(backendNodemon)) {
-  run("backend", [backendNodemon, "server.js"], backendDir, "36"); // cyan
+  run("backend", [backendNodemon, "server.js"], backendDir, "36", backendEnv); // cyan
 } else {
-  run("backend", ["server.js"], backendDir, "36");
+  run("backend", ["server.js"], backendDir, "36", backendEnv);
 }
 
 // Frontend: Vite dev server (HMR).
