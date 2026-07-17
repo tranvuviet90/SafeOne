@@ -4,6 +4,7 @@ import App from "./App.jsx";
 
 import "./index.css";
 import "./styles/typography.css";
+import "./styles/ui.css";
 import "./styles/global-responsive.css";
 import "./auto-fix.js";
 

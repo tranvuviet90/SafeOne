@@ -31,6 +31,37 @@
      được pha trong suốt (đổ bóng, viền mờ). */
   --so-primary-rgb: 70, 110, 115;
   --so-error-rgb: 217, 83, 79;
+
+  /* ==== Token hình khối (spec 2026-07-17-ui-facelift) ====
+     Bo góc 3 mức: sm = nút/input/chip, md = card con/dropdown, lg = card lớn/modal.
+     Khung nội dung chính giữ 22px riêng làm nét đặc trưng. */
+  --so-radius-sm: 8px;
+  --so-radius-md: 12px;
+  --so-radius-lg: 16px;
+
+  /* Spacing thang bội số 4 */
+  --so-space-1: 4px;
+  --so-space-2: 8px;
+  --so-space-3: 12px;
+  --so-space-4: 16px;
+  --so-space-5: 24px;
+  --so-space-6: 32px;
+
+  /* Đổ bóng 3 tầng, nhuộm teal theo nền (không dùng đen thuần):
+     sm = card nghỉ, md = hover/dropdown, lg = modal. */
+  --so-shadow-sm: 0 1px 2px rgba(var(--so-primary-rgb), 0.05), 0 2px 8px rgba(var(--so-primary-rgb), 0.07);
+  --so-shadow-md: 0 2px 4px rgba(var(--so-primary-rgb), 0.06), 0 6px 16px rgba(var(--so-primary-rgb), 0.13);
+  --so-shadow-lg: 0 4px 12px rgba(var(--so-primary-rgb), 0.1), 0 16px 40px rgba(var(--so-primary-rgb), 0.2);
+
+  /* Vòng focus thống nhất toàn app (dùng làm box-shadow, cộng dồn được với bóng) */
+  --so-focus-ring: 0 0 0 3px rgba(var(--so-primary-rgb), 0.3);
+
+  /* Nhịp chuyển động chuẩn cho hover/focus/active */
+  --so-transition: 160ms ease;
+
+  /* Nền màn Login: gradient teal đặc trưng ở tông sáng; tông tối ghi đè bên dưới
+     (giữ gradient sáng trong dark mode sẽ chói và lệch tông). */
+  --so-login-bg: linear-gradient(135deg, #A9D9D4 0%, #466E73 100%);
 }
 
 :root[data-theme="dark"] {
@@ -68,6 +99,20 @@
 
   --so-primary-rgb: 95, 148, 154;
   --so-error-rgb: 233, 115, 111;
+
+  /* Tông tối: bóng gần như vô hình trên nền tối nên giảm bóng, chiều sâu
+     chuyển sang viền --so-border (các primitive .so-* tự thêm viền theo theme). */
+  --so-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --so-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.45);
+  --so-shadow-lg: 0 12px 36px rgba(0, 0, 0, 0.55);
+
+  --so-focus-ring: 0 0 0 3px rgba(var(--so-primary-rgb), 0.4);
+
+  /* Quầng teal mờ hai góc trên nền tối — giữ "chất teal" mà không chói */
+  --so-login-bg:
+    radial-gradient(60% 50% at 15% 0%, rgba(var(--so-primary-rgb), 0.25) 0%, transparent 70%),
+    radial-gradient(50% 40% at 100% 100%, rgba(var(--so-primary-rgb), 0.15) 0%, transparent 70%),
+    #0F1819;
 }
 
 :root {
@@ -129,7 +174,7 @@ table { max-width: 100%; }
 .table-wrap, .table-scroll { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
 button {
-  border-radius: 8px;
+  border-radius: var(--so-radius-sm);
   border: 1px solid transparent;
   padding: 0.6em 1.2em;
   font-size: 1em;
@@ -138,12 +183,26 @@ button {
   background-color: var(--so-surface);
   color: var(--so-text-primary);
   cursor: pointer;
-  transition: border-color 0.25s;
+  transition: border-color var(--so-transition), background var(--so-transition),
+              box-shadow var(--so-transition), transform var(--so-transition);
 }
 button:hover {
   border-color: var(--so-primary);
 }
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+/* Phản hồi vật lý khi bấm: lún nhẹ 1px thay vì đổi màu đột ngột */
+button:active {
+  transform: translateY(1px);
+}
+
+/* Vòng focus thống nhất toàn app — chỉ hiện khi điều hướng bằng bàn phím
+   (:focus-visible), thay outline mặc định mỗi trình duyệt một kiểu. */
+:focus-visible {
+  outline: 2px solid var(--so-primary);
+  outline-offset: 2px;
+}
+button:focus:not(:focus-visible),
+input:focus:not(:focus-visible),
+select:focus:not(:focus-visible),
+textarea:focus:not(:focus-visible) {
+  outline: none;
 }

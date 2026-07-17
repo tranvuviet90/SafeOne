@@ -21,7 +21,7 @@ import "./App.css";
 
 import MagicMenu from "./components/MagicMenu";
 import Chatbot from "./components/Chatbot";
-import { colors, alpha } from "./theme";
+import { colors, alpha, shadows } from "./theme";
 import { ToastProvider, ConfirmProvider, useToast } from "./components/LightboxSwipeOnly";
 import PublicLockerView from "./components/PublicLockerView";
 import ResetPassword from "./components/ResetPassword";
@@ -484,7 +484,8 @@ function MainApp() {
           background: colors.surface,
           borderRadius: isMobile ? 0 : 22,
           minHeight: 460,
-          boxShadow: `0 6px 32px ${alpha("primary", 0.13)}, 0 1.5px 10px #0001`,
+          border: `1px solid ${colors.border}`,
+          boxShadow: shadows.md,
           padding: isMobile ? "24px 16px" : "38px 32px",
           display: "flex",
           color: colors.textPrimary,

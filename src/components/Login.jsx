@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import authService from '../services/authService';
 import apiClient from '../services/apiClient';
 import { useI18n } from '../i18n/I18nProvider';
+import { colors, alpha, shadows } from '../theme';
 
 function Login({ setUser }) {
   const { t } = useI18n();
@@ -137,38 +138,63 @@ function Login({ setUser }) {
     }
   };
 
+  // Khung toàn màn hình dùng chung cho cả form login lẫn form khởi tạo.
+  // Nền lấy từ token --so-login-bg: gradient teal ở tông sáng, nền tối + quầng teal ở tông tối.
+  const screenStyle = {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    minHeight: '100dvh',
+    width: '100vw',
+    background: 'var(--so-login-bg)',
+    padding: 20,
+    boxSizing: 'border-box'
+  };
+
+  const errorBoxStyle = {
+    color: colors.error,
+    marginBottom: 20,
+    fontSize: 13,
+    fontWeight: 500,
+    padding: 12,
+    background: alpha('error', 0.1),
+    borderRadius: 'var(--so-radius-sm)',
+    lineHeight: 1.5,
+    textAlign: 'left'
+  };
+
   if (showInitForm) {
     return (
-      <div style={{ display:'flex', justifyContent:'center', alignItems:'center', minHeight:'100vh', width:'100vw', background:'linear-gradient(135deg, #A9D9D4 0%, #466E73 100%)', padding:'20px', boxSizing:'border-box' }}>
-        <form onSubmit={handleInitAdmin} style={{ background:'white', padding:'40px 50px', borderRadius:'16px', boxShadow:'0 10px 30px rgba(0,0,0,0.1)', width:'100%', maxWidth:'450px', textAlign:'center', boxSizing:'border-box' }}>
-          <h2 style={{ color:'#222', marginBottom:'10px', fontWeight:'700', fontSize:'26px' }}>Khởi Tạo Hệ Thống</h2>
-          <p style={{ color:'#e74c3c', marginBottom:'25px', fontSize:'14px', lineHeight:'1.5', fontWeight:'500', padding:'10px', background:'#fadbd8', borderRadius:'8px' }}>
+      <div style={screenStyle}>
+        <form onSubmit={handleInitAdmin} className="so-card" style={{ boxShadow: shadows.lg, padding: '36px 40px', width: '100%', maxWidth: 450, textAlign: 'center' }}>
+          <h2 style={{ color: colors.textPrimary, marginBottom: 8, fontWeight: 700, fontSize: 26, letterSpacing: '-0.01em' }}>Khởi tạo hệ thống</h2>
+          <p style={errorBoxStyle}>
             Hệ thống chưa có người dùng nào. Vui lòng tạo tài khoản Admin đầu tiên để thiết lập cấu hình.
           </p>
-          {error && <p style={{ color:'red', marginBottom:'20px', fontSize:'14px', fontWeight:'500' }}>{error}</p>}
-          
-          <div style={{ marginBottom:'18px', textAlign:'left' }}>
-            <label style={{ display:'block', marginBottom:'6px', color:'#333', fontWeight:'600', fontSize:'14px' }}>Tên người quản trị (Admin Name)</label>
-            <input type="text" value={initName} onChange={e => setInitName(e.target.value)} placeholder="Ví dụ: Super Admin" required style={{ width:'100%', padding:'12px 15px', borderRadius:'8px', border:'1px solid #ddd', fontSize:'15px', boxSizing:'border-box' }} />
+          {error && <p style={errorBoxStyle}>{error}</p>}
+
+          <div style={{ marginBottom: 18, textAlign: 'left' }}>
+            <label className="so-label">Tên người quản trị (Admin Name)</label>
+            <input type="text" className="so-input" value={initName} onChange={e => setInitName(e.target.value)} placeholder="Ví dụ: Super Admin" required />
           </div>
 
-          <div style={{ marginBottom:'18px', textAlign:'left' }}>
-            <label style={{ display:'block', marginBottom:'6px', color:'#333', fontWeight:'600', fontSize:'14px' }}>Email Admin</label>
-            <input type="email" value={initEmail} onChange={e => setInitEmail(e.target.value)} placeholder="admin@domain.com" required style={{ width:'100%', padding:'12px 15px', borderRadius:'8px', border:'1px solid #ddd', fontSize:'15px', boxSizing:'border-box' }} />
+          <div style={{ marginBottom: 18, textAlign: 'left' }}>
+            <label className="so-label">Email Admin</label>
+            <input type="email" className="so-input" value={initEmail} onChange={e => setInitEmail(e.target.value)} placeholder="admin@domain.com" required />
           </div>
 
-          <div style={{ marginBottom:'18px', textAlign:'left' }}>
-            <label style={{ display:'block', marginBottom:'6px', color:'#333', fontWeight:'600', fontSize:'14px' }}>Mật khẩu</label>
-            <input type="password" value={initPassword} onChange={e => setInitPassword(e.target.value)} required style={{ width:'100%', padding:'12px 15px', borderRadius:'8px', border:'1px solid #ddd', fontSize:'15px', boxSizing:'border-box' }} />
+          <div style={{ marginBottom: 18, textAlign: 'left' }}>
+            <label className="so-label">Mật khẩu</label>
+            <input type="password" className="so-input" value={initPassword} onChange={e => setInitPassword(e.target.value)} required />
           </div>
 
-          <div style={{ marginBottom:'25px', textAlign:'left' }}>
-            <label style={{ display:'block', marginBottom:'6px', color:'#333', fontWeight:'600', fontSize:'14px' }}>Nhập lại mật khẩu</label>
-            <input type="password" value={initConfirmPassword} onChange={e => setInitConfirmPassword(e.target.value)} required style={{ width:'100%', padding:'12px 15px', borderRadius:'8px', border:'1px solid #ddd', fontSize:'15px', boxSizing:'border-box' }} />
+          <div style={{ marginBottom: 24, textAlign: 'left' }}>
+            <label className="so-label">Nhập lại mật khẩu</label>
+            <input type="password" className="so-input" value={initConfirmPassword} onChange={e => setInitConfirmPassword(e.target.value)} required />
           </div>
 
-          <button type="submit" disabled={loading} style={{ width:'100%', padding:'15px', borderRadius:'8px', border:'none', background:'#e74c3c', color:'white', fontSize:'16px', fontWeight:'700', cursor:'pointer', boxShadow:'0 4px 15px rgba(231,76,60,0.3)', opacity: loading ? 0.7 : 1, transition:'all 0.2s ease-in-out' }}>
-            {loading ? "Đang đăng ký..." : "Khởi Tạo & Đăng Ký Admin"}
+          <button type="submit" disabled={loading} className="so-btn so-btn--primary" style={{ width: '100%', padding: 14, fontSize: 16 }}>
+            {loading ? "Đang đăng ký..." : "Khởi tạo & đăng ký Admin"}
           </button>
         </form>
       </div>
@@ -176,63 +202,64 @@ function Login({ setUser }) {
   }
 
   return (
-    <div style={{ display:'flex', justifyContent:'center', alignItems:'center', minHeight:'100vh', width:'100vw', background:'linear-gradient(135deg, #A9D9D4 0%, #466E73 100%)', padding:'20px', boxSizing:'border-box' }}>
-      <form onSubmit={handleLogin} style={{ background:'white', padding:'40px 50px', borderRadius:'16px', boxShadow:'0 10px 30px rgba(0,0,0,0.1)', width:'100%', maxWidth:'400px', textAlign:'center', boxSizing:'border-box' }}>
-        <h2 style={{ color:'#222', marginBottom:'10px', fontWeight:'700', fontSize:'28px' }}>{t('login.title')}</h2>
-        <p style={{ color:'#555', marginBottom:'30px', fontSize:'16px' }}>{t('login.subtitle')}</p>
-        {initError && <p style={{ color:'#c0392b', marginBottom:'20px', fontSize:'13px', fontWeight:'500', padding:'12px', background:'#fadbd8', borderRadius:'8px', lineHeight:'1.5', textAlign:'left' }}>⚠️ {initError}</p>}
-        {error && <p style={{ color:'red', marginBottom:'20px' }}>{error}</p>}
-        <div style={{ marginBottom:'20px', textAlign:'left' }}>
-          <label style={{ display:'block', marginBottom:'8px', color:'#333', fontWeight:'600' }}>{t('login.email')}</label>
-          <input type="email" value={email} onChange={e => setEmail(e.target.value)} required style={{ width:'100%', padding:'12px 15px', borderRadius:'8px', border:'1px solid #ddd', fontSize:'16px', boxSizing:'border-box' }} />
+    <div style={screenStyle}>
+      <form onSubmit={handleLogin} className="so-card" style={{ boxShadow: shadows.lg, padding: '36px 40px', width: '100%', maxWidth: 400, textAlign: 'center' }}>
+        <h2 style={{ color: colors.textPrimary, marginBottom: 6, fontWeight: 700, fontSize: 28, letterSpacing: '-0.01em' }}>{t('login.title')}</h2>
+        <p style={{ color: colors.textSecondary, marginBottom: 28, fontSize: 15 }}>{t('login.subtitle')}</p>
+        {initError && <p style={errorBoxStyle}>⚠️ {initError}</p>}
+        {error && <p style={errorBoxStyle}>{error}</p>}
+        <div style={{ marginBottom: 18, textAlign: 'left' }}>
+          <label className="so-label">{t('login.email')}</label>
+          <input type="email" className="so-input" value={email} onChange={e => setEmail(e.target.value)} required style={{ fontSize: 16 }} />
         </div>
-        <div style={{ marginBottom:'20px', textAlign:'left' }}>
-          <label style={{ display:'block', marginBottom:'8px', color:'#333', fontWeight:'600' }}>{t('login.password')}</label>
-          <input type="password" value={password} onChange={e => setPassword(e.target.value)} style={{ width:'100%', padding:'12px 15px', borderRadius:'8px', border:'1px solid #ddd', fontSize:'16px', boxSizing:'border-box' }} />
+        <div style={{ marginBottom: 18, textAlign: 'left' }}>
+          <label className="so-label">{t('login.password')}</label>
+          <input type="password" className="so-input" value={password} onChange={e => setPassword(e.target.value)} style={{ fontSize: 16 }} />
         </div>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'30px', fontSize:'14px' }}>
-          <label style={{ display:'flex', alignItems:'center', color:'#555', cursor:'pointer' }}>
-            <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)} style={{ marginRight:'8px', accentColor:'#466E73' }} />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28, fontSize: 14 }}>
+          <label style={{ display: 'flex', alignItems: 'center', color: colors.textSecondary, cursor: 'pointer' }}>
+            <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)} style={{ marginRight: 8, accentColor: colors.primary }} />
             {t('login.remember')}
           </label>
-          <a href="#" style={{ color:'#466E73', textDecoration:'none', fontWeight:'600' }}
+          <a href="#" style={{ color: colors.primary, textDecoration: 'none', fontWeight: 600 }}
             onClick={e => { e.preventDefault(); setForgotEmail(email); setForgotMsg(''); setShowForgot(true); }}>
             {t('login.forgot')}
           </a>
         </div>
-        <button type="submit" disabled={loading} style={{ width:'100%', padding:'15px', borderRadius:'8px', border:'none', background:'#466E73', color:'white', fontSize:'18px', fontWeight:'700', cursor:'pointer', boxShadow:'0 4px 15px rgba(70,110,115,0.4)', opacity: loading ? 0.7 : 1 }}>
+        <button type="submit" disabled={loading} className="so-btn so-btn--primary" style={{ width: '100%', padding: 14, fontSize: 17 }}>
           {loading ? t('login.logging') : t('login.button')}
         </button>
       </form>
 
       {showForgot && (
-        <div style={{ position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.5)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999, padding:'16px' }}>
-          <form onSubmit={handleForgot} style={{ background:'white', padding:'28px 30px', borderRadius:'14px', boxShadow:'0 10px 30px rgba(0,0,0,0.2)', width:'100%', maxWidth:'420px', boxSizing:'border-box' }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'14px' }}>
-              <h3 style={{ margin:0, color:'#222', fontWeight:'700', fontSize:'20px' }}>{t('login.forgot')}</h3>
-              <button type="button" onClick={() => setShowForgot(false)} style={{ background:'none', border:'none', fontSize:'20px', cursor:'pointer', color:'#888' }}>✕</button>
+        <div className="so-modal-overlay">
+          <form onSubmit={handleForgot} className="so-modal" style={{ maxWidth: 420 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <h3 style={{ margin: 0, color: colors.textPrimary, fontWeight: 700, fontSize: 20 }}>{t('login.forgot')}</h3>
+              <button type="button" onClick={() => setShowForgot(false)} className="so-btn so-btn--ghost" style={{ padding: '4px 10px', fontSize: 18, color: colors.textSecondary }} aria-label="Đóng">✕</button>
             </div>
-            <p style={{ color:'#555', fontSize:'14px', marginBottom:'16px', lineHeight:1.5 }}>
+            <p style={{ color: colors.textSecondary, fontSize: 14, marginBottom: 16, lineHeight: 1.5 }}>
               Nhập email tài khoản của bạn. Chúng tôi sẽ gửi liên kết đặt lại mật khẩu đến hộp thư của bạn.
             </p>
             <input
               type="email"
+              className="so-input"
               value={forgotEmail}
               onChange={e => setForgotEmail(e.target.value)}
               placeholder="email@domain.com"
               required
-              style={{ width:'100%', padding:'12px 15px', borderRadius:'8px', border:'1px solid #ddd', fontSize:'15px', boxSizing:'border-box', marginBottom:'12px' }}
+              style={{ marginBottom: 12 }}
             />
             {forgotMsg && (
-              <p style={{ color:'#466E73', fontSize:'13px', marginBottom:'12px', background:'#eef6f5', padding:'10px', borderRadius:'8px' }}>{forgotMsg}</p>
+              <p style={{ color: colors.primary, fontSize: 13, marginBottom: 12, background: alpha('primary', 0.08), padding: 10, borderRadius: 'var(--so-radius-sm)' }}>{forgotMsg}</p>
             )}
             {forgotDevLink && (
-              <p style={{ fontSize:'12px', marginBottom:'12px', background:'#fff7e6', padding:'10px', borderRadius:'8px', color:'#8a6d3b', wordBreak:'break-all' }}>
+              <p style={{ fontSize: 12, marginBottom: 12, background: alpha('primary', 0.08), padding: 10, borderRadius: 'var(--so-radius-sm)', color: colors.warning, wordBreak: 'break-all' }}>
                 ⚙️ Chế độ dev (chưa cấu hình SMTP) — nhấp để đặt lại mật khẩu:<br />
-                <a href={forgotDevLink} style={{ color:'#466E73', fontWeight:600 }}>{forgotDevLink}</a>
+                <a href={forgotDevLink} style={{ color: colors.primary, fontWeight: 600 }}>{forgotDevLink}</a>
               </p>
             )}
-            <button type="submit" disabled={forgotLoading} style={{ width:'100%', padding:'13px', borderRadius:'8px', border:'none', background:'#466E73', color:'white', fontSize:'16px', fontWeight:'700', cursor:'pointer', opacity: forgotLoading ? 0.7 : 1 }}>
+            <button type="submit" disabled={forgotLoading} className="so-btn so-btn--primary" style={{ width: '100%', padding: 13, fontSize: 15 }}>
               {forgotLoading ? 'Đang gửi...' : 'Gửi liên kết đặt lại'}
             </button>
           </form>

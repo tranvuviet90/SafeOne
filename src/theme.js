@@ -42,3 +42,23 @@ export const colors = {
 // "var(--so-primary)33" — CSS không hợp lệ, hiệu ứng sẽ mất im lặng chứ không báo lỗi.
 // Chỉ 'primary' và 'error' có biến --so-*-rgb đi kèm, vì chỉ chúng cần pha trong suốt.
 export const alpha = (name, a) => `rgba(var(--so-${name}-rgb), ${a})`;
+
+// Token hình khối cho chỗ buộc phải inline (style động theo state).
+// Chỗ tĩnh thì dùng class .so-* trong src/styles/ui.css thay vì các token này.
+export const radius = {
+  sm: 'var(--so-radius-sm)',   // nút, input, chip
+  md: 'var(--so-radius-md)',   // card con, dropdown
+  lg: 'var(--so-radius-lg)',   // card lớn, modal
+  pill: '999px',
+};
+
+export const shadows = {
+  sm: 'var(--so-shadow-sm)',   // card nghỉ
+  md: 'var(--so-shadow-md)',   // hover, dropdown
+  lg: 'var(--so-shadow-lg)',   // modal
+  focusRing: 'var(--so-focus-ring)',
+};
+
+export const space = (n) => `var(--so-space-${n})`; // n = 1..6 → 4/8/12/16/24/32px
+
+export const transition = 'var(--so-transition)';   // 160ms ease

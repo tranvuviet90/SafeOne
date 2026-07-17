@@ -1,0 +1,250 @@
+/* ==== SafeOne UI primitives (spec 2026-07-17-ui-facelift) ====
+   Bộ class dùng chung cho mọi tab. Chỉ dùng token --so-* (không số trần, không hex)
+   để cả hai tông sáng/tối tự đúng. Inline style chỉ dành cho giá trị động theo state.
+
+   Quy ước đặt tên: .so-<khối> và .so-<khối>--<biến thể> (BEM rút gọn). */
+
+/* ---------- Card ---------- */
+/* Card nghỉ: bóng sm. Ở tông tối bóng chìm nên viền gánh chiều sâu (border theo
+   --so-border vốn đã đổi theo theme). */
+.so-card {
+  background: var(--so-surface);
+  border: 1px solid var(--so-border);
+  border-radius: var(--so-radius-lg);
+  box-shadow: var(--so-shadow-sm);
+  padding: var(--so-space-5);
+}
+.so-card--sub {
+  border-radius: var(--so-radius-md);
+  box-shadow: none;
+  padding: var(--so-space-4);
+  background: var(--so-background-light);
+  border-color: transparent;
+}
+.so-card--hover {
+  transition: box-shadow var(--so-transition), transform var(--so-transition),
+              border-color var(--so-transition);
+}
+.so-card--hover:hover {
+  box-shadow: var(--so-shadow-md);
+  transform: translateY(-2px);
+  border-color: var(--so-primary-light);
+}
+
+/* ---------- Nút ---------- */
+.so-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--so-space-2);
+  padding: 10px var(--so-space-4);
+  border-radius: var(--so-radius-sm);
+  border: 1px solid var(--so-border);
+  background: var(--so-surface);
+  color: var(--so-text-primary);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+  user-select: none;
+  transition: background var(--so-transition), border-color var(--so-transition),
+              box-shadow var(--so-transition), transform var(--so-transition),
+              color var(--so-transition);
+}
+.so-btn:hover { border-color: var(--so-primary); color: var(--so-primary); }
+.so-btn:active { transform: translateY(1px); }
+.so-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none;
+}
+
+.so-btn--primary {
+  background: var(--so-primary);
+  border-color: var(--so-primary);
+  color: #fff; /* chữ trên nền teal luôn trắng, cả hai tông (xem spec dark-mode §5.2) */
+  box-shadow: var(--so-shadow-sm);
+}
+.so-btn--primary:hover {
+  background: var(--so-primary-dark);
+  border-color: var(--so-primary-dark);
+  color: #fff;
+  box-shadow: var(--so-shadow-md);
+}
+:root[data-theme="dark"] .so-btn--primary:hover {
+  /* --so-primary-dark ở tông tối là màu NHẤN SÁNG (chữ tiêu đề) — làm nền nút sẽ
+     nuốt chữ trắng, nên hover ở tông tối chỉ nâng bóng + viền sáng. */
+  background: var(--so-primary);
+  border-color: var(--so-primary-light);
+}
+
+.so-btn--ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--so-primary);
+}
+.so-btn--ghost:hover {
+  background: rgba(var(--so-primary-rgb), 0.08);
+  border-color: transparent;
+}
+
+.so-btn--danger {
+  background: transparent;
+  border-color: var(--so-error);
+  color: var(--so-error);
+}
+.so-btn--danger:hover {
+  background: var(--so-error);
+  border-color: var(--so-error);
+  color: #fff;
+}
+
+/* ---------- Input / Select / Textarea ---------- */
+.so-input,
+.so-select,
+.so-textarea {
+  width: 100%;
+  padding: 10px var(--so-space-3);
+  border-radius: var(--so-radius-sm);
+  border: 1px solid var(--so-border);
+  background: var(--so-surface);
+  color: var(--so-text-primary);
+  font-size: 14px;
+  font-family: inherit;
+  line-height: 1.4;
+  box-sizing: border-box;
+  transition: border-color var(--so-transition), box-shadow var(--so-transition);
+}
+.so-input::placeholder,
+.so-textarea::placeholder { color: var(--so-text-disabled); }
+.so-input:focus,
+.so-select:focus,
+.so-textarea:focus {
+  outline: none;
+  border-color: var(--so-primary);
+  box-shadow: var(--so-focus-ring);
+}
+.so-input:disabled,
+.so-select:disabled,
+.so-textarea:disabled {
+  background: var(--so-background-light);
+  color: var(--so-text-disabled);
+  cursor: not-allowed;
+}
+.so-label {
+  display: block;
+  margin-bottom: var(--so-space-2);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--so-text-secondary);
+}
+
+/* ---------- Bảng ---------- */
+.so-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums; /* cột số thẳng hàng */
+}
+.so-table th {
+  text-align: left;
+  padding: var(--so-space-3) var(--so-space-3);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--so-text-secondary);
+  border-bottom: 1px solid var(--so-border);
+  background: var(--so-background-light);
+}
+.so-table td {
+  padding: var(--so-space-3) var(--so-space-3);
+  border-bottom: 1px solid var(--so-border);
+  color: var(--so-text-primary);
+}
+.so-table tbody tr { transition: background var(--so-transition); }
+.so-table tbody tr:hover { background: rgba(var(--so-primary-rgb), 0.05); }
+
+/* ---------- Modal ---------- */
+.so-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(12, 24, 25, 0.55);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--so-space-4);
+  z-index: 1000;
+}
+.so-modal {
+  background: var(--so-surface);
+  border: 1px solid var(--so-border);
+  border-radius: var(--so-radius-lg);
+  box-shadow: var(--so-shadow-lg);
+  padding: var(--so-space-5);
+  width: 100%;
+  max-width: 440px;
+  max-height: min(86vh, 720px);
+  overflow-y: auto;
+  box-sizing: border-box;
+  animation: so-modal-in 180ms ease;
+}
+@keyframes so-modal-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to   { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .so-modal { animation: none; }
+}
+
+/* ---------- Badge / Chip ---------- */
+.so-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--so-space-2);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.6;
+  background: rgba(var(--so-primary-rgb), 0.12);
+  color: var(--so-primary);
+}
+.so-badge--success { background: var(--so-accent-light); color: var(--so-success); }
+.so-badge--warning { background: rgba(226, 158, 43, 0.15); color: var(--so-warning); }
+.so-badge--error   { background: rgba(var(--so-error-rgb), 0.12); color: var(--so-error); }
+
+.so-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--so-space-1);
+  padding: 4px var(--so-space-3);
+  border-radius: 999px;
+  border: 1px solid var(--so-border);
+  background: var(--so-surface);
+  color: var(--so-text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--so-transition), border-color var(--so-transition),
+              color var(--so-transition);
+}
+.so-chip:hover { border-color: var(--so-primary); color: var(--so-primary); }
+.so-chip--active {
+  background: var(--so-primary);
+  border-color: var(--so-primary);
+  color: #fff;
+}
+
+/* ---------- Trạng thái rỗng ---------- */
+.so-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--so-space-2);
+  padding: var(--so-space-6) var(--so-space-4);
+  text-align: center;
+  color: var(--so-text-secondary);
+  font-size: 14px;
+}
+.so-empty .so-empty__icon { font-size: 32px; opacity: 0.6; }
