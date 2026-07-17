@@ -509,8 +509,8 @@ function ExportModal({ onClose, departments }) {
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 1200 }}>
-      <div style={{ background: colors.surface, padding: 22, borderRadius: 12, width: 520, boxShadow: "0 4px 15px rgba(0,0,0,.2)" }}>
+    <div className="so-modal-overlay" style={{ zIndex: 1200 }}>
+      <div className="so-modal" style={{ maxWidth: 520 }}>
         <h3 style={{ marginTop: 0, color: colors.primary }}>{t("ehs.export.title")}</h3>
         <div style={{ display: 'grid', gap: '15px' }}>
           <div>
@@ -535,11 +535,11 @@ function ExportModal({ onClose, departments }) {
             </select>
           </div>
         </div>
-        <style>{`.date-picker-wrapper{width:100%}.date-picker-input{width:100%;padding:8px;border-radius:6px;border:1px solid ${colors.border};box-sizing:border-box}`}</style>
+        <style>{`.date-picker-wrapper{width:100%}.date-picker-input{width:100%;padding:8px;border-radius:var(--so-radius-sm);border:1px solid ${colors.border};background:${colors.surface};color:${colors.textPrimary};box-sizing:border-box;transition:border-color var(--so-transition),box-shadow var(--so-transition)}.date-picker-input:focus{outline:none;border-color:${colors.primary};box-shadow:var(--so-focus-ring)}`}</style>
         <div style={{ display: "flex", gap: 12, marginTop: 20, justifyContent: "flex-end", flexWrap: "wrap" }}>
-          <button onClick={onClose} disabled={isGenerating} style={{ padding: "8px 16px", borderRadius: 6, border: `1px solid ${colors.border}`, background: colors.background, cursor: "pointer" }}>{t("common.cancel")}</button>
-          <button onClick={() => handleExport("bang")} disabled={isGenerating} style={{ padding: "8px 16px", borderRadius: 6, border: "none", background: colors.success, color: colors.white, fontWeight: 700, cursor: "pointer" }}>{isGenerating ? t("ehs.processing") : t("ehs.export.btnScoreSheet")}</button>
-          <button onClick={() => handleExport("cap")} disabled={isGenerating} style={{ padding: "8px 16px", borderRadius: 6, border: "none", background: "#1f80e0", color: colors.white, fontWeight: 700, cursor: "pointer" }}>{isGenerating ? t("ehs.processing") : t("ehs.export.btnCap")}</button>
+          <button className="so-btn" onClick={onClose} disabled={isGenerating}>{t("common.cancel")}</button>
+          <button className="so-btn" onClick={() => handleExport("bang")} disabled={isGenerating} style={{ background: colors.success, borderColor: colors.success, color: colors.white }}>{isGenerating ? t("ehs.processing") : t("ehs.export.btnScoreSheet")}</button>
+          <button className="so-btn" onClick={() => handleExport("cap")} disabled={isGenerating} style={{ background: colors.info, borderColor: colors.info, color: colors.white }}>{isGenerating ? t("ehs.processing") : t("ehs.export.btnCap")}</button>
         </div>
       </div>
     </div>
@@ -601,12 +601,12 @@ function ImprovementModal({ modalData, onClose, onSave, canConfirm, onViewImage 
     onClose();
   };
 
-  const inputStyle = { width: '100%', padding: 8, borderRadius: 6, border: `1px solid ${colors.border}`, marginTop: 5, boxSizing: 'border-box' };
-  const labelStyle = { fontWeight: 600, color: '#333' };
+  const inputStyle = { width: '100%', padding: 8, borderRadius: 'var(--so-radius-sm)', border: `1px solid ${colors.border}`, background: colors.surface, color: colors.textPrimary, marginTop: 5, boxSizing: 'border-box' };
+  const labelStyle = { fontWeight: 600, color: colors.textPrimary };
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 1001 }}>
-      <div style={{ background: colors.surface, padding: 22, borderRadius: 12, width: '90%', maxWidth: 550, boxShadow: "0 4px 15px rgba(0,0,0,.2)" }}>
+    <div className="so-modal-overlay" style={{ zIndex: 1001 }}>
+      <div className="so-modal" style={{ maxWidth: 550 }}>
         <h3 style={{ marginTop: 0, color: colors.primary, borderBottom: `2px solid ${colors.primaryLight}`, paddingBottom: 10 }}>{t("ehs.improve.title")}</h3>
         <p><b>{t("ehs.errorColon")}</b> {modalData.error.desc}</p>
         <div style={{ display: 'grid', gap: 12 }}>
@@ -632,8 +632,8 @@ function ImprovementModal({ modalData, onClose, onSave, canConfirm, onViewImage 
                   width: '100%', padding: '10px 14px', borderRadius: 8, cursor: 'pointer',
                   fontWeight: 700, fontSize: 14, display: 'flex', alignItems: 'center',
                   justifyContent: 'center', gap: 8,
-                  border: ehsVerified ? '1px solid #388e3c' : `1px solid ${colors.border}`,
-                  background: ehsVerified ? '#4caf50' : colors.background,
+                  border: ehsVerified ? `1px solid ${colors.success}` : `1px solid ${colors.border}`,
+                  background: ehsVerified ? colors.success : colors.background,
                   color: ehsVerified ? colors.white : colors.textPrimary,
                 }}
               >
@@ -643,9 +643,9 @@ function ImprovementModal({ modalData, onClose, onSave, canConfirm, onViewImage 
               <div style={{
                 padding: '10px 14px', borderRadius: 8, fontWeight: 700, fontSize: 14,
                 textAlign: 'center',
-                background: ehsVerified ? '#e8f5e9' : colors.background,
-                color: ehsVerified ? '#2e7d32' : colors.textSecondary,
-                border: `1px solid ${ehsVerified ? '#a5d6a7' : colors.border}`,
+                background: ehsVerified ? alpha('success', 0.12) : colors.background,
+                color: ehsVerified ? colors.success : colors.textSecondary,
+                border: `1px solid ${ehsVerified ? alpha('success', 0.45) : colors.border}`,
               }}>
                 {ehsVerified ? `✓ ${t("ehs.improve.statusConfirmed")}` : t("ehs.improve.statusPending")}
               </div>
@@ -668,8 +668,8 @@ function ImprovementModal({ modalData, onClose, onSave, canConfirm, onViewImage 
           </div>
         </div>
         <div style={{ display: "flex", gap: 12, marginTop: 20, justifyContent: "flex-end" }}>
-          <button onClick={onClose} disabled={isSaving} style={{ padding: "8px 16px", borderRadius: 6, border: `1px solid ${colors.border}`, background: colors.background, cursor: "pointer" }}>{t("common.cancel")}</button>
-          <button onClick={handleSave} disabled={isSaving} style={{ padding: "8px 16px", borderRadius: 6, border: "none", background: colors.primary, color: colors.white, fontWeight: 700, cursor: "pointer" }}> {isSaving ? t("ehs.saving") : t("ehs.improve.saveChanges")} </button>
+          <button className="so-btn" onClick={onClose} disabled={isSaving}>{t("common.cancel")}</button>
+          <button className="so-btn so-btn--primary" onClick={handleSave} disabled={isSaving}> {isSaving ? t("ehs.saving") : t("ehs.improve.saveChanges")} </button>
         </div>
       </div>
     </div>
@@ -678,7 +678,10 @@ function ImprovementModal({ modalData, onClose, onSave, canConfirm, onViewImage 
 
 /* =========================
    GembaReportDashboard
-   ========================= */
+   =========================
+   NGOẠI LỆ FACELIFT: dashboard này cố ý dùng nền navy tối riêng với hệ màu tier
+   điểm (xanh ≥90 / vàng ≥70 / đỏ <70) — một khối trình chiếu độc lập, hiển thị
+   ổn ở cả hai theme sáng/tối nên GIỮ hex nội bộ, không quy về token --so-*. */
 function GembaReportDashboard({ onClose, onExport, departments, allDeptScores, selectedMonth: initialMonth, calcHeSo, isMobile }) {
   const { t } = useI18n();
   const [tooltip, setTooltip] = useState({ visible: false, x: 0, y: 0, dept: null, side: 'top' });
@@ -990,18 +993,18 @@ function GembaReportDashboard({ onClose, onExport, departments, allDeptScores, s
                       </span>
                     </div>
                     
-                    <div style={{ display: 'flex', gap: 16, fontSize: 13, color: '#666' }}>
+                    <div style={{ display: 'flex', gap: 16, fontSize: 13, color: colors.textSecondary }}>
                       <div>{t("ehs.report.staff")}: <b>{stat.people}</b> ({t("ehs.report.factor")} {stat.heSo})</div>
-                      <div>{t("ehs.report.errorCount")}: <b style={{ color: '#d32f2f' }}>{stat.errorCount}</b></div>
-                      <div>{t("ehs.report.reminderCount")}: <b style={{ color: '#ff9800' }}>{stat.reminderCount}</b></div>
+                      <div>{t("ehs.report.errorCount")}: <b style={{ color: colors.error }}>{stat.errorCount}</b></div>
+                      <div>{t("ehs.report.reminderCount")}: <b style={{ color: colors.warning }}>{stat.reminderCount}</b></div>
                     </div>
 
                     {stat.topGroups.length > 0 && (
-                      <div style={{ marginTop: 4, borderTop: '1px solid #f1f3f4', paddingTop: 8 }}>
-                        <div style={{ fontSize: 11, color: '#999', fontWeight: 700, textTransform: 'uppercase', marginBottom: 4 }}>{t("ehs.report.commonErrors")}</div>
+                      <div style={{ marginTop: 4, borderTop: `1px solid ${colors.border}`, paddingTop: 8 }}>
+                        <div style={{ fontSize: 11, color: colors.textSecondary, fontWeight: 700, textTransform: 'uppercase', marginBottom: 4 }}>{t("ehs.report.commonErrors")}</div>
                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                           {stat.topGroups.map(([group, count]) => (
-                            <span key={group} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, background: '#f5f5f5', color: '#555', fontWeight: 600 }}>
+                            <span key={group} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, background: colors.backgroundLight, color: colors.textSecondary, fontWeight: 600 }}>
                               {group} ({count})
                             </span>
                           ))}
@@ -1153,14 +1156,14 @@ function EditErrorModal({ modalData, onClose, onSave }) {
   };
 
   const labelStyle = { fontSize: 14, fontWeight: 600, marginBottom: 5, color: colors.textPrimary };
-  const fieldStyle = { width: '100%', boxSizing: 'border-box', padding: '8px 12px', borderRadius: 8, border: `1.5px solid ${colors.primaryLight}`, fontSize: 15, fontFamily: 'sans-serif' };
+  const fieldStyle = { width: '100%', boxSizing: 'border-box', padding: '8px 12px', borderRadius: 'var(--so-radius-sm)', border: `1.5px solid ${colors.primaryLight}`, background: colors.surface, color: colors.textPrimary, fontSize: 15, fontFamily: 'inherit' };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1300 }}>
-      <div style={{ background: '#fff', padding: 26, borderRadius: 16, width: '92%', maxWidth: 520, boxShadow: '0 6px 32px rgba(0,0,0,.25)', maxHeight: '90vh', overflowY: 'auto' }}>
+    <div className="so-modal-overlay" style={{ zIndex: 1300 }}>
+      <div className="so-modal" style={{ maxWidth: 520 }}>
         <h3 style={{ marginTop: 0, color: colors.primary, display: 'flex', alignItems: 'center', gap: 8 }}>{t("ehs.edit.title")}</h3>
 
-        <div style={{ fontSize: 12, color: '#888', marginBottom: 16, lineHeight: 1.6 }}>
+        <div style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 16, lineHeight: 1.6 }}>
           {t("ehs.edit.dept")}: <b>{modalData.department || ''}</b> · {t("ehs.edit.recorder")}: <b>{err.addedBy || ''}</b>
         </div>
 
@@ -1236,8 +1239,8 @@ function EditErrorModal({ modalData, onClose, onSave }) {
         </div>
 
         <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
-          <button onClick={onClose} disabled={saving} style={{ padding: '8px 18px', borderRadius: 8, border: `1px solid ${colors.border}`, background: '#f5f5f5', cursor: 'pointer', fontWeight: 600 }}>{t("common.cancel")}</button>
-          <button onClick={handleSubmit} disabled={saving} style={{ padding: '8px 22px', borderRadius: 8, border: 'none', background: colors.primary, color: '#fff', cursor: 'pointer', fontWeight: 700 }}>{saving ? t("ehs.saving") : `✓ ${t("common.save")}`}</button>
+          <button className="so-btn" onClick={onClose} disabled={saving}>{t("common.cancel")}</button>
+          <button className="so-btn so-btn--primary" onClick={handleSubmit} disabled={saving}>{saving ? t("ehs.saving") : `✓ ${t("common.save")}`}</button>
         </div>
       </div>
     </div>
@@ -1879,9 +1882,9 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
     setEditModal({ isOpen: false, error: null, logId: "", department: "" });
   };
 
-  const numberInputStyle = { width: 60, fontSize: 16, padding: "2px 5px", border: `1px solid ${colors.primaryLight}`, borderRadius: 4, MozAppearance: "textfield" };
+  const numberInputStyle = { width: 60, fontSize: 16, padding: "2px 5px", border: `1px solid ${colors.primaryLight}`, background: colors.surface, color: colors.textPrimary, borderRadius: 4, MozAppearance: "textfield" };
   const numberInputWebkitStyle = `input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }`;
-  const ActionButton = ({ onClick, title, children, color = "#555", bg = "#f0f0f0" }) => (
+  const ActionButton = ({ onClick, title, children, color = colors.textSecondary, bg = "transparent" }) => (
     <button onClick={onClick} title={title} style={{ border: `1px solid ${color === colors.white ? 'transparent' : color}`, background: bg, color: color, borderRadius: '50%', width: 28, height: 28, cursor: 'pointer', fontWeight: 800, fontSize: 16, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', margin: '0 2px', lineHeight: 1, padding: 0 }}>
       {children}
     </button>
@@ -1911,29 +1914,30 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
         {editModal.isOpen && <EditErrorModal modalData={editModal} onClose={() => setEditModal({ isOpen: false, error: null, logId: "", department: "" })} onSave={handleSaveEdit} />}
 
         {showCorrectModal && (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1002 }}>
-            <div style={{ background: '#fff', padding: 26, borderRadius: 16, width: '92%', maxWidth: 540, boxShadow: '0 6px 32px rgba(0,0,0,.25)' }}>
+          <div className="so-modal-overlay" style={{ zIndex: 1002 }}>
+            <div className="so-modal" style={{ maxWidth: 540 }}>
               <h3 style={{ marginTop: 0, color: colors.primary, display: 'flex', alignItems: 'center', gap: 8 }}>
                 {t("gemba.correct.title")}
               </h3>
               <div style={{ marginBottom: 14 }}>
-                <div style={{ fontWeight: 600, color: '#888', marginBottom: 6, fontSize: 13 }}>{t("gemba.correct.original")}</div>
-                <div style={{ background: '#fff8e1', border: '1px solid #ffe082', borderRadius: 8, padding: '10px 14px', fontSize: 14, lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{note}</div>
+                <div style={{ fontWeight: 600, color: colors.textSecondary, marginBottom: 6, fontSize: 13 }}>{t("gemba.correct.original")}</div>
+                <div style={{ background: alpha('warning', 0.12), border: `1px solid ${alpha('warning', 0.5)}`, borderRadius: 'var(--so-radius-sm)', padding: '10px 14px', fontSize: 14, lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{note}</div>
               </div>
               <div style={{ marginBottom: 22 }}>
-                <div style={{ fontWeight: 600, color: '#2e7d32', marginBottom: 6, fontSize: 13 }}>{t("gemba.correct.corrected")}</div>
-                <div style={{ background: '#f1f8e9', border: '1px solid #a5d6a7', borderRadius: 8, padding: '10px 14px', fontSize: 14, lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{correctedNote}</div>
+                <div style={{ fontWeight: 600, color: colors.success, marginBottom: 6, fontSize: 13 }}>{t("gemba.correct.corrected")}</div>
+                <div style={{ background: alpha('success', 0.12), border: `1px solid ${alpha('success', 0.45)}`, borderRadius: 'var(--so-radius-sm)', padding: '10px 14px', fontSize: 14, lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{correctedNote}</div>
               </div>
               <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                 <button
+                  className="so-btn"
                   onClick={async () => { setShowCorrectModal(false); await doSaveError(note); }}
-                  style={{ padding: '8px 18px', borderRadius: 8, border: `1px solid ${colors.border}`, background: '#f5f5f5', cursor: 'pointer', fontWeight: 600, fontSize: 14 }}
                 >
                   {t("gemba.correct.useOriginal")}
                 </button>
                 <button
+                  className="so-btn"
                   onClick={async () => { setShowCorrectModal(false); await doSaveError(correctedNote); }}
-                  style={{ padding: '8px 22px', borderRadius: 8, border: 'none', background: '#2e7d32', color: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: 14 }}
+                  style={{ background: colors.success, borderColor: colors.success, color: colors.white }}
                 >
                   {t("gemba.correct.useCorrected")}
                 </button>
@@ -1962,15 +1966,15 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
                 <span>| {t("gemba.factor")} {heSo}</span>
               </div>
               <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
-                  <input type="month" value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} style={{ padding: 8, borderRadius: 6, border: `1px solid ${colors.border}` }} />
-                  <button onClick={() => setShowReportDashboard(true)} style={{ background: '#1565c0', color: colors.white, border: "none", padding: "8px 15px", borderRadius: 6, fontWeight: "bold", cursor: isMobile ? "pointer" : "pointer", marginTop: isMobile ? 0 : 0 }}>
+                  <input type="month" value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="so-input" style={{ width: 'auto' }} />
+                  <button className="so-btn" onClick={() => setShowReportDashboard(true)} style={{ background: colors.info, borderColor: colors.info, color: colors.white }}>
                     {t("ehs.report.btn")}
                   </button>
               </div>
             </div>
             <div style={{ marginBottom: 15 }}>
                 <div style={{ fontSize: 15, color: colors.textPrimary, marginBottom: 5 }}>{t("gemba.group.label")}</div>
-                <select value={selectedGroup} onChange={(e) => { setSelectedGroup(e.target.value); setSelectedError(""); }} style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: `1.5px solid ${colors.primaryLight}`, fontSize: 15 }}>
+                <select value={selectedGroup} onChange={(e) => { setSelectedGroup(e.target.value); setSelectedError(""); }} style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: `1.5px solid ${colors.primaryLight}`, background: colors.surface, color: colors.textPrimary, fontSize: 15 }}>
                 <option value="">{t("gemba.group.placeholder")}</option>
                 {errorGroups.map((g) => <option key={g.group} value={g.group}>{g.group}</option>)}
                 </select>
@@ -1978,7 +1982,7 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
             {selectedGroup && selectedGroup !== "Lỗi Khác" && (
               <div style={{ marginBottom: 15 }}>
                   <div style={{ fontSize: 15, color: colors.textPrimary, marginBottom: 5 }}>{t("gemba.error.label")}</div>
-                  <select value={selectedError} onChange={(e) => setSelectedError(e.target.value)} style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: `1.5px solid ${colors.primaryLight}`, fontSize: 15 }}>
+                  <select value={selectedError} onChange={(e) => setSelectedError(e.target.value)} style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: `1.5px solid ${colors.primaryLight}`, background: colors.surface, color: colors.textPrimary, fontSize: 15 }}>
                   <option value="">{t("gemba.error.placeholder")}</option>
                   {(errorGroups.find(g => g.group === selectedGroup)?.items || []).map(e => <option key={e.code} value={e.code}>{e.code} - {e.desc} ({e.point > 0 ? `${e.point}đ` : t("ehs.customLabel")})</option>)}
                   </select>
@@ -2003,7 +2007,7 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
                     value={responsiblePerson}
                     onChange={(e) => setResponsiblePerson(e.target.value)}
                     placeholder={t("gemba.recipient.placeholder")}
-                    style={{ width: "100%", boxSizing: "border-box", padding: "8px 12px", borderRadius: 8, border: `1.5px solid ${colors.primaryLight}`, fontSize: 15 }}
+                    style={{ width: "100%", boxSizing: "border-box", padding: "8px 12px", borderRadius: 8, border: `1.5px solid ${colors.primaryLight}`, background: colors.surface, color: colors.textPrimary, fontSize: 15 }}
                   />
                 </div>
                 <div style={{ width: 120 }}>
@@ -2011,7 +2015,7 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
                   <select
                     value={ca}
                     onChange={(e) => setCa(e.target.value)}
-                    style={{ width: "100%", boxSizing: "border-box", padding: "8px 12px", borderRadius: 8, border: `1.5px solid ${colors.primaryLight}`, fontSize: 15 }}
+                    style={{ width: "100%", boxSizing: "border-box", padding: "8px 12px", borderRadius: 8, border: `1.5px solid ${colors.primaryLight}`, background: colors.surface, color: colors.textPrimary, fontSize: 15 }}
                   >
                     <option value="">{t("gemba.shift.placeholder")}</option>
                     {["S1", "S2", "S3", "S8"].map(s => <option key={s} value={s}>{s}</option>)}
@@ -2020,7 +2024,7 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
             </div>
             <div style={{ marginBottom: 8 }}>
                 <div style={{ fontSize: 15, color: colors.textPrimary, marginBottom: 5 }}>{t("gemba.note.label")}</div>
-                <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder={isCustomError ? t("gemba.note.custom.placeholder") : t("gemba.note.placeholder")} style={{ width: "100%", minHeight: 60, boxSizing: "border-box", padding: "8px 12px", borderRadius: 8, border: `1.5px solid ${colors.primaryLight}`, fontSize: 15, fontFamily: "sans-serif" }} />
+                <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder={isCustomError ? t("gemba.note.custom.placeholder") : t("gemba.note.placeholder")} style={{ width: "100%", minHeight: 60, boxSizing: "border-box", padding: "8px 12px", borderRadius: 8, border: `1.5px solid ${colors.primaryLight}`, background: colors.surface, color: colors.textPrimary, fontSize: 15, fontFamily: "inherit" }} />
             </div>
             <div style={{ display: 'flex', gap: 20, marginBottom: 18, flexWrap: 'wrap' }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' }}>
@@ -2050,13 +2054,13 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
 
             <div style={{ marginBottom: 24, display: 'flex', alignItems: 'center', gap: 10, flexWrap: "wrap" }}>
                 <input id="imageUploadGemba" type="file" accept="image/*" onChange={handleImageChange} ref={fileRef} style={{ display: 'none' }} multiple />
-                <label htmlFor="imageUploadGemba" style={{background: 'white', color: colors.primary, border: `1.2px solid ${colors.primaryLight}`, borderRadius: 8, padding: '8px 15px', cursor: 'pointer', fontWeight: 600}}>
+                <label htmlFor="imageUploadGemba" style={{background: colors.surface, color: colors.primary, border: `1.2px solid ${colors.primaryLight}`, borderRadius: 'var(--so-radius-sm)', padding: '8px 15px', cursor: 'pointer', fontWeight: 600}}>
                     {t("gemba.attach", { count: imageFiles.length }).replace("{count}", imageFiles.length)}
                 </label>
-                <span style={{fontStyle: 'italic', fontSize: 14, color: '#555', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
+                <span style={{fontStyle: 'italic', fontSize: 14, color: colors.textSecondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
                     {imageFileNames.length > 0 ? imageFileNames.join(', ') : t("common.noImage")}
                 </span>
-                <button onClick={handleAddError} disabled={isUploading || isCorrecting} style={{ marginLeft: 'auto', height: 38, background: isCorrecting ? '#888' : colors.primary, color: colors.white, borderRadius: 9, border: "none", padding: "0 26px", fontWeight: 700, fontSize: 16, cursor: "pointer", opacity: (isUploading || isCorrecting) ? 0.7 : 1 }}>
+                <button className="so-btn so-btn--primary" onClick={handleAddError} disabled={isUploading || isCorrecting} style={{ marginLeft: 'auto', height: 38, padding: "0 26px", fontSize: 16, background: isCorrecting ? colors.textDisabled : undefined, borderColor: isCorrecting ? colors.textDisabled : undefined }}>
                     {isCorrecting ? t("gemba.correcting") : isUploading ? t("gemba.uploading") : t("gemba.add")}
                 </button>
             </div>
@@ -2077,18 +2081,18 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
                         <div style={{ marginTop: 6, overflowWrap:'anywhere' }}>
                            <div>{e.group === 'Lỗi Khác' ? t("ehs.otherError") : e.desc}</div>
                            {e.responsiblePerson && (
-                             <div style={{ fontSize: '12px', color: '#b94a48', fontWeight: 600, marginTop: 4 }}>
+                             <div style={{ fontSize: '12px', color: colors.error, fontWeight: 600, marginTop: 4 }}>
                              {t("ehs.recipientShort")}: {e.responsiblePerson}
                              </div>
                            )}
                            {e.addedBy && <div style={{fontSize: 11, color: colors.textSecondary, fontStyle:'italic', marginTop: 2}}>{t("gemba.by")} {e.addedBy}</div>}
                            {e.ehsVerified && (
-                             <div style={{ fontSize: '12px', color: '#2e7d32', fontWeight: 700, background: '#e8f5e9', padding: '2px 8px', borderRadius: 6, marginTop: 4, display: 'inline-block' }}>
+                             <div style={{ fontSize: '12px', color: colors.success, fontWeight: 700, background: alpha('success', 0.12), padding: '2px 8px', borderRadius: 6, marginTop: 4, display: 'inline-block' }}>
                                {t("ehs.confirmedDone")}
                              </div>
                            )}
                            {e.deleteRequested && (
-                             <div style={{ fontSize: '12px', color: '#c62828', fontWeight: 'bold', background: '#ffebee', padding: '4px 8px', borderRadius: 6, marginTop: 6, display: 'inline-block' }}>
+                             <div style={{ fontSize: '12px', color: colors.error, fontWeight: 'bold', background: alpha('error', 0.12), padding: '4px 8px', borderRadius: 6, marginTop: 6, display: 'inline-block' }}>
                                {t("ehs.pendingDeleteBy").replace("{by}", e.deleteRequestedBy)}
                              </div>
                            )}
@@ -2098,7 +2102,7 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
                             <div style={{ position:'relative', display:'inline-block', cursor:'pointer' }} onClick={() => openViewer(images, 0)}>
                               <img src={thumbMap[images[0]] || images[0]} alt="" onError={(e) => { e.currentTarget.style.display = 'none'; }} style={{ width: 56, height: 56, borderRadius: 6, objectFit:'cover' }}/>
                               {images.length > 1 && (
-                                <span style={{ position:'absolute', top:-6, right:-6, background:'rgba(0,0,0,0.7)', color:'#fff', borderRadius:'50%', width:20, height:20, fontSize:12, display:'flex', alignItems:'center', justifyContent:'center' }}>+{images.length-1}</span>
+                                <span style={{ position:'absolute', top:-6, right:-6, background:'rgba(0,0,0,0.7)', color: colors.white, borderRadius:'50%', width:20, height:20, fontSize:12, display:'flex', alignItems:'center', justifyContent:'center' }}>+{images.length-1}</span>
                               )}
                             </div>
                           </div>
@@ -2117,21 +2121,21 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
                           >
                             💬
                           </ActionButton>
-                          <ActionButton onClick={() => setImprovementModal({ isOpen: true, error: e, logId: e.id })} title={t("gemba.improve.action")} color={colors.white} bg={isImproved ? '#4caf50' : '#f44336'}><ImprovementIcon /></ActionButton>
+                          <ActionButton onClick={() => setImprovementModal({ isOpen: true, error: e, logId: e.id })} title={t("gemba.improve.action")} color={colors.white} bg={isImproved ? colors.success : colors.error}><ImprovementIcon /></ActionButton>
                           {isEhsCommitteeOnly && (e.addedByUid === user.uid || e.addedBy === user.name) && !e.deleteRequested && (
-                            <ActionButton onClick={() => handleDeleteRequest(e.id)} title={t("ehs.title.requestDelete")} color="#d32f2f" bg="transparent">x</ActionButton>
+                            <ActionButton onClick={() => handleDeleteRequest(e.id)} title={t("ehs.title.requestDelete")} color={colors.error} bg="transparent">x</ActionButton>
                           )}
                           {isAdminOrEhs && e.deleteRequested && (
                             <>
-                              <ActionButton onClick={() => handleDelete(e.id)} title={t("ehs.title.approveDelete")} color="#fff" bg="#2e7d32">✅</ActionButton>
-                              <ActionButton onClick={() => handleCancelDeleteRequest(e.id)} title={t("ehs.title.rejectDelete")} color="#fff" bg="#e65100">❌</ActionButton>
+                              <ActionButton onClick={() => handleDelete(e.id)} title={t("ehs.title.approveDelete")} color={colors.white} bg={colors.success}>✅</ActionButton>
+                              <ActionButton onClick={() => handleCancelDeleteRequest(e.id)} title={t("ehs.title.rejectDelete")} color={colors.white} bg={colors.warning}>❌</ActionButton>
                             </>
                           )}
                           {(userRole === 'admin' || userRole === 'ehs') && !e.deleteRequested && (
-                            <ActionButton onClick={() => setEditModal({ isOpen: true, error: e, logId: e.id, department: dep.name })} title={t("ehs.title.editError")} color="#1565c0" bg="transparent">✏️</ActionButton>
+                            <ActionButton onClick={() => setEditModal({ isOpen: true, error: e, logId: e.id, department: dep.name })} title={t("ehs.title.editError")} color={colors.info} bg="transparent">✏️</ActionButton>
                           )}
                           {(userRole === 'admin' || userRole === 'ehs') && !e.deleteRequested && (
-                            <ActionButton onClick={() => handleDelete(e.id)} title={t("gemba.delete.action")} color="#d32f2f" bg="transparent">x</ActionButton>
+                            <ActionButton onClick={() => handleDelete(e.id)} title={t("gemba.delete.action")} color={colors.error} bg="transparent">x</ActionButton>
                           )}
                         </div>
                       </div>
@@ -2162,12 +2166,12 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
                      return (
                       <tr key={`${e.code}-${dateForkey ? dateForkey.getTime() : i}`}>
                       <td style={{ padding: "10px 14px", fontSize: 12 }}>{safeTsToDate(e.timestamp)?.toLocaleString("vi-VN")}</td>
-                      <td style={{ padding: "10px 8px", textAlign: "center", fontWeight: 600, color: '#666' }}>{e.ca || ""}</td>
+                      <td style={{ padding: "10px 8px", textAlign: "center", fontWeight: 600, color: colors.textSecondary }}>{e.ca || ""}</td>
                       <td style={{ padding: "10px 14px" }}>{e.group}</td>
                       <td style={{ padding: "10px 14px" }}>
                         <div>{e.group === 'Lỗi Khác' ? t("ehs.otherError") : e.desc}</div>
                         {e.responsiblePerson && (
-                          <div style={{ fontSize: '12px', color: '#b94a48', fontWeight: 600, marginTop: 4 }}>
+                          <div style={{ fontSize: '12px', color: colors.error, fontWeight: 600, marginTop: 4 }}>
                             {t("ehs.recipientShort")}: {e.responsiblePerson}
                           </div>
                         )}
@@ -2177,12 +2181,12 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
                           </div>
                         )}
                         {e.ehsVerified && (
-                          <div style={{ fontSize: '11px', color: '#2e7d32', fontWeight: 700, background: '#e8f5e9', padding: '2px 6px', borderRadius: 4, marginTop: 4, display: 'inline-block' }}>
+                          <div style={{ fontSize: '11px', color: colors.success, fontWeight: 700, background: alpha('success', 0.12), padding: '2px 6px', borderRadius: 4, marginTop: 4, display: 'inline-block' }}>
                             {t("ehs.confirmedDone")}
                           </div>
                         )}
                         {e.deleteRequested && (
-                          <div style={{ fontSize: '11px', color: '#c62828', fontWeight: 'bold', background: '#ffebee', padding: '2px 6px', borderRadius: 4, marginTop: 4, display: 'inline-block' }}>
+                          <div style={{ fontSize: '11px', color: colors.error, fontWeight: 'bold', background: alpha('error', 0.12), padding: '2px 6px', borderRadius: 4, marginTop: 4, display: 'inline-block' }}>
                             {t("ehs.pendingDeleteBy").replace("{by}", e.deleteRequestedBy)}
                           </div>
                         )}
@@ -2192,7 +2196,7 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
                           <div style={{ position: 'relative', display: 'inline-block', cursor: 'pointer' }} onClick={() => openViewer(images, 0)}>
                             <img src={thumbMap[images[0]] || images[0]} alt="" onError={(e) => { e.currentTarget.style.display = 'none'; }} style={{ width: 40, height: 40, borderRadius: 4, objectFit: "cover" }}/>
                             {images.length > 1 && (
-                              <span style={{ position: 'absolute', top: -5, right: -5, background: 'rgba(0,0,0,0.7)', color: 'white', borderRadius: '50%', width: 18, height: 18, fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <span style={{ position: 'absolute', top: -5, right: -5, background: 'rgba(0,0,0,0.7)', color: colors.white, borderRadius: '50%', width: 18, height: 18, fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                 +{images.length - 1}
                               </span>
                             )}
@@ -2212,21 +2216,21 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
                             >
                               💬
                             </button>
-                            <ActionButton onClick={() => setImprovementModal({ isOpen: true, error: e, logId: e.id })} title={t("gemba.improve.action")} color={colors.white} bg={isImproved ? "#4caf50" : "#f44336"}> <ImprovementIcon /> </ActionButton>
+                            <ActionButton onClick={() => setImprovementModal({ isOpen: true, error: e, logId: e.id })} title={t("gemba.improve.action")} color={colors.white} bg={isImproved ? colors.success : colors.error}> <ImprovementIcon /> </ActionButton>
                             {isEhsCommitteeOnly && (e.addedByUid === user.uid || e.addedBy === user.name) && !e.deleteRequested && (
-                              <ActionButton onClick={() => handleDeleteRequest(e.id)} title={t("ehs.title.requestDelete")} color="#d32f2f" bg="transparent">x</ActionButton>
+                              <ActionButton onClick={() => handleDeleteRequest(e.id)} title={t("ehs.title.requestDelete")} color={colors.error} bg="transparent">x</ActionButton>
                             )}
                             {isAdminOrEhs && e.deleteRequested && (
                               <>
-                                <ActionButton onClick={() => handleDelete(e.id)} title={t("ehs.title.approveDelete")} color="#fff" bg="#2e7d32">✅</ActionButton>
-                                <ActionButton onClick={() => handleCancelDeleteRequest(e.id)} title={t("ehs.title.rejectDelete")} color="#fff" bg="#e65100">❌</ActionButton>
+                                <ActionButton onClick={() => handleDelete(e.id)} title={t("ehs.title.approveDelete")} color={colors.white} bg={colors.success}>✅</ActionButton>
+                                <ActionButton onClick={() => handleCancelDeleteRequest(e.id)} title={t("ehs.title.rejectDelete")} color={colors.white} bg={colors.warning}>❌</ActionButton>
                               </>
                             )}
                             {(userRole === "admin" || userRole === "ehs") && !e.deleteRequested && (
-                              <ActionButton onClick={() => setEditModal({ isOpen: true, error: e, logId: e.id, department: dep.name })} title={t("ehs.title.editError")} color="#1565c0" bg="transparent">✏️</ActionButton>
+                              <ActionButton onClick={() => setEditModal({ isOpen: true, error: e, logId: e.id, department: dep.name })} title={t("ehs.title.editError")} color={colors.info} bg="transparent">✏️</ActionButton>
                             )}
                             {(userRole === "admin" || userRole === "ehs") && !e.deleteRequested && (
-                              <ActionButton onClick={() => handleDelete(e.id)} title={t("gemba.delete.action")} color="#d32f2f" bg="transparent">x</ActionButton>
+                              <ActionButton onClick={() => handleDelete(e.id)} title={t("gemba.delete.action")} color={colors.error} bg="transparent">x</ActionButton>
                             )}
                           </div>
                       </td>
@@ -2235,7 +2239,7 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
                   </tbody>
               </table>
               ))}
-            <div style={{ color: colors.textPrimary, fontWeight: 700, fontSize: 22, marginTop: 28, background: remainingScore < 80 ? "#ffe3e3" : "#e3fff1", borderRadius: 10, padding: "14px 18px", boxShadow: "0 1.5px 7px #00000011", width: "fit-content" }}>
+            <div style={{ color: colors.textPrimary, fontWeight: 700, fontSize: 22, marginTop: 28, background: remainingScore < 80 ? alpha('error', 0.12) : alpha('success', 0.12), borderRadius: 'var(--so-radius-md)', padding: "14px 18px", boxShadow: 'var(--so-shadow-sm)', width: "fit-content" }}>
               {t("ehs.report.remainingMonth").replace("{month}", selectedMonth.slice(5,7))} <span style={{ color: remainingScore < 80 ? colors.error : colors.success }}>{remainingScore.toFixed(2)}</span>
             </div>
           </div>
@@ -2255,7 +2259,7 @@ function DailyAudit({ user, isMobile, newErrorCounts, setGembaNotifCounts }) {
                       <button key={d.name} style={{ display: "block", width: "100%", marginBottom: 10, padding: "10px 15px", borderRadius: 8, border: "none", fontWeight: 600, fontSize: 15, background: depIndex === i ? colors.primary : colors.backgroundLight, color: depIndex === i ? colors.white : colors.primary, boxShadow: depIndex === i ? `0 1.5px 7px ${alpha("primary", 0.2)}` : "none", cursor: "pointer", transition: "all .13s", position: 'relative' }} onClick={() => handleSelectDepartment(i)}>
                       {d.name}
                       {newErrorCounts && newErrorCounts[d.name] > 0 && (
-                        <span style={{ position: 'absolute', top: 5, right: 8, background: 'red', color: 'white', borderRadius: '50%', width: 20, height: 20, fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
+                        <span style={{ position: 'absolute', top: 5, right: 8, background: colors.error, color: colors.white, borderRadius: '50%', width: 20, height: 20, fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
                           {newErrorCounts[d.name]}
                         </span>
                       )}
@@ -2351,18 +2355,18 @@ function CommentModal({ isOpen, onClose, eventId, user, error }) {
   if (!isOpen) return null;
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 1002 }}>
-      <div style={{ background: colors.surface, padding: 22, borderRadius: 12, width: '90%', maxWidth: 500, height: 500, display: 'flex', flexDirection: 'column', boxShadow: "0 4px 15px rgba(0,0,0,.2)" }}>
+    <div className="so-modal-overlay" style={{ zIndex: 1002 }}>
+      <div className="so-modal" style={{ maxWidth: 500, height: 500, display: 'flex', flexDirection: 'column' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: `2.5px solid ${colors.primaryLight}`, paddingBottom: 10, marginBottom: 12 }}>
           <h3 style={{ margin: 0, color: colors.primary }}>{t("ehs.comment.title")}</h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#888' }}>✕</button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: colors.textSecondary }}>✕</button>
         </div>
-        
+
         <div ref={scrollRef} style={{ flexGrow: 1, overflowY: 'auto', marginBottom: 15, paddingRight: 5 }}>
           {loadingComments ? (
-            <div style={{ textAlign: 'center', color: '#888', marginTop: 20 }}>{t("ehs.comment.loading")}</div>
+            <div style={{ textAlign: 'center', color: colors.textSecondary, marginTop: 20 }}>{t("ehs.comment.loading")}</div>
           ) : comments.length === 0 ? (
-            <div style={{ textAlign: 'center', color: '#888', marginTop: 20 }}>{t("ehs.comment.empty")}</div>
+            <div style={{ textAlign: 'center', color: colors.textSecondary, marginTop: 20 }}>{t("ehs.comment.empty")}</div>
           ) : (
             comments.map(c => {
               const isMe = c.userId === user.uid;
@@ -2372,7 +2376,7 @@ function CommentModal({ isOpen, onClose, eventId, user, error }) {
                 <div key={c.id} style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start', marginBottom: 12 }}>
                   <div style={{ fontSize: 11, color: colors.textSecondary, marginBottom: 2 }}>{c.userName} • {dateStr}</div>
                   <div style={{
-                    background: isMe ? colors.primary : '#f1f1f1',
+                    background: isMe ? colors.primary : colors.backgroundLight,
                     color: isMe ? colors.white : colors.textPrimary,
                     padding: '8px 14px',
                     borderRadius: 14,
@@ -2398,11 +2402,12 @@ function CommentModal({ isOpen, onClose, eventId, user, error }) {
             onChange={e => setNewComment(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') handleSend(); }}
             placeholder={t("ehs.comment.placeholder")}
-            style={{ flexGrow: 1, padding: '8px 12px', borderRadius: 8, border: `1.5px solid ${colors.primaryLight}`, fontSize: 14, outline: 'none' }}
+            className="so-input"
+            style={{ flexGrow: 1, width: 'auto' }}
           />
           <button
+            className="so-btn so-btn--primary"
             onClick={handleSend}
-            style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: colors.primary, color: colors.white, fontWeight: 700, cursor: 'pointer' }}
           >
             {t("common.send")}
           </button>

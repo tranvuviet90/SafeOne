@@ -29,6 +29,7 @@ export const colors = {
   error: 'var(--so-error)',
   success: 'var(--so-success)',
   warning: 'var(--so-warning)',
+  info: 'var(--so-info)',
 
   // Các màu khác
   border: 'var(--so-border)',
@@ -40,7 +41,7 @@ export const colors = {
 //
 // Không dùng được cách nối chuỗi hex quen thuộc (`${colors.primary}33`) nữa: nó sinh ra
 // "var(--so-primary)33" — CSS không hợp lệ, hiệu ứng sẽ mất im lặng chứ không báo lỗi.
-// Chỉ 'primary' và 'error' có biến --so-*-rgb đi kèm, vì chỉ chúng cần pha trong suốt.
+// Các màu có biến --so-*-rgb đi kèm: primary, error, success, warning, info.
 export const alpha = (name, a) => `rgba(var(--so-${name}-rgb), ${a})`;
 
 // Token hình khối cho chỗ buộc phải inline (style động theo state).

@@ -27,10 +27,16 @@
   --so-white: #ffffff;
   --so-black: #1C292A;
 
-  /* Dạng RGB cho hàm alpha() trong theme.js. Chỉ 2 màu này cần, vì chỉ chúng
-     được pha trong suốt (đổ bóng, viền mờ). */
+  /* Màu thông tin (nút/nhãn xanh dương — xuất CAP, sửa, báo cáo) */
+  --so-info: #1565C0;
+
+  /* Dạng RGB cho hàm alpha() trong theme.js — các màu cần pha trong suốt
+     (đổ bóng, viền mờ, nền badge trạng thái). */
   --so-primary-rgb: 70, 110, 115;
   --so-error-rgb: 217, 83, 79;
+  --so-success-rgb: 32, 115, 53;
+  --so-warning-rgb: 226, 158, 43;
+  --so-info-rgb: 21, 101, 192;
 
   /* ==== Token hình khối (spec 2026-07-17-ui-facelift) ====
      Bo góc 3 mức: sm = nút/input/chip, md = card con/dropdown, lg = card lớn/modal.
@@ -97,8 +103,13 @@
   --so-white: #ffffff;
   --so-black: #1C292A;
 
+  --so-info: #5B9BD5;
+
   --so-primary-rgb: 95, 148, 154;
   --so-error-rgb: 233, 115, 111;
+  --so-success-rgb: 76, 166, 100;
+  --so-warning-rgb: 224, 169, 74;
+  --so-info-rgb: 91, 155, 213;
 
   /* Tông tối: bóng gần như vô hình trên nền tối nên giảm bóng, chiều sâu
      chuyển sang viền --so-border (các primitive .so-* tự thêm viền theo theme). */
