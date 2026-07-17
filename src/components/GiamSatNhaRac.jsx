@@ -75,6 +75,16 @@ const formatTimestamp = (ts) => {
   return date.toLocaleString("vi-VN");
 };
 
+// Đổi timestamp về milliseconds, chịu được cả chuỗi ISO lẫn object Timestamp
+// ({seconds}) của dữ liệu cũ — cùng cách nhận dạng như formatTimestamp ở trên.
+// Trả 0 nếu không parse được, để sort không bị NaN làm vỡ thứ tự cả danh sách.
+const tsToMs = (ts) => {
+  if (!ts) return 0;
+  if (ts.seconds) return ts.seconds * 1000;
+  const ms = new Date(ts).getTime();
+  return Number.isNaN(ms) ? 0 : ms;
+};
+
 function GiamSatNhaRac({ user }) {
   const { t } = useI18n();
   const { askConfirm } = useConfirm();
@@ -96,7 +106,7 @@ function GiamSatNhaRac({ user }) {
     try {
       const list = await dbService.getDocs(COLLECTION_NAME);
       if (Array.isArray(list)) {
-        const sorted = list.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        const sorted = list.sort((a, b) => tsToMs(b.timestamp) - tsToMs(a.timestamp));
         setChat(sorted);
       }
     } catch (err) {
@@ -126,7 +136,10 @@ function GiamSatNhaRac({ user }) {
         if (!Array.isArray(list)) return;
 
         const sevenDaysAgoMs = Date.now() - 7 * 24 * 60 * 60 * 1000;
-        const oldItems = list.filter(item => item.timestamp && new Date(item.timestamp).getTime() < sevenDaysAgoMs);
+        const oldItems = list.filter(item => {
+          const ms = tsToMs(item.timestamp);
+          return ms > 0 && ms < sevenDaysAgoMs;
+        });
         if (oldItems.length === 0) return;
 
         // Delete images

@@ -1666,8 +1666,10 @@ export default function Locker({ user }) {
               </div>
             </div>
 
-            {/* MODAL CON 1.1: ĐỔI TỦ (TRANSFER LOCKER) */}
-            {showTransferModal && (
+            {/* MODAL CON 1.1: ĐỔI TỦ (TRANSFER LOCKER)
+                Cần info != null: khi đổi tủ xong, realtime có thể xóa currentUser của tủ cũ
+                TRƯỚC khi onSuccess kịp đóng modal -> phải tự unmount để khỏi đọc null.name */}
+            {showTransferModal && info && (
               <LockerTransferModal 
                 lockerId={id} 
                 currentUser={info} 
