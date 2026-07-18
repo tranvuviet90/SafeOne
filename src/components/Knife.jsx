@@ -694,39 +694,24 @@ export default function Knife({ user, isMobile }) {
   return (
     <div className="knife-container" style={{ padding: "8px 0", color: "var(--kf-text-primary)", width: "100%", boxSizing: "border-box" }}>
       <style dangerouslySetInnerHTML={{__html: `
+        /* Biến cục bộ --kf-* là bí danh của token --so-* toàn app. Khối dark
+           riêng cũ (bám prefers-color-scheme của OS) đã bỏ: nó không nghe công
+           tắc sáng/tối của app; --so-* tự đổi theo data-theme nên bí danh đổi theo. */
         .knife-container {
-          --kf-text-primary: #2b3a3c;
-          --kf-text-secondary: #5a6f72;
-          --kf-card-bg: #ffffff;
-          --kf-card-border: #d0e2e0;
-          --kf-input-bg: #ffffff;
-          --kf-input-border: #a9d9d4;
-          --kf-grid-bg: #f4faf9;
-          --kf-grid-border: #d0e2e0;
-          --kf-badge-agree-bg: #eaf6e3;
-          --kf-badge-agree-text: #207335;
-          --kf-badge-disagree-bg: #fadbd8;
-          --kf-badge-disagree-text: #d9534f;
-          --kf-badge-pending-bg: #fef5e7;
-          --kf-badge-pending-text: #d35400;
-        }
-        @media (prefers-color-scheme: dark) {
-          .knife-container {
-            --kf-text-primary: #e8f0fe;
-            --kf-text-secondary: #8a9fc8;
-            --kf-card-bg: #111a2e;
-            --kf-card-border: rgba(255, 255, 255, 0.08);
-            --kf-input-bg: #1a243d;
-            --kf-input-border: rgba(255, 255, 255, 0.15);
-            --kf-grid-bg: rgba(255, 255, 255, 0.02);
-            --kf-grid-border: rgba(255, 255, 255, 0.06);
-            --kf-badge-agree-bg: rgba(32, 115, 53, 0.15);
-            --kf-badge-agree-text: #81c784;
-            --kf-badge-disagree-bg: rgba(217, 83, 79, 0.15);
-            --kf-badge-disagree-text: #e57373;
-            --kf-badge-pending-bg: rgba(211, 84, 0, 0.15);
-            --kf-badge-pending-text: #ffb74d;
-          }
+          --kf-text-primary: var(--so-text-primary);
+          --kf-text-secondary: var(--so-text-secondary);
+          --kf-card-bg: var(--so-surface);
+          --kf-card-border: var(--so-border);
+          --kf-input-bg: var(--so-surface);
+          --kf-input-border: var(--so-border);
+          --kf-grid-bg: var(--so-background);
+          --kf-grid-border: var(--so-border);
+          --kf-badge-agree-bg: rgba(var(--so-success-rgb), 0.15);
+          --kf-badge-agree-text: var(--so-success);
+          --kf-badge-disagree-bg: rgba(var(--so-error-rgb), 0.15);
+          --kf-badge-disagree-text: var(--so-error);
+          --kf-badge-pending-bg: rgba(var(--so-warning-rgb), 0.15);
+          --kf-badge-pending-text: var(--so-warning);
         }
       `}} />
 
@@ -758,26 +743,26 @@ export default function Knife({ user, isMobile }) {
       <div style={{ display: "flex", gap: 10, marginBottom: 16, borderBottom: "1.5px solid var(--kf-card-border)", paddingBottom: 10, overflowX: "auto" }}>
         <button 
           onClick={() => setActiveTab("dashboard")} 
-          style={{ padding: "8px 16px", background: activeTab === "dashboard" ? colors.primary : "transparent", border: "none", borderRadius: 8, color: activeTab === "dashboard" ? "#fff" : "var(--kf-text-secondary)", fontWeight: "bold", cursor: "pointer", fontSize: "14px", whiteSpace: "nowrap" }}
+          style={{ padding: "8px 16px", background: activeTab === "dashboard" ? colors.primary : "transparent", border: "none", borderRadius: 8, color: activeTab === "dashboard" ? colors.white : "var(--kf-text-secondary)", fontWeight: "bold", cursor: "pointer", fontSize: "14px", whiteSpace: "nowrap" }}
         >
           📊 Báo cáo tổng hợp
         </button>
         <button 
           onClick={() => setActiveTab("list")} 
-          style={{ padding: "8px 16px", background: activeTab === "list" ? colors.primary : "transparent", border: "none", borderRadius: 8, color: activeTab === "list" ? "#fff" : "var(--kf-text-secondary)", fontWeight: "bold", cursor: "pointer", fontSize: "14px", whiteSpace: "nowrap" }}
+          style={{ padding: "8px 16px", background: activeTab === "list" ? colors.primary : "transparent", border: "none", borderRadius: 8, color: activeTab === "list" ? colors.white : "var(--kf-text-secondary)", fontWeight: "bold", cursor: "pointer", fontSize: "14px", whiteSpace: "nowrap" }}
         >
           📋 Danh sách dao
         </button>
         <button 
           onClick={() => setActiveTab("registrations")} 
-          style={{ padding: "8px 16px", background: activeTab === "registrations" ? colors.primary : "transparent", border: "none", borderRadius: 8, color: activeTab === "registrations" ? "#fff" : "var(--kf-text-secondary)", fontWeight: "bold", cursor: "pointer", fontSize: "14px", whiteSpace: "nowrap" }}
+          style={{ padding: "8px 16px", background: activeTab === "registrations" ? colors.primary : "transparent", border: "none", borderRadius: 8, color: activeTab === "registrations" ? colors.white : "var(--kf-text-secondary)", fontWeight: "bold", cursor: "pointer", fontSize: "14px", whiteSpace: "nowrap" }}
         >
           📝 Form đăng ký & Đánh giá
         </button>
         {isEhsOrAdmin && (
           <button
             onClick={() => setActiveTab("excel")}
-            style={{ padding: "8px 16px", background: activeTab === "excel" ? colors.primary : "transparent", border: "none", borderRadius: 8, color: activeTab === "excel" ? "#fff" : "var(--kf-text-secondary)", fontWeight: "bold", cursor: "pointer", fontSize: "14px", whiteSpace: "nowrap" }}
+            style={{ padding: "8px 16px", background: activeTab === "excel" ? colors.primary : "transparent", border: "none", borderRadius: 8, color: activeTab === "excel" ? colors.white : "var(--kf-text-secondary)", fontWeight: "bold", cursor: "pointer", fontSize: "14px", whiteSpace: "nowrap" }}
           >
             📤 Xuất/Nhập tệp Excel
           </button>
@@ -918,7 +903,7 @@ export default function Knife({ user, isMobile }) {
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 900 }}>
                   <thead>
-                    <tr style={{ background: colors.primary, color: "#fff", height: "35px" }}>
+                    <tr style={{ background: colors.primary, color: colors.white, height: "35px" }}>
                       <th style={{ padding: "8px 6px", width: 50, textAlign: "center" }}>No.</th>
                       <th style={{ padding: "8px 6px", textAlign: "left" }}>Nhân viên sử dụng</th>
                       <th style={{ padding: "8px 6px", textAlign: "left" }}>Vị trí sử dụng</th>
@@ -1011,7 +996,7 @@ export default function Knife({ user, isMobile }) {
 
                 <button 
                   onClick={() => openRegModal(null)}
-                  style={{ padding: "8px 16px", background: colors.secondary, color: "#fff", border: "none", borderRadius: 8, fontWeight: "bold", cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}
+                  style={{ padding: "8px 16px", background: colors.secondary, color: colors.white, border: "none", borderRadius: 8, fontWeight: "bold", cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}
                 >
                   <FaScissors /> Đăng ký sử dụng dao
                 </button>
@@ -1021,7 +1006,7 @@ export default function Knife({ user, isMobile }) {
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 950 }}>
                   <thead>
-                    <tr style={{ background: colors.primary, color: "#fff", height: "35px" }}>
+                    <tr style={{ background: colors.primary, color: colors.white, height: "35px" }}>
                       <th style={{ padding: "8px 6px", width: 50, textAlign: "center" }}>STT</th>
                       <th style={{ padding: "8px 6px", textAlign: "left" }}>Nhân viên sử dụng</th>
                       <th style={{ padding: "8px 6px", textAlign: "left" }}>Bộ phận</th>
@@ -1135,9 +1120,10 @@ export default function Knife({ user, isMobile }) {
                   <button 
                     onClick={handleExportExcel}
                     style={{ 
-                      padding: "14px 20px", 
-                      background: "linear-gradient(135deg, #207335 0%, #175427 100%)", 
-                      color: "#fff", 
+                      padding: "14px 20px",
+                      // Nút Excel: gradient xanh lá theo token success, đầu cuối trộn đen 25% tạo chiều sâu
+                      background: `linear-gradient(135deg, ${colors.success} 0%, color-mix(in srgb, ${colors.success}, #000 25%) 100%)`,
+                      color: colors.white, 
                       border: "none", 
                       borderRadius: 12, 
                       fontWeight: "800", 
@@ -1167,7 +1153,7 @@ export default function Knife({ user, isMobile }) {
           <form onSubmit={handleSaveReg} style={{ background: "var(--kf-card-bg)", padding: 22, borderRadius: 12, width: "90%", maxWidth: 500, display: "flex", flexDirection: "column", gap: 14, boxShadow: "0 4px 15px rgba(0,0,0,.2)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: `2px solid ${colors.primaryLight}`, paddingBottom: 10 }}>
               <h3 style={{ margin: 0, color: colors.primary }}>{editingReg ? "Chỉnh sửa đăng ký" : "Đăng ký sử dụng dao mới"}</h3>
-              <button type="button" onClick={() => setShowRegModal(false)} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#888" }}>✕</button>
+              <button type="button" onClick={() => setShowRegModal(false)} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: colors.textSecondary }}>✕</button>
             </div>
 
             <div style={{ maxHeight: "400px", overflowY: "auto", paddingRight: 6, display: "flex", flexDirection: "column", gap: 12 }}>
@@ -1337,7 +1323,7 @@ export default function Knife({ user, isMobile }) {
 
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 10 }}>
               <button type="button" onClick={() => setShowRegModal(false)} style={{ padding: "8px 16px", borderRadius: 8, border: "1.5px solid var(--kf-card-border)", background: "transparent", cursor: "pointer", fontWeight: "bold" }}>Hủy</button>
-              <button type="submit" style={{ padding: "8px 20px", background: colors.secondary, color: "#fff", border: "none", borderRadius: 8, fontWeight: "bold", cursor: "pointer" }}>OK</button>
+              <button type="submit" style={{ padding: "8px 20px", background: colors.secondary, color: colors.white, border: "none", borderRadius: 8, fontWeight: "bold", cursor: "pointer" }}>OK</button>
             </div>
           </form>
         </div>
