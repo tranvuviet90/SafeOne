@@ -4,18 +4,20 @@ import dbService from "../services/dbService";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { useI18n } from "../i18n/I18nProvider";
 import realtimeService from "../services/realtimeService";
+import { colors, alpha } from "../theme";
 
-/* ====== UI constants ====== */
-const orange = "#466E73";
-const orangeLight = "#A9D9D4";
-const dark = "#222";
-const redInvalid = "#f8d7da";
-const statusGreenBg = "#d4edda";
-const statusGreenText = "#155724";
-const statusGreenBorder = "#c3e6cb";
-const statusRedBg = "#f8d7da";
-const statusRedText = "#721c24";
-const statusRedBorder = "#f5c6cb";
+/* ====== UI constants ======
+   Tên "orange" giữ nguyên vì rải khắp file, nhưng giá trị đã theo token theme. */
+const orange = colors.primary;
+const orangeLight = colors.primaryLight;
+const dark = colors.textPrimary;
+const redInvalid = alpha('error', 0.18);
+const statusGreenBg = alpha('success', 0.15);
+const statusGreenText = colors.success;
+const statusGreenBorder = alpha('success', 0.4);
+const statusRedBg = alpha('error', 0.15);
+const statusRedText = colors.error;
+const statusRedBorder = alpha('error', 0.4);
 
 /* ====== Domain constants ====== */
 const DEFAULT_TASKS = [
@@ -108,11 +110,12 @@ const parseBoardDroppableId = (id) => {
   return { shift, task };
 };
 
+// Heatmap xanh theo số ca đã gán — pha alpha để chữ vẫn đọc được ở cả hai theme.
 const getColorForAssignmentCount = (count) => {
-  if (count === 1) return "#d4edda";
-  if (count === 2) return "#a3d9a5";
-  if (count >= 3) return "#72bf76";
-  return "white";
+  if (count === 1) return alpha('success', 0.18);
+  if (count === 2) return alpha('success', 0.38);
+  if (count >= 3) return alpha('success', 0.58);
+  return colors.surface;
 };
 
 // Đọc cấu trúc phân chia bộ đàm theo ca (đồng bộ với logic trong Bodam.jsx)
@@ -683,8 +686,8 @@ function CaLamViec({ user, isMobile }) {
                             ref={provided.innerRef}
                             {...provided.droppableProps}
                             style={{
-                              background: isDropInvalid ? redInvalid : snapshot.isDraggingOver ? orangeLight : "#e9ecef",
-                              border: `1px dashed ${isDropInvalid ? "red" : orange}`,
+                              background: isDropInvalid ? redInvalid : snapshot.isDraggingOver ? orangeLight : colors.backgroundLight,
+                              border: `1px dashed ${isDropInvalid ? colors.error : orange}`,
                               borderRadius: 6, minHeight: 40, padding: 4, flexGrow: 1, display: 'flex', flexWrap: 'wrap', gap: 4,
                             }}
                           >
@@ -700,7 +703,7 @@ function CaLamViec({ user, isMobile }) {
                                       className="name-tag-container"
                                       style={{
                                         padding: "6px 8px", borderRadius: 4, cursor: canPlanBoard ? "pointer" : "default", fontSize: 12, fontWeight: 500,
-                                        background: "#EBF5F4", ...provided2.draggableProps.style,
+                                        background: colors.backgroundLight, ...provided2.draggableProps.style,
                                       }}
                                     >
                                       {item.name}
@@ -720,7 +723,7 @@ function CaLamViec({ user, isMobile }) {
                 ))}
                 <div style={{ display: 'flex', alignItems: 'center' }}>
                     <div style={{ width: '120px', flexShrink: 0, fontSize: 13 }}>{STATIC_TASK}</div>
-                    <div style={{ padding: '8px', background: '#e9ecef', borderRadius: 6, textAlign: 'center', color: '#6c757d', flexGrow: 1, fontSize: 12 }}>
+                    <div style={{ padding: '8px', background: colors.backgroundLight, borderRadius: 6, textAlign: 'center', color: colors.textSecondary, flexGrow: 1, fontSize: 12 }}>
                         Tất cả nhân sự trong ca
                     </div>
                 </div>
@@ -764,8 +767,8 @@ function CaLamViec({ user, isMobile }) {
                       ref={provided.innerRef}
                       {...provided.droppableProps}
                       style={{
-                        background: isDropInvalid ? redInvalid : snapshot.isDraggingOver ? orangeLight : "#e9ecef",
-                        border: `2px dashed ${isDropInvalid ? "red" : snapshot.isDraggingOver ? orange : "transparent"}`,
+                        background: isDropInvalid ? redInvalid : snapshot.isDraggingOver ? orangeLight : colors.backgroundLight,
+                        border: `2px dashed ${isDropInvalid ? colors.error : snapshot.isDraggingOver ? orange : "transparent"}`,
                         borderRadius: 6, minHeight: 60, padding: 2,
                       }}
                     >
@@ -781,7 +784,7 @@ function CaLamViec({ user, isMobile }) {
                                 className="name-tag-container"
                                 style={{
                                   padding: "8px 10px", margin: "2px", borderRadius: 4, cursor: canPlanBoard ? "pointer" : "default", textAlign: "center",
-                                  fontSize: 13, fontWeight: 500, background: "#EBF5F4",
+                                  fontSize: 13, fontWeight: 500, background: colors.backgroundLight,
                                   ...provided2.draggableProps.style,
                                   transform: snapshot2.isDragging ? `${provided2.draggableProps.style.transform} scale(1.05)` : provided2.draggableProps.style.transform,
                                   boxShadow: snapshot2.isDragging ? "0 4px 12px rgba(0,0,0,0.2)" : "0 1px 2px rgba(0,0,0,0.1)",
@@ -801,8 +804,8 @@ function CaLamViec({ user, isMobile }) {
                 }}
               </Droppable>
             ))}
-            <div style={{ background: "#e9ecef", borderRadius: 6, minHeight: 60, padding: 2, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <div style={{ padding: "8px 12px", margin: "2px", borderRadius: 4, background: "#e9ecef", color: "#6c757d", cursor: "not-allowed", textAlign: "center", fontSize: 12 }}>All</div>
+            <div style={{ background: colors.backgroundLight, borderRadius: 6, minHeight: 60, padding: 2, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <div style={{ padding: "8px 12px", margin: "2px", borderRadius: 4, background: colors.backgroundLight, color: colors.textSecondary, cursor: "not-allowed", textAlign: "center", fontSize: 12 }}>All</div>
             </div>
           </React.Fragment>
         ))}
@@ -823,6 +826,8 @@ function CaLamViec({ user, isMobile }) {
           bottom: 115%;
           left: 50%;
           transform: translateX(-50%);
+          /* Tooltip nền tối cố định — độc lập theme (tối trên cả hai tông đều
+             đọc tốt), giữ hex có chủ đích. */
           background-color: #2c3e50;
           color: #fff;
           padding: 8px 12px;
@@ -862,7 +867,7 @@ function CaLamViec({ user, isMobile }) {
       {/* Sleek dashboard for user's assigned tasks and notes */}
       {isEhsCommittee && (
         <div style={{
-          background: "#eef7f6", borderRadius: 8, padding: isMobile ? 12 : 18,
+          background: colors.backgroundLight, borderRadius: 8, padding: isMobile ? 12 : 18,
           marginBottom: 20, borderLeft: `5px solid ${orange}`
         }}>
           <h3 style={{ marginTop: 0, fontSize: isMobile ? 16 : 20, color: orange, display: "flex", alignItems: "center", gap: 8 }}>
@@ -871,7 +876,7 @@ function CaLamViec({ user, isMobile }) {
 
           {/* Bộ đàm được yêu cầu sử dụng (lấy dữ liệu từ tab Bộ đàm) */}
           <div style={{
-            background: "white", border: `1px solid ${orangeLight}`, borderRadius: 8,
+            background: colors.surface, border: `1px solid ${orangeLight}`, borderRadius: 8,
             padding: "10px 14px", marginBottom: 14
           }}>
             <div style={{ fontSize: 13, fontWeight: "bold", color: orange, marginBottom: 6 }}>
@@ -881,7 +886,7 @@ function CaLamViec({ user, isMobile }) {
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                 {Object.entries(myBodamByShift).map(([sk, list]) => (
                   <span key={sk} style={{
-                    background: "#e9f5f3", color: "#2c3e50", border: `1px solid ${orangeLight}`,
+                    background: colors.backgroundLight, color: colors.textPrimary, border: `1px solid ${orangeLight}`,
                     padding: "4px 10px", borderRadius: 12, fontSize: 12, fontWeight: 600
                   }}>
                     {SHIFTS[sk] || sk}: {list.join(", ")}
@@ -889,7 +894,7 @@ function CaLamViec({ user, isMobile }) {
                 ))}
               </div>
             ) : (
-              <div style={{ fontSize: 12, color: "#95a5a6", fontStyle: "italic" }}>
+              <div style={{ fontSize: 12, color: colors.textDisabled, fontStyle: "italic" }}>
                 Bạn chưa được chỉ định bộ đàm nào. (Phân chia tại tab Bộ đàm)
               </div>
             )}
@@ -899,11 +904,11 @@ function CaLamViec({ user, isMobile }) {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 12 }}>
               {myWeekAssignments.map((assign, idx) => (
                 <div key={idx} style={{
-                  background: "white", padding: 12, borderRadius: 8,
-                  boxShadow: "0 2px 5px rgba(0,0,0,0.05)", border: "1px solid #d1e7e4"
+                  background: colors.surface, padding: 12, borderRadius: 8,
+                  boxShadow: "0 2px 5px rgba(0,0,0,0.05)", border: `1px solid ${colors.border}`
                 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                    <span style={{ fontWeight: "bold", fontSize: 13, color: "#555" }}>
+                    <span style={{ fontWeight: "bold", fontSize: 13, color: colors.textSecondary }}>
                       📅 {assign.date.toLocaleDateString("vi-VN", { weekday: "short", day: "2-digit", month: "2-digit" })}
                     </span>
                     <span style={{
@@ -913,14 +918,14 @@ function CaLamViec({ user, isMobile }) {
                       {SHIFTS[assign.shiftKey] || assign.shiftKey}
                     </span>
                   </div>
-                  <div style={{ fontSize: 15, fontWeight: "bold", color: "#2c3e50", marginBottom: 6 }}>
+                  <div style={{ fontSize: 15, fontWeight: "bold", color: colors.textPrimary, marginBottom: 6 }}>
                     Nhiệm vụ: {assign.taskName}
                   </div>
                   {myBodamByShift[assign.shiftKey]?.length > 0 && (
                     <div style={{
                       display: "flex", alignItems: "center", gap: 6, marginBottom: 6,
                       fontSize: 12, fontWeight: "bold", color: orange,
-                      background: "#e9f5f3", border: `1px solid ${orangeLight}`,
+                      background: colors.backgroundLight, border: `1px solid ${orangeLight}`,
                       padding: "5px 8px", borderRadius: 6
                     }}>
                       🎙️ Bộ đàm: {myBodamByShift[assign.shiftKey].join(", ")}
@@ -928,13 +933,13 @@ function CaLamViec({ user, isMobile }) {
                   )}
                   {assign.note ? (
                     <div style={{
-                      background: "#fdf8e2", borderLeft: "3px solid #f39c12",
-                      padding: "8px 10px", borderRadius: 4, fontSize: 12, color: "#7f8c8d"
+                      background: alpha('warning', 0.12), borderLeft: `3px solid ${colors.warning}`,
+                      padding: "8px 10px", borderRadius: 4, fontSize: 12, color: colors.textSecondary
                     }}>
                       <b>Ghi chú:</b> {assign.note}
                     </div>
                   ) : (
-                    <div style={{ fontSize: 12, color: "#95a5a6", fontStyle: "italic" }}>
+                    <div style={{ fontSize: 12, color: colors.textDisabled, fontStyle: "italic" }}>
                       Không có ghi chú nào.
                     </div>
                   )}
@@ -942,14 +947,14 @@ function CaLamViec({ user, isMobile }) {
               ))}
             </div>
           ) : (
-            <div style={{ color: "#666", fontSize: 14, fontStyle: "italic" }}>
+            <div style={{ color: colors.textSecondary, fontSize: 14, fontStyle: "italic" }}>
               Bạn không có nhiệm vụ phân công đặc biệt nào trong tuần này.
             </div>
           )}
         </div>
       )}
 
-      <div style={{ background: "#f5f5f5", borderRadius: 8, padding: isMobile ? 10 : 15, marginBottom: 20 }}>
+      <div style={{ background: colors.backgroundLight, borderRadius: 8, padding: isMobile ? 10 : 15, marginBottom: 20 }}>
         <h3 style={{ marginTop: 0, fontSize: isMobile ? 16 : 20 }}>
           {canPlanBoard 
             ? `Phân ca làm việc (Tuần ${getWeekNumber(weekDates[0])})` 
@@ -963,7 +968,7 @@ function CaLamViec({ user, isMobile }) {
             <select
               value={selectedTargetUser}
               onChange={(e) => setSelectedTargetUser(e.target.value)}
-              style={{ padding: "8px 12px", borderRadius: 6, border: "1px solid #ccc", minWidth: 200, fontSize: 14 }}
+              style={{ padding: "8px 12px", borderRadius: 6, border: `1px solid ${colors.border}`, background: colors.surface, color: colors.textPrimary, minWidth: 200, fontSize: 14 }}
             >
               {targetUsersList.map((u) => (
                 <option key={u.id} value={u.name}>
@@ -975,7 +980,7 @@ function CaLamViec({ user, isMobile }) {
         )}
         {isEhsCommittee && isSundayMorning && (
           <div style={{
-            background: "#fff3cd", color: "#856404", border: "1px solid #ffeeba",
+            background: alpha('warning', 0.15), color: colors.warning, border: `1px solid ${alpha('warning', 0.5)}`,
             padding: "12px 16px", borderRadius: 8, marginBottom: 15, fontWeight: "bold",
             display: "flex", alignItems: "center", gap: 8, fontSize: 13
           }}>
@@ -995,7 +1000,7 @@ function CaLamViec({ user, isMobile }) {
                   value={userShifts[selectedTargetUser]?.[dayId] || ""}
                   onChange={(e) => handleShiftChange(dayId, e.target.value)}
                   disabled={!canEditThisUser}
-                  style={{ width: "100%", padding: "8px", borderRadius: 6, border: "1px solid #ccc" }}
+                  style={{ width: "100%", padding: "8px", borderRadius: 6, border: `1px solid ${colors.border}`, background: colors.surface, color: colors.textPrimary }}
                 >
                   <option value="">{t("shifts.selectShift")}</option>
                   {ALL_SHIFTS_LIST.map((ca) => ( <option key={ca} value={ca}> {ca === "Off" ? "Off" : SHIFTS[ca] || ca} </option> ))}
@@ -1006,7 +1011,7 @@ function CaLamViec({ user, isMobile }) {
         </div>
       </div>
 
-      <div style={{ background: "#f5f5f5", borderRadius: 8, padding: isMobile ? 10 : 15, marginBottom: 20 }}>
+      <div style={{ background: colors.backgroundLight, borderRadius: 8, padding: isMobile ? 10 : 15, marginBottom: 20 }}>
         <h3 style={{ marginTop: 0, fontSize: isMobile ? 16 : 20 }}>
           Trạng thái báo ca:{" "} {selectedDate.toLocaleDateString("vi-VN", { weekday: "long", day: "2-digit", month: "2-digit" })}
         </h3>
@@ -1025,7 +1030,7 @@ function CaLamViec({ user, isMobile }) {
       </div>
 
       <DragDropContext onDragEnd={onDragEnd} onDragStart={onDragStart}>
-        <div style={{ background: "#f5f5f5", borderRadius: 8, padding: isMobile ? 10 : 15, marginBottom: 20 }}>
+        <div style={{ background: colors.backgroundLight, borderRadius: 8, padding: isMobile ? 10 : 15, marginBottom: 20 }}>
           <h3 style={{ textAlign: "center", color: dark, marginTop: 0, fontSize: isMobile ? 16 : 20 }}>
             {t("shifts.availableStaff")}
           </h3>
@@ -1038,7 +1043,7 @@ function CaLamViec({ user, isMobile }) {
           </div>
           {getWeekNumber(new Date()) !== getWeekNumber(selectedDate) && (
             <div style={{ textAlign: "center", marginBottom: 15 }}>
-              <button onClick={goToCurrentWeek} style={{ fontSize: 13, padding: "5px 10px", cursor: "pointer", background: "#e9ecef", border: "1px solid #ccc", borderRadius: 5 }}>
+              <button onClick={goToCurrentWeek} style={{ fontSize: 13, padding: "5px 10px", cursor: "pointer", background: colors.backgroundLight, border: `1px solid ${colors.border}`, borderRadius: 5 }}>
                 {t("nav.backToCurrentWeek")}
               </button>
             </div>
@@ -1050,7 +1055,7 @@ function CaLamViec({ user, isMobile }) {
               return (
                 <button
                   key={dayId} onClick={() => setSelectedDate(day)}
-                  style={{ background: isActive ? orange : "white", color: isActive ? "white" : dark, border: "1px solid #ddd", padding: "8px 12px", borderRadius: 6, fontWeight: "bold" }}
+                  style={{ background: isActive ? orange : colors.surface, color: isActive ? colors.white : dark, border: `1px solid ${colors.border}`, padding: "8px 12px", borderRadius: 6, fontWeight: "bold" }}
                 > {day.getDate()} </button>
               );
             })}
@@ -1062,7 +1067,7 @@ function CaLamViec({ user, isMobile }) {
                   <div
                     ref={provided.innerRef} {...provided.droppableProps}
                     style={{
-                      background: "#e9ecef", borderRadius: 6, flex: 1, minWidth: isMobile ? "calc(33.33% - 7px)" : "auto",
+                      background: colors.backgroundLight, borderRadius: 6, flex: 1, minWidth: isMobile ? "calc(33.33% - 7px)" : "auto",
                       padding: 8, display: "flex", flexDirection: "column",
                     }}
                   >
@@ -1080,13 +1085,13 @@ function CaLamViec({ user, isMobile }) {
                           return (
                             <Draggable key={name} draggableId={name} index={index} isDragDisabled={!canPlanBoard || isProtectedRole || isOff}>
                               {(provided2, snapshot) => {
-                                const backgroundColor = isProtectedRole ? orange : isOff ? "#d3d3d3" : getColorForAssignmentCount(assignmentCountToday[name] || 0);
-                                const textColor = isProtectedRole ? "white" : isOff ? "#555" : "inherit";
+                                const backgroundColor = isProtectedRole ? orange : isOff ? colors.border : getColorForAssignmentCount(assignmentCountToday[name] || 0);
+                                const textColor = isProtectedRole ? colors.white : isOff ? colors.textSecondary : "inherit";
                                 const style = {
                                   padding: isMobile ? "8px" : "8px 10px", margin: "2px", borderRadius: 4,
                                   cursor: !canPlanBoard || isProtectedRole || isOff ? "not-allowed" : "grab",
                                   textAlign: "center", fontSize: isMobile ? 12 : 13, fontWeight: 500, background: backgroundColor, color: textColor,
-                                  border: "1px solid #ddd", ...provided2.draggableProps.style,
+                                  border: `1px solid ${colors.border}`, ...provided2.draggableProps.style,
                                   transform: snapshot.isDragging ? `${provided2.draggableProps.style.transform} scale(1.05)` : provided2.draggableProps.style.transform,
                                   boxShadow: snapshot.isDragging ? "0 4px 12px rgba(0,0,0,0.2)" : "0 1px 2px rgba(0,0,0,0.1)",
                                 };
@@ -1107,7 +1112,7 @@ function CaLamViec({ user, isMobile }) {
         {/* Cấu hình/Quản lý danh sách nhiệm vụ của Admin & EHS */}
         {canPlanBoard && (
           <div style={{
-            background: "white", padding: 15, borderRadius: 8, marginBottom: 20,
+            background: colors.surface, padding: 15, borderRadius: 8, marginBottom: 20,
             boxShadow: "0 2px 8px rgba(0,0,0,0.05)", border: `1px solid ${orangeLight}`
           }}>
             <h4 style={{ margin: "0 0 10px 0", color: orange, display: "flex", alignItems: "center", gap: 6, fontSize: 15 }}>
@@ -1116,8 +1121,8 @@ function CaLamViec({ user, isMobile }) {
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
               {tasks.map((task) => (
                 <div key={task.id} style={{
-                  display: "flex", alignItems: "center", gap: 6, background: "#f1f3f5",
-                  padding: "6px 12px", borderRadius: 20, fontSize: 13, border: "1px solid #dee2e6"
+                  display: "flex", alignItems: "center", gap: 6, background: colors.backgroundLight,
+                  padding: "6px 12px", borderRadius: 20, fontSize: 13, border: `1px solid ${colors.border}`
                 }}>
                   {editingTaskId === task.id ? (
                     <input
@@ -1131,6 +1136,7 @@ function CaLamViec({ user, isMobile }) {
                       autoFocus
                       style={{
                         padding: "2px 6px", fontSize: 13, border: `1px solid ${orange}`,
+                        background: colors.surface, color: colors.textPrimary,
                         borderRadius: 4, width: 120
                       }}
                     />
@@ -1166,12 +1172,13 @@ function CaLamViec({ user, isMobile }) {
                   if (e.key === 'Enter') handleAddTask();
                 }}
                 style={{
-                  padding: "8px 12px", border: "1px solid #ced4da", borderRadius: 6,
+                  padding: "8px 12px", border: `1px solid ${colors.border}`, borderRadius: 6,
+                  background: colors.surface, color: colors.textPrimary,
                   fontSize: 13, flexGrow: 1, maxWidth: 300
                 }}
               />
               <button onClick={handleAddTask} style={{
-                background: orange, color: "white", border: "none", padding: "8px 16px",
+                background: orange, color: colors.white, border: "none", padding: "8px 16px",
                 borderRadius: 6, fontSize: 13, fontWeight: "bold", cursor: "pointer"
               }}>
                 ➕ Thêm cột
@@ -1180,7 +1187,7 @@ function CaLamViec({ user, isMobile }) {
           </div>
         )}
 
-        <div style={{ background: "#f5f5f5", borderRadius: 8, padding: isMobile ? 10 : 15, flexGrow: 1 }}>
+        <div style={{ background: colors.backgroundLight, borderRadius: 8, padding: isMobile ? 10 : 15, flexGrow: 1 }}>
           <h3 style={{ textAlign: "center", color: dark, marginTop: 0, fontSize: isMobile ? 16 : 20 }}>
             {t("board.titleForDay").replace("{date}", selectedDate.toLocaleDateString("vi-VN"))}
           </h3>
@@ -1196,13 +1203,13 @@ function CaLamViec({ user, isMobile }) {
           alignItems: "center", zIndex: 10000, padding: 15
         }}>
           <div style={{
-            backgroundColor: "white", padding: 20, borderRadius: 12, width: "100%",
+            backgroundColor: colors.surface, padding: 20, borderRadius: 12, width: "100%",
             maxWidth: 450, boxShadow: "0 10px 25px rgba(0,0,0,0.2)", position: "relative"
           }}>
             <h3 style={{ marginTop: 0, color: orange, marginBottom: 4 }}>
               📝 Ghi chú cho {noteModal.item.name}
             </h3>
-            <p style={{ margin: "0 0 15px 0", fontSize: 13, color: "#666" }}>
+            <p style={{ margin: "0 0 15px 0", fontSize: 13, color: colors.textSecondary }}>
               Nhiệm vụ: <b>{noteModal.task.name}</b> | Ca: <b>{SHIFTS[noteModal.shiftKey] || noteModal.shiftKey}</b>
             </p>
             
@@ -1212,7 +1219,8 @@ function CaLamViec({ user, isMobile }) {
               placeholder="Nhập nội dung ghi chú (ví dụ: vị trí Gemba, lưu ý đặc biệt...)"
               rows={4}
               style={{
-                width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #ccc",
+                width: "100%", padding: "10px", borderRadius: 8, border: `1px solid ${colors.border}`,
+                background: colors.surface, color: colors.textPrimary,
                 fontSize: 14, fontFamily: "inherit", boxSizing: "border-box", marginBottom: 15
               }}
               autoFocus
@@ -1222,7 +1230,8 @@ function CaLamViec({ user, isMobile }) {
               <button
                 onClick={() => setNoteModal(null)}
                 style={{
-                  padding: "8px 16px", border: "1px solid #ccc", background: "none",
+                  padding: "8px 16px", border: `1px solid ${colors.border}`, background: "none",
+                  color: colors.textPrimary,
                   borderRadius: 6, cursor: "pointer", fontSize: 13
                 }}
               >
@@ -1231,7 +1240,7 @@ function CaLamViec({ user, isMobile }) {
               <button
                 onClick={handleSaveNote}
                 style={{
-                  padding: "8px 16px", border: "none", background: orange, color: "white",
+                  padding: "8px 16px", border: "none", background: orange, color: colors.white,
                   borderRadius: 6, cursor: "pointer", fontSize: 13, fontWeight: "bold"
                 }}
               >
