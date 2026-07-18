@@ -29,7 +29,7 @@ const dbService = {
     return res;
   }
 };
-import { colors } from '../theme';
+import { colors, alpha } from '../theme';
 import { useToast, useConfirm } from './LightboxSwipeOnly';
 import { useI18n } from '../i18n/I18nProvider';
 
@@ -171,8 +171,8 @@ const NumberInput = React.memo(function NumberInput({ value, onChange, itemShift
     height: 38,
     fontSize: 22,
     fontWeight: 'bold',
-    border: '1px solid #ccc',
-    backgroundColor: '#f9f9f9',
+    border: `1px solid ${colors.border}`,
+    backgroundColor: colors.backgroundLight,
     borderRadius: 8,
     cursor: 'pointer',
     display: 'none',
@@ -194,7 +194,7 @@ const NumberInput = React.memo(function NumberInput({ value, onChange, itemShift
       <button
         type="button"
         className="number-control-btn"
-        style={{ ...btnStyle, color: '#d9534f' }}
+        style={{ ...btnStyle, color: colors.error }}
         // Chặn bubble sự kiện touch để không ảnh hưởng đến input
         onTouchStart={(e) => { e.stopPropagation(); !disabled && longPressDecrement.onTouchStart?.(e); }}
         onTouchEnd={(e)   => { e.stopPropagation(); !disabled && longPressDecrement.onTouchEnd?.(e); }}
@@ -215,13 +215,13 @@ const NumberInput = React.memo(function NumberInput({ value, onChange, itemShift
         placeholder={placeholder}
         onChange={handleInputChange}
         disabled={disabled}
-        style={{ width: 80, padding: 6, textAlign: 'center', borderRadius: 8, border: '1px solid #ddd', touchAction: 'manipulation', backgroundColor: disabled ? '#f1f5f9' : '#fff', color: disabled ? '#64748b' : '#000', ...style }}
+        style={{ width: 80, padding: 6, textAlign: 'center', borderRadius: 8, border: `1px solid ${colors.border}`, touchAction: 'manipulation', backgroundColor: disabled ? colors.backgroundLight : colors.surface, color: disabled ? colors.textDisabled : colors.textPrimary, ...style }}
       />
 
       <button
         type="button"
         className="number-control-btn"
-        style={{ ...btnStyle, color: '#5cb85c' }}
+        style={{ ...btnStyle, color: colors.success }}
         onTouchStart={(e) => { e.stopPropagation(); !disabled && longPressIncrement.onTouchStart?.(e); }}
         onTouchEnd={(e)   => { e.stopPropagation(); !disabled && longPressIncrement.onTouchEnd?.(e); }}
         onMouseDown={!disabled ? longPressIncrement.onMouseDown : undefined}
@@ -539,7 +539,7 @@ function DepartmentView({ user, reportData, selectedDateKey, selectedDate }) {
       onBlurCapture={() => { setTimeout(() => { isEditingRef.current = false; }, 120); }}
     >
       {SHIFTS.map(shift => (
-        <div key={shift} className="card" style={{ marginBottom: 16, padding: 12, border: '1px solid #eee', borderRadius: 12 }}>
+        <div key={shift} className="card" style={{ marginBottom: 16, padding: 12, border: `1px solid ${colors.border}`, borderRadius: 12 }}>
           <h3 style={{ marginTop: 0 }}>Ca: {SHIFT_NAMES[shift]}</h3>
           <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}>
             <div>
@@ -580,9 +580,9 @@ function DepartmentView({ user, reportData, selectedDateKey, selectedDate }) {
                 marginTop: 14,
                 padding: 12,
                 borderRadius: 8,
-                border: '1px solid #ddd',
-                backgroundColor: fulfilled.deptAck ? '#e6f4ea' : '#fffbeb',
-                borderColor: fulfilled.deptAck ? '#34a853' : '#fbbc05',
+                border: `1px solid ${colors.border}`,
+                backgroundColor: fulfilled.deptAck ? alpha('success', 0.12) : alpha('warning', 0.1),
+                borderColor: fulfilled.deptAck ? colors.success : colors.warning,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
@@ -597,11 +597,11 @@ function DepartmentView({ user, reportData, selectedDateKey, selectedDate }) {
                     </span>
                   </strong>
                   {fulfilled.deptAck ? (
-                    <div style={{ color: '#137333', fontSize: 12, marginTop: 4 }}>
+                    <div style={{ color: colors.success, fontSize: 12, marginTop: 4 }}>
                       ✅ Đã xác nhận nhận đủ bởi <strong>{fulfilled.deptAck}</strong> vào lúc {fmtTime(fulfilled.deptAckAt)}.
                     </div>
                   ) : (
-                    <div style={{ color: '#b06000', fontSize: 12, marginTop: 4 }}>
+                    <div style={{ color: colors.warning, fontSize: 12, marginTop: 4 }}>
                       ⏳ Bộ phận cần xác nhận sau khi đã nhận trực tiếp số lượng này từ Nhà Ăn.
                     </div>
                   )}
@@ -612,8 +612,8 @@ function DepartmentView({ user, reportData, selectedDateKey, selectedDate }) {
                     onClick={() => confirmDeptReceivedOvertime(shift, fulfilled)}
                     style={{
                       padding: '8px 14px',
-                      backgroundColor: '#fbbc05',
-                      color: '#000',
+                      backgroundColor: colors.warning,
+                      color: colors.black,
                       border: 'none',
                       borderRadius: 6,
                       fontWeight: 700,
@@ -631,7 +631,7 @@ function DepartmentView({ user, reportData, selectedDateKey, selectedDate }) {
           })()}
 
           {isLocked && (
-            <div style={{ marginTop: 10, color: '#dc2626', fontWeight: 600, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ marginTop: 10, color: colors.error, fontWeight: 600, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
               🔒 Số liệu ngày này đã bị khóa (chỉ Admin mới có quyền chỉnh sửa).
             </div>
           )}
@@ -640,8 +640,8 @@ function DepartmentView({ user, reportData, selectedDateKey, selectedDate }) {
             disabled={isLocked}
             style={{
               marginTop: 10,
-              background: isLocked ? '#cbd5e1' : colors.primary,
-              color: '#fff',
+              background: isLocked ? colors.textDisabled : colors.primary,
+              color: colors.white,
               border: 0,
               padding: '10px 16px',
               borderRadius: 10,
@@ -661,14 +661,14 @@ function DepartmentView({ user, reportData, selectedDateKey, selectedDate }) {
 function DeptDetailModal({ department, reportData, onClose }) {
   if (!department) return null;
   const history = (reportData?.history || []).filter(h => h?.role === department);
-  const cellStyle = { padding: 8, border: '1px solid #eee', textAlign: 'center' };
+  const cellStyle = { padding: 8, border: `1px solid ${colors.border}`, textAlign: 'center' };
 
   return (
     <div style={{
       position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999
     }}>
-      <div style={{ background: '#fff', maxWidth: 'min(980px, 95vw)', width: '95%', borderRadius: 12, padding: 12, boxShadow: '0 10px 40px rgba(0,0,0,.2)' }}>
+      <div style={{ background: colors.surface, maxWidth: 'min(980px, 95vw)', width: '95%', borderRadius: 'var(--so-radius-md)', padding: 12, boxShadow: 'var(--so-shadow-lg)', border: `1px solid ${colors.border}` }}>
         <style>{`
           @media (max-width: 480px) {
             .rc-table th, .rc-table td { padding: 6px !important; font-size: 12px !important; }
@@ -679,7 +679,7 @@ function DeptDetailModal({ department, reportData, onClose }) {
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <h3 style={{ margin: 0, fontSize: 18 }}>Chi tiết báo cơm – {department}</h3>
-          <button onClick={onClose} style={{ border: 0, background: '#eee', padding: '6px 10px', borderRadius: 8, cursor: 'pointer' }}>Đóng</button>
+          <button onClick={onClose} style={{ border: 0, background: colors.backgroundLight, padding: '6px 10px', borderRadius: 8, cursor: 'pointer' }}>Đóng</button>
         </div>
 
         <h4 style={{ margin: '6px 0' }}>Số lượng theo từng ca</h4>
@@ -714,7 +714,7 @@ function DeptDetailModal({ department, reportData, onClose }) {
                     <td style={cellStyle}>
                       {rep.tangCaMi || 0}
                       {isFulfilled && (
-                        <div style={{ fontSize: 11, color: '#16a34a', marginTop: 2 }}>
+                        <div style={{ fontSize: 11, color: colors.success, marginTop: 2 }}>
                           Thực phát: {fulfilled.mi}
                         </div>
                       )}
@@ -722,7 +722,7 @@ function DeptDetailModal({ department, reportData, onClose }) {
                     <td style={cellStyle}>
                       {rep.tangCaSua || 0}
                       {isFulfilled && (
-                        <div style={{ fontSize: 11, color: '#16a34a', marginTop: 2 }}>
+                        <div style={{ fontSize: 11, color: colors.success, marginTop: 2 }}>
                           Thực phát: {fulfilled.sua}
                         </div>
                       )}
@@ -730,7 +730,7 @@ function DeptDetailModal({ department, reportData, onClose }) {
                     <td style={{ ...cellStyle, fontSize: 12 }}>
                       {fmtTime(rep.lastUpdated) || '-'}
                       {isFulfilled && (
-                        <div style={{ fontSize: 11, color: fulfilled.deptAck ? '#137333' : '#b06000', fontWeight: 'bold', marginTop: 2 }}>
+                        <div style={{ fontSize: 11, color: fulfilled.deptAck ? colors.success : colors.warning, fontWeight: 'bold', marginTop: 2 }}>
                           {fulfilled.deptAck ? `✓ Đã nhận (${fulfilled.deptAck})` : '⏳ Chưa nhận'}
                         </div>
                       )}
@@ -744,11 +744,11 @@ function DeptDetailModal({ department, reportData, onClose }) {
 
         <h4 style={{ margin: '12px 0 6px' }}>Lịch sử thay đổi của bộ phận</h4>
         {history.length === 0 ? (
-          <div style={{ padding: 8, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8 }}>
+          <div style={{ padding: 8, background: colors.backgroundLight, border: `1px solid ${colors.border}`, borderRadius: 8 }}>
             Chưa ghi nhận lịch sử cho bộ phận này.
           </div>
         ) : (
-          <div className="rc-wrap" style={{ maxHeight: 280, border: '1px solid #eee', borderRadius: 8 }}>
+          <div className="rc-wrap" style={{ maxHeight: 280, border: `1px solid ${colors.border}`, borderRadius: 8 }}>
             <table className="rc-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
@@ -1179,11 +1179,11 @@ function AdminView({ user, reportData, selectedDateKey, onDeptClick, onOpenExpor
       style={{
         display: 'inline-block', marginRight: 6, marginBottom: 6, padding: '4px 8px',
         borderRadius: 999, fontSize: 12, border: '1px solid transparent',
-        background: isPending ? '#fef9c3' : (reported ? '#e6f4ea' : '#ffe6e6'),
-        color: isPending ? '#713f12' : (reported ? '#1e7e34' : '#b71c1c'),
+        background: isPending ? alpha('warning', 0.15) : (reported ? alpha('success', 0.12) : alpha('error', 0.12)),
+        color: isPending ? colors.warning : (reported ? colors.success : colors.error),
         cursor: reported ? 'pointer' : 'not-allowed',
         borderStyle: isPending ? 'dashed' : 'solid',
-        borderColor: isPending ? '#facc15' : 'transparent',
+        borderColor: isPending ? colors.warning : 'transparent',
       }}
     >
       {dep}{isPending ? ' ⏳' : ''}
@@ -1193,7 +1193,7 @@ function AdminView({ user, reportData, selectedDateKey, onDeptClick, onOpenExpor
   const Delta = ({ diff }) => {
     if (!diff) return null;
     const up = diff > 0;
-    const color = up ? '#16a34a' : '#dc2626';
+    const color = up ? colors.success : colors.error;
     const arrow = up ? '▲' : '▼';
     return <span style={{ marginLeft: 6, color, fontWeight: 700 }}>{arrow} {Math.abs(diff)}</span>;
   };
@@ -1209,29 +1209,29 @@ function AdminView({ user, reportData, selectedDateKey, onDeptClick, onOpenExpor
     <div>
       {/* Nút xuất báo cáo Excel */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 8, gap: 8, flexWrap: 'wrap' }}>
-        <button onClick={onOpenExport} style={{ background: '#1f80e0', color: '#fff', border: 0, padding: '8px 12px', borderRadius: 8, fontWeight: 700, cursor: 'pointer' }}>
+        <button onClick={onOpenExport} style={{ background: colors.info, color: colors.white, border: 0, padding: '8px 12px', borderRadius: 8, fontWeight: 700, cursor: 'pointer' }}>
           Xuất báo cáo (Excel)
         </button>
       </div>
 
       {/* Yêu cầu thay đổi tăng ca (Chờ EHS duyệt) */}
       {pendingChangeRequests.length > 0 && (
-        <div className="card" style={{ marginBottom: 16, padding: 12, border: '1px solid #fde68a', borderRadius: 12, background: '#fefce8' }}>
-          <h3 style={{ marginTop: 0, color: '#a16207', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div className="card" style={{ marginBottom: 16, padding: 12, border: `1px solid ${alpha('warning', 0.5)}`, borderRadius: 12, background: alpha('warning', 0.08) }}>
+          <h3 style={{ marginTop: 0, color: colors.warning, display: 'flex', alignItems: 'center', gap: 8 }}>
             <span>⏳ Yêu cầu thay đổi tăng ca (Chờ EHS duyệt)</span>
           </h3>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead style={{ background: '#fef9c3' }}>
+              <thead style={{ background: alpha('warning', 0.15) }}>
                 <tr>
-                  <th style={{ padding: 8, border: '1px solid #fef08a' }}>Bộ phận</th>
-                  <th style={{ padding: 8, border: '1px solid #fef08a' }}>Ca</th>
-                  <th style={{ padding: 8, border: '1px solid #fef08a' }}>Loại yêu cầu</th>
-                  <th style={{ padding: 8, border: '1px solid #fef08a' }}>Số lượng đã phát</th>
-                  <th style={{ padding: 8, border: '1px solid #fef08a' }}>Yêu cầu mới</th>
-                  <th style={{ padding: 8, border: '1px solid #fef08a' }}>Chênh lệch</th>
-                  <th style={{ padding: 8, border: '1px solid #fef08a' }}>Người yêu cầu</th>
-                  <th style={{ padding: 8, border: '1px solid #fef08a' }}>Thao tác EHS</th>
+                  <th style={{ padding: 8, border: `1px solid ${alpha('warning', 0.35)}` }}>Bộ phận</th>
+                  <th style={{ padding: 8, border: `1px solid ${alpha('warning', 0.35)}` }}>Ca</th>
+                  <th style={{ padding: 8, border: `1px solid ${alpha('warning', 0.35)}` }}>Loại yêu cầu</th>
+                  <th style={{ padding: 8, border: `1px solid ${alpha('warning', 0.35)}` }}>Số lượng đã phát</th>
+                  <th style={{ padding: 8, border: `1px solid ${alpha('warning', 0.35)}` }}>Yêu cầu mới</th>
+                  <th style={{ padding: 8, border: `1px solid ${alpha('warning', 0.35)}` }}>Chênh lệch</th>
+                  <th style={{ padding: 8, border: `1px solid ${alpha('warning', 0.35)}` }}>Người yêu cầu</th>
+                  <th style={{ padding: 8, border: `1px solid ${alpha('warning', 0.35)}` }}>Thao tác EHS</th>
                 </tr>
               </thead>
               <tbody>
@@ -1242,45 +1242,45 @@ function AdminView({ user, reportData, selectedDateKey, onDeptClick, onOpenExpor
 
                   return (
                     <tr key={`${req.shift}-${req.dept}`}>
-                      <td style={{ padding: 8, border: '1px solid #fef08a', fontWeight: 'bold' }}>{req.dept}</td>
-                      <td style={{ padding: 8, border: '1px solid #fef08a' }}>{SHIFT_NAMES[req.shift]}</td>
-                      <td style={{ padding: 8, border: '1px solid #fef08a' }}>
+                      <td style={{ padding: 8, border: `1px solid ${alpha('warning', 0.35)}`, fontWeight: 'bold' }}>{req.dept}</td>
+                      <td style={{ padding: 8, border: `1px solid ${alpha('warning', 0.35)}` }}>{SHIFT_NAMES[req.shift]}</td>
+                      <td style={{ padding: 8, border: `1px solid ${alpha('warning', 0.35)}` }}>
                         {isDecrease ? (
-                          <span style={{ color: '#b91c1c', fontWeight: 700 }}>⬇️ Yêu cầu GIẢM</span>
+                          <span style={{ color: colors.error, fontWeight: 700 }}>⬇️ Yêu cầu GIẢM</span>
                         ) : (
-                          <span style={{ color: '#16a34a', fontWeight: 700 }}>⬆️ Yêu cầu TĂNG</span>
+                          <span style={{ color: colors.success, fontWeight: 700 }}>⬆️ Yêu cầu TĂNG</span>
                         )}
                       </td>
-                      <td style={{ padding: 8, border: '1px solid #fef08a', textAlign: 'center' }}>
+                      <td style={{ padding: 8, border: `1px solid ${alpha('warning', 0.35)}`, textAlign: 'center' }}>
                         {req.fulMi} Mì / {req.fulSua} Sữa
                       </td>
-                      <td style={{ padding: 8, border: '1px solid #fef08a', textAlign: 'center', fontWeight: 'bold', color: '#1e3a8a' }}>
+                      <td style={{ padding: 8, border: `1px solid ${alpha('warning', 0.35)}`, textAlign: 'center', fontWeight: 'bold', color: colors.info }}>
                         {req.newMi} Mì / {req.newSua} Sữa
                       </td>
-                      <td style={{ padding: 8, border: '1px solid #fef08a', textAlign: 'center' }}>
+                      <td style={{ padding: 8, border: `1px solid ${alpha('warning', 0.35)}`, textAlign: 'center' }}>
                         {diffMi !== 0 && (
-                          <span style={{ color: diffMi > 0 ? '#16a34a' : '#dc2626', fontWeight: 'bold', marginRight: 8 }}>
+                          <span style={{ color: diffMi > 0 ? colors.success : colors.error, fontWeight: 'bold', marginRight: 8 }}>
                             Mì: {diffMi > 0 ? `+${diffMi}` : diffMi}
                           </span>
                         )}
                         {diffSua !== 0 && (
-                          <span style={{ color: diffSua > 0 ? '#16a34a' : '#dc2626', fontWeight: 'bold' }}>
+                          <span style={{ color: diffSua > 0 ? colors.success : colors.error, fontWeight: 'bold' }}>
                             Sữa: {diffSua > 0 ? `+${diffSua}` : diffSua}
                           </span>
                         )}
                       </td>
-                      <td style={{ padding: 8, border: '1px solid #fef08a', fontSize: 12 }}>{req.user}</td>
-                      <td style={{ padding: 8, border: '1px solid #fef08a', textAlign: 'center' }}>
+                      <td style={{ padding: 8, border: `1px solid ${alpha('warning', 0.35)}`, fontSize: 12 }}>{req.user}</td>
+                      <td style={{ padding: 8, border: `1px solid ${alpha('warning', 0.35)}`, textAlign: 'center' }}>
                         <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
                           <button
                             onClick={() => approveChangeRequest(req)}
-                            style={{ background: '#16a34a', color: '#fff', border: 0, padding: '6px 12px', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: 12 }}
+                            style={{ background: colors.success, color: colors.white, border: 0, padding: '6px 12px', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: 12 }}
                           >
                             ✅ Duyệt
                           </button>
                           <button
                             onClick={() => rejectChangeRequest(req)}
-                            style={{ background: '#dc2626', color: '#fff', border: 0, padding: '6px 12px', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: 12 }}
+                            style={{ background: colors.error, color: colors.white, border: 0, padding: '6px 12px', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: 12 }}
                           >
                             ❌ Từ chối
                           </button>
@@ -1297,18 +1297,18 @@ function AdminView({ user, reportData, selectedDateKey, onDeptClick, onOpenExpor
 
       {/* Thông báo yêu cầu thu hồi tăng ca (nếu có) */}
       {recallRequests.length > 0 && (
-        <div className="card" style={{ marginBottom: 16, padding: 12, border: '1px solid #fecaca', borderRadius: 12, background: '#fff1f2' }}>
-          <h3 style={{ marginTop: 0, color: '#b91c1c' }}>Yêu cầu thu hồi tăng ca</h3>
+        <div className="card" style={{ marginBottom: 16, padding: 12, border: `1px solid ${alpha('error', 0.3)}`, borderRadius: 12, background: alpha('error', 0.08) }}>
+          <h3 style={{ marginTop: 0, color: colors.error }}>Yêu cầu thu hồi tăng ca</h3>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead style={{ background: '#fee2e2' }}>
+              <thead style={{ background: alpha('error', 0.15) }}>
                 <tr>
-                  <th style={{ padding: 8, border: '1px solid #fecaca' }}>Bộ phận</th>
-                  <th style={{ padding: 8, border: '1px solid #fecaca' }}>Ca</th>
-                  <th style={{ padding: 8, border: '1px solid #fecaca' }}>Mì cần thu hồi</th>
-                  <th style={{ padding: 8, border: '1px solid #fecaca' }}>Sữa cần thu hồi</th>
-                  <th style={{ padding: 8, border: '1px solid #fecaca' }}>Trạng thái</th>
-                  <th style={{ padding: 8, border: '1px solid #fecaca' }}>Thao tác EHS</th>
+                  <th style={{ padding: 8, border: `1px solid ${alpha('error', 0.3)}` }}>Bộ phận</th>
+                  <th style={{ padding: 8, border: `1px solid ${alpha('error', 0.3)}` }}>Ca</th>
+                  <th style={{ padding: 8, border: `1px solid ${alpha('error', 0.3)}` }}>Mì cần thu hồi</th>
+                  <th style={{ padding: 8, border: `1px solid ${alpha('error', 0.3)}` }}>Sữa cần thu hồi</th>
+                  <th style={{ padding: 8, border: `1px solid ${alpha('error', 0.3)}` }}>Trạng thái</th>
+                  <th style={{ padding: 8, border: `1px solid ${alpha('error', 0.3)}` }}>Thao tác EHS</th>
                 </tr>
               </thead>
               <tbody>
@@ -1319,20 +1319,20 @@ function AdminView({ user, reportData, selectedDateKey, onDeptClick, onOpenExpor
 
                   return (
                     <tr key={`${rec.shift}-${rec.dept}`}>
-                      <td style={{ padding: 8, border: '1px solid #fecaca' }}>{rec.dept}</td>
-                      <td style={{ padding: 8, border: '1px solid #fecaca' }}>{SHIFT_NAMES[rec.shift]}</td>
-                      <td style={{ padding: 8, border: '1px solid #fecaca', textAlign: 'center', fontWeight: 'bold' }}>{rec.surplusMi}</td>
-                      <td style={{ padding: 8, border: '1px solid #fecaca', textAlign: 'center', fontWeight: 'bold' }}>{rec.surplusSua}</td>
-                      <td style={{ padding: 8, border: '1px solid #fecaca', fontSize: 12 }}>
-                        {step === 1 && <span style={{ color: '#b45309' }}>⏳ Chờ EHS nhận từ bộ phận</span>}
-                        {step === 2 && <span style={{ color: '#1d4ed8' }}>✅ EHS đã nhận – Chờ trả Nhà Ăn</span>}
-                        {step === 3 && <span style={{ color: '#166534' }}>✅ EHS đã trả – Chờ Nhà Ăn xác nhận</span>}
+                      <td style={{ padding: 8, border: `1px solid ${alpha('error', 0.3)}` }}>{rec.dept}</td>
+                      <td style={{ padding: 8, border: `1px solid ${alpha('error', 0.3)}` }}>{SHIFT_NAMES[rec.shift]}</td>
+                      <td style={{ padding: 8, border: `1px solid ${alpha('error', 0.3)}`, textAlign: 'center', fontWeight: 'bold' }}>{rec.surplusMi}</td>
+                      <td style={{ padding: 8, border: `1px solid ${alpha('error', 0.3)}`, textAlign: 'center', fontWeight: 'bold' }}>{rec.surplusSua}</td>
+                      <td style={{ padding: 8, border: `1px solid ${alpha('error', 0.3)}`, fontSize: 12 }}>
+                        {step === 1 && <span style={{ color: colors.warning }}>⏳ Chờ EHS nhận từ bộ phận</span>}
+                        {step === 2 && <span style={{ color: colors.info }}>✅ EHS đã nhận – Chờ trả Nhà Ăn</span>}
+                        {step === 3 && <span style={{ color: colors.success }}>✅ EHS đã trả – Chờ Nhà Ăn xác nhận</span>}
                       </td>
-                      <td style={{ padding: 8, border: '1px solid #fecaca', textAlign: 'center' }}>
+                      <td style={{ padding: 8, border: `1px solid ${alpha('error', 0.3)}`, textAlign: 'center' }}>
                         {step === 1 && (
                           <button
                             onClick={() => confirmEhsReceivedRecall(rec)}
-                            style={{ background: '#1d4ed8', color: '#fff', border: 0, padding: '6px 12px', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: 12 }}
+                            style={{ background: colors.info, color: colors.white, border: 0, padding: '6px 12px', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: 12 }}
                           >
                             ✅ Xác nhận đã nhận từ bộ phận
                           </button>
@@ -1340,12 +1340,12 @@ function AdminView({ user, reportData, selectedDateKey, onDeptClick, onOpenExpor
                         {step === 2 && (
                           <button
                             onClick={() => confirmEhsReturnedToCanteen(rec)}
-                            style={{ background: '#7c3aed', color: '#fff', border: 0, padding: '6px 12px', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: 12 }}
+                            style={{ background: colors.info, color: colors.white, border: 0, padding: '6px 12px', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: 12 }}
                           >
                             ↩️ Xác nhận đã trả Nhà Ăn
                           </button>
                         )}
-                        {step === 3 && <span style={{ color: '#166534', fontSize: 12 }}>Đang chờ Nhà Ăn xác nhận</span>}
+                        {step === 3 && <span style={{ color: colors.success, fontSize: 12 }}>Đang chờ Nhà Ăn xác nhận</span>}
                       </td>
                     </tr>
                   );
@@ -1375,13 +1375,13 @@ function AdminView({ user, reportData, selectedDateKey, onDeptClick, onOpenExpor
         }));
 
         return (
-          <div key={shift} className="card" style={{ marginBottom: 16, padding: 12, border: '1px solid #eee', borderRadius: 12 }}>
+          <div key={shift} className="card" style={{ marginBottom: 16, padding: 12, border: `1px solid ${colors.border}`, borderRadius: 12 }}>
             <h3 style={{ marginTop: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>Tổng hợp ca: {SHIFT_NAMES[shift]}</span>
               <span style={{
                 fontSize: 12,
                 fontWeight: 700,
-                color: statusCanteen ? '#16a34a' : (statusAdmin ? (newAfterSend ? '#f59e0b' : '#f59e0b') : '#6b7280')
+                color: statusCanteen ? colors.success : (statusAdmin ? (newAfterSend ? colors.warning : colors.warning) : colors.textSecondary)
               }}>
                 {statusCanteen
                   ? 'Nhà ăn đã xác nhận'
@@ -1391,12 +1391,12 @@ function AdminView({ user, reportData, selectedDateKey, onDeptClick, onOpenExpor
 
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: isMobile ? '100%' : 400 }}>
-              <thead style={{ background: colors.primaryLight || '#eef5ff' }}>
+              <thead style={{ background: colors.backgroundLight }}>
                 <tr>
-                  <th style={{ padding: 8, border: '1px solid #eee' }}>Loại cơm</th>
-                  <th style={{ padding: 8, border: '1px solid #eee' }}>Số lượng đã báo</th>
-                  <th style={{ padding: 8, border: '1px solid #eee' }}>Tổng báo cáo</th>
-                  <th style={{ padding: 8, border: '1px solid #eee' }}>Điều chỉnh</th>
+                  <th style={{ padding: 8, border: `1px solid ${colors.border}` }}>Loại cơm</th>
+                  <th style={{ padding: 8, border: `1px solid ${colors.border}` }}>Số lượng đã báo</th>
+                  <th style={{ padding: 8, border: `1px solid ${colors.border}` }}>Tổng báo cáo</th>
+                  <th style={{ padding: 8, border: `1px solid ${colors.border}` }}>Điều chỉnh</th>
                 </tr>
               </thead>
               <tbody>
@@ -1408,15 +1408,15 @@ function AdminView({ user, reportData, selectedDateKey, onDeptClick, onOpenExpor
                       const diff = (statusAdmin && newAfterSend) ? (current - sent) : 0;
                       return (
                         <tr key={k}>
-                          <td style={{ padding: 8, border: '1px solid #f0f0f0' }}>{label}</td>
-                          <td style={{ padding: 8, border: '1px solid #f0f0f0', textAlign: 'center', color: '#64748b' }}>
+                          <td style={{ padding: 8, border: `1px solid ${colors.border}` }}>{label}</td>
+                          <td style={{ padding: 8, border: `1px solid ${colors.border}`, textAlign: 'center', color: colors.textSecondary }}>
                             {sent}
                           </td>
-                          <td style={{ padding: 8, border: '1px solid #f0f0f0', textAlign: 'center' }}>
+                          <td style={{ padding: 8, border: `1px solid ${colors.border}`, textAlign: 'center' }}>
                             {current}
                             <Delta diff={diff} />
                           </td>
-                          <td style={{ padding: 8, border: '1px solid #f0f0f0', textAlign: 'center' }}>
+                          <td style={{ padding: 8, border: `1px solid ${colors.border}`, textAlign: 'center' }}>
                             <NumberInput 
                               value={adjustedTotals[shift]?.[k] ?? 0} 
                               onChange={onAdjust} 
@@ -1448,8 +1448,8 @@ function AdminView({ user, reportData, selectedDateKey, onDeptClick, onOpenExpor
                 onClick={() => confirmShift(shift)}
                 disabled={!canConfirm}
                 style={{
-                  background: canConfirm ? (colors.success || '#16a34a') : '#cbd5e1',
-                  color: '#fff',
+                  background: canConfirm ? (colors.success) : colors.textDisabled,
+                  color: colors.white,
                   border: 0, padding: '10px 16px', borderRadius: 10, fontWeight: 700,
                   cursor: canConfirm ? 'pointer' : 'not-allowed'
                 }}
@@ -1472,7 +1472,7 @@ function CanteenView({ user, reportData, selectedDateKey, isMobile }) {
   const Delta = ({ diff }) => {
     if (!diff) return null;
     const up = diff > 0;
-    const color = up ? '#16a34a' : '#dc2626';
+    const color = up ? colors.success : colors.error;
     const arrow = up ? '▲' : '▼';
     return <span style={{ marginLeft: 6, color, fontWeight: 700 }}>{arrow} {Math.abs(diff)}</span>;
   };
@@ -1750,7 +1750,7 @@ function CanteenView({ user, reportData, selectedDateKey, isMobile }) {
   return (
     <div>
       {Object.keys(processedData).length === 0 && (
-        <div className="card" style={{ padding: 12, border: '1px solid #eee', borderRadius: 12 }}>
+        <div className="card" style={{ padding: 12, border: `1px solid ${colors.border}`, borderRadius: 12 }}>
           <p>Chưa có ca nào được Aldila gửi.</p>
         </div>
       )}
@@ -1770,8 +1770,8 @@ function CanteenView({ user, reportData, selectedDateKey, isMobile }) {
               <div key={`recall-canteen-${item.dept}`} style={{
                 marginBottom: 12,
                 padding: '14px 16px',
-                background: '#f5f3ff',
-                border: '2px solid #a78bfa',
+                background: alpha('info', 0.08),
+                border: `2px solid ${alpha('info', 0.5)}`,
                 borderRadius: 10,
                 display: 'flex',
                 alignItems: 'center',
@@ -1783,13 +1783,13 @@ function CanteenView({ user, reportData, selectedDateKey, isMobile }) {
                   <span style={{ fontSize: 18, marginRight: 8 }}>↩️</span>
                   <strong>EHS trả lại ({item.dept} – {SHIFT_NAMES[shift]}):</strong>{' '}
                   {item.surplusMi > 0 ? `${item.surplusMi} mì` : ''}{item.surplusMi > 0 && item.surplusSua > 0 ? ' và ' : ''}{item.surplusSua > 0 ? `${item.surplusSua} sữa` : ''}
-                  <span style={{ color: '#6d28d9', fontWeight: 600, marginLeft: 6 }}>Vui lòng xác nhận đã nhận lại!</span>
+                  <span style={{ color: colors.info, fontWeight: 600, marginLeft: 6 }}>Vui lòng xác nhận đã nhận lại!</span>
                 </div>
                 <button
                   onClick={() => confirmCanteenRecallAck(shift, item.dept, item.surplusMi, item.surplusSua)}
                   style={{
-                    background: '#7c3aed',
-                    color: '#fff',
+                    background: colors.info,
+                    color: colors.white,
                     border: 0,
                     padding: '8px 16px',
                     borderRadius: 8,
@@ -1808,8 +1808,8 @@ function CanteenView({ user, reportData, selectedDateKey, isMobile }) {
               <div style={{
                 marginBottom: 12,
                 padding: '12px 16px',
-                background: '#fffbeb',
-                border: '1px solid #fde68a',
+                background: alpha('warning', 0.1),
+                border: `1px solid ${alpha('warning', 0.5)}`,
                 borderRadius: 8,
                 textAlign: 'center',
                 display: 'flex',
@@ -1817,15 +1817,15 @@ function CanteenView({ user, reportData, selectedDateKey, isMobile }) {
                 alignItems: 'center',
                 gap: 10
               }}>
-                <p style={{ margin: 0, color: '#b45309', fontWeight: 500, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                <p style={{ margin: 0, color: colors.warning, fontWeight: 500, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
                   <span style={{ fontSize: 20, lineHeight: 1 }}>⚠️</span>
                   Aldila đã cập nhật số liệu cho ca này. Vui lòng xác nhận thay đổi để tiếp tục.
                 </p>
                 <button
                   onClick={() => confirmShift(shift, true)}
                   style={{
-                    background: '#f9a825',
-                    color: '#fff',
+                    background: colors.warning,
+                    color: colors.white,
                     border: 0,
                     padding: '10px 16px',
                     borderRadius: 8,
@@ -1839,11 +1839,11 @@ function CanteenView({ user, reportData, selectedDateKey, isMobile }) {
               </div>
             )}
 
-            <div className="card" style={{ marginBottom: 12, padding: 12, border: '1px solid #eee', borderRadius: 12 }}>
+            <div className="card" style={{ marginBottom: 12, padding: 12, border: `1px solid ${colors.border}`, borderRadius: 12 }}>
               <h3 style={{ marginTop: 0, display: 'flex', justifyContent: 'space-between' }}>
                 <span>Số lượng suất ăn – {SHIFT_NAMES[shift]}</span>
                 {isConfirmed && (
-                  <span style={{ fontSize: 12, color: '#1e5bb8', fontWeight: 700 }}>
+                  <span style={{ fontSize: 12, color: colors.info, fontWeight: 700 }}>
                     Đã nhận bởi {data.confirmedByCanteen}
                   </span>
                 )}
@@ -1851,10 +1851,10 @@ function CanteenView({ user, reportData, selectedDateKey, isMobile }) {
 
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: isMobile ? '100%' : 400 }}>
-                <thead style={{ background: colors.primaryLight || '#eef5ff' }}>
+                <thead style={{ background: colors.backgroundLight }}>
                   <tr>
-                    <th style={{ padding: 8, border: '1px solid #eee' }}>Loại cơm/suất ăn</th>
-                    <th style={{ padding: 8, border: '1px solid #eee' }}>Số lượng đã nhận</th>
+                    <th style={{ padding: 8, border: `1px solid ${colors.border}` }}>Loại cơm/suất ăn</th>
+                    <th style={{ padding: 8, border: `1px solid ${colors.border}` }}>Số lượng đã nhận</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1862,8 +1862,8 @@ function CanteenView({ user, reportData, selectedDateKey, isMobile }) {
                     <React.Fragment key={cat}>
                       {Object.entries(types).map(([k, label]) => (
                         <tr key={k}>
-                          <td style={{ padding: 8, border: '1px solid #f0f0f0' }}>{label}</td>
-                          <td style={{ padding: 8, border: '1px solid #f0f0f0', textAlign: 'center', fontWeight: 700 }}>
+                          <td style={{ padding: 8, border: `1px solid ${colors.border}` }}>{label}</td>
+                          <td style={{ padding: 8, border: `1px solid ${colors.border}`, textAlign: 'center', fontWeight: 700 }}>
                             {data.summary?.[k] || 0}
                             <Delta diff={isConfirmed && data.needsReconfirmation ? (Number(data.summary?.[k] || 0) - Number(data.confirmedSummary?.[k] || 0)) : 0} />
                           </td>
@@ -1878,7 +1878,7 @@ function CanteenView({ user, reportData, selectedDateKey, isMobile }) {
               {/* Nút xác nhận lần đầu (chỉ hiện nếu chưa xác nhận) */}
               {!isConfirmed && (
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
-                  <button onClick={() => confirmShift(shift, false)} style={{ background: colors.primary, color: '#fff', border: 0, padding: '10px 16px', borderRadius: 10, fontWeight: 700, cursor: 'pointer' }}>
+                  <button onClick={() => confirmShift(shift, false)} style={{ background: colors.primary, color: colors.white, border: 0, padding: '10px 16px', borderRadius: 10, fontWeight: 700, cursor: 'pointer' }}>
                     Xác nhận đã nhận
                   </button>
                 </div>
@@ -1887,17 +1887,17 @@ function CanteenView({ user, reportData, selectedDateKey, isMobile }) {
 
             {/* Bảng yêu cầu lãnh tăng ca (hiện sau khi đã xác nhận và không cần xác nhận lại) */}
             {canShowRequests && data.requests.length > 0 && (
-              <div className="card" style={{ margin: '-5px 0 12px 0', padding: 12, border: '1px solid #eee', borderRadius: 12, borderTopLeftRadius: 0, borderTopRightRadius: 0 }}>
+              <div className="card" style={{ margin: '-5px 0 12px 0', padding: 12, border: `1px solid ${colors.border}`, borderRadius: 12, borderTopLeftRadius: 0, borderTopRightRadius: 0 }}>
                 <h4 style={{ marginTop: 0 }}>Yêu cầu lãnh tăng ca – {SHIFT_NAMES[shift]}</h4>
                 <div style={{ overflowX: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead style={{ background: '#f1f5f9' }}>
+                    <thead style={{ background: colors.backgroundLight }}>
                       <tr>
-                        <th style={{ padding: 8, border: '1px solid #e2e8f0' }}>Bộ phận</th>
-                        <th style={{ padding: 8, border: '1px solid #e2e8f0' }}>Mì (yêu cầu)</th>
-                        <th style={{ padding: 8, border: '1px solid #e2e8f0' }}>Sữa (yêu cầu)</th>
-                        <th style={{ padding: 8, border: '1px solid #e2e8f0' }}>Đã phát (Mì/Sữa)</th>
-                        <th style={{ padding: 8, border: '1px solid #e2e8f0' }}>Thao tác</th>
+                        <th style={{ padding: 8, border: `1px solid ${colors.border}` }}>Bộ phận</th>
+                        <th style={{ padding: 8, border: `1px solid ${colors.border}` }}>Mì (yêu cầu)</th>
+                        <th style={{ padding: 8, border: `1px solid ${colors.border}` }}>Sữa (yêu cầu)</th>
+                        <th style={{ padding: 8, border: `1px solid ${colors.border}` }}>Đã phát (Mì/Sữa)</th>
+                        <th style={{ padding: 8, border: `1px solid ${colors.border}` }}>Thao tác</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1908,27 +1908,27 @@ function CanteenView({ user, reportData, selectedDateKey, isMobile }) {
 
                         return (
                           <tr key={req.dept}>
-                            <td style={{ padding: 8, border: '1px solid #f1f5f9' }}>{req.dept}</td>
-                            <td style={{ padding: 8, border: '1px solid #f1f5f9', textAlign: 'center' }}>{req.reqMi}</td>
-                            <td style={{ padding: 8, border: '1px solid #f1f5f9', textAlign: 'center' }}>{req.reqSua}</td>
-                            <td style={{ padding: 8, border: '1px solid #f1f5f9', textAlign: 'center' }}>{req.fulMi} / {req.fulSua}</td>
-                            <td style={{ padding: 8, border: '1px solid #f1f5f9', textAlign: 'center' }}>
+                            <td style={{ padding: 8, border: `1px solid ${colors.border}` }}>{req.dept}</td>
+                            <td style={{ padding: 8, border: `1px solid ${colors.border}`, textAlign: 'center' }}>{req.reqMi}</td>
+                            <td style={{ padding: 8, border: `1px solid ${colors.border}`, textAlign: 'center' }}>{req.reqSua}</td>
+                            <td style={{ padding: 8, border: `1px solid ${colors.border}`, textAlign: 'center' }}>{req.fulMi} / {req.fulSua}</td>
+                            <td style={{ padding: 8, border: `1px solid ${colors.border}`, textAlign: 'center' }}>
                               {req.isRecallPending ? (
-                                <span style={{ color: '#b91c1c', fontWeight: 700, fontSize: 12 }}>Chờ EHS thu hồi</span>
+                                <span style={{ color: colors.error, fontWeight: 700, fontSize: 12 }}>Chờ EHS thu hồi</span>
                               ) : canFulfill ? (
                                 <button
                                   onClick={() => fulfillOvertime(shift, req)}
-                                  style={{ background: colors.success, color: '#fff', border: 0, padding: '6px 12px', borderRadius: 8, cursor: 'pointer', fontWeight: 700 }}
+                                  style={{ background: colors.success, color: colors.white, border: 0, padding: '6px 12px', borderRadius: 8, cursor: 'pointer', fontWeight: 700 }}
                                 >
                                   {actionText} (+{req.miToFulfill} mì, +{req.suaToFulfill} sữa)
                                 </button>
                               ) : isFulfilled ? (
                                 req.deptAck ? (
-                                  <span style={{ color: '#166534', fontWeight: 700, fontSize: 12 }} title={`Đã xác nhận lúc ${fmtTime(req.deptAckAt)}`}>
+                                  <span style={{ color: colors.success, fontWeight: 700, fontSize: 12 }} title={`Đã xác nhận lúc ${fmtTime(req.deptAckAt)}`}>
                                     ✅ Đã nhận đủ ({req.deptAck})
                                   </span>
                                 ) : (
-                                  <span style={{ color: '#d97706', fontWeight: 700, fontSize: 12 }}>
+                                  <span style={{ color: colors.warning, fontWeight: 700, fontSize: 12 }}>
                                     Đã phát đủ (Chờ BP nhận)
                                   </span>
                                 )
@@ -1949,19 +1949,19 @@ function CanteenView({ user, reportData, selectedDateKey, isMobile }) {
       })}
 
       {/* Lịch sử hoạt động báo cơm của ngày */}
-      <h3 style={{ marginTop: 28, marginBottom: 12, color: colors.primary, borderBottom: `2px solid ${colors.primaryLight || '#E88E2E'}`, paddingBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+      <h3 style={{ marginTop: 28, marginBottom: 12, color: colors.primary, borderBottom: `2px solid ${colors.primaryLight}`, paddingBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
         📋 Lịch sử thay đổi & xác nhận trong ngày
       </h3>
       
       {(!filteredHistory || filteredHistory.length === 0) ? (
-        <div style={{ padding: 16, background: '#fafafa', border: '1px solid #e0e0e0', borderRadius: 12, color: '#666', textAlign: 'center' }}>
+        <div style={{ padding: 16, background: colors.backgroundLight, border: `1px solid ${colors.border}`, borderRadius: 12, color: colors.textSecondary, textAlign: 'center' }}>
           Chưa ghi nhận lịch sử hoạt động nào trong ngày.
         </div>
       ) : (
-        <div style={{ overflowX: 'auto', border: '1px solid #ddd', borderRadius: 12, background: 'white', maxHeight: 350, overflowY: 'auto' }}>
+        <div style={{ overflowX: 'auto', border: `1px solid ${colors.border}`, borderRadius: 12, background: colors.surface, maxHeight: 350, overflowY: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-            <thead style={{ background: '#f5f5f5', position: 'sticky', top: 0, zIndex: 1 }}>
-              <tr style={{ borderBottom: '1px solid #ddd' }}>
+            <thead style={{ background: colors.backgroundLight, position: 'sticky', top: 0, zIndex: 1 }}>
+              <tr style={{ borderBottom: `1px solid ${colors.border}` }}>
                 <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 'bold' }}>Thời điểm</th>
                 <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 'bold' }}>Ca</th>
                 <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 'bold' }}>Hành động</th>
@@ -1971,13 +1971,13 @@ function CanteenView({ user, reportData, selectedDateKey, isMobile }) {
             </thead>
             <tbody>
               {filteredHistory.map((h, idx) => (
-                <tr key={idx} style={{ borderBottom: '1px solid #eee' }}>
-                  <td style={{ padding: '10px 12px', color: '#666', whiteSpace: 'nowrap' }}>{fmtTime(h.timestampMs)}</td>
-                  <td style={{ padding: '10px 12px', color: '#333', fontWeight: 600 }}>{SHIFT_NAMES[h.shift] || h.shift || '-'}</td>
+                <tr key={idx} style={{ borderBottom: `1px solid ${colors.border}` }}>
+                  <td style={{ padding: '10px 12px', color: colors.textSecondary, whiteSpace: 'nowrap' }}>{fmtTime(h.timestampMs)}</td>
+                  <td style={{ padding: '10px 12px', color: colors.textPrimary, fontWeight: 600 }}>{SHIFT_NAMES[h.shift] || h.shift || '-'}</td>
                   <td style={{ padding: '10px 12px', color: colors.primary, fontWeight: 600 }}>{h.action || '-'}</td>
-                  <td style={{ padding: '10px 12px', color: '#444' }}>{h.details || '-'}</td>
-                  <td style={{ padding: '10px 12px', color: '#555', fontWeight: 500 }}>
-                    {h.user} <span style={{ color: '#888', fontSize: 11 }}>({h.role})</span>
+                  <td style={{ padding: '10px 12px', color: colors.textPrimary }}>{h.details || '-'}</td>
+                  <td style={{ padding: '10px 12px', color: colors.textSecondary, fontWeight: 500 }}>
+                    {h.user} <span style={{ color: colors.textSecondary, fontSize: 11 }}>({h.role})</span>
                   </td>
                 </tr>
               ))}
@@ -2149,7 +2149,7 @@ function ExportBaoComModal({ onClose }) {
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
-      <div style={{ background: "#fff", padding: 20, borderRadius: 12, width: "min(420px, 95vw)" }}>
+      <div style={{ background: colors.surface, padding: 20, borderRadius: 'var(--so-radius-md)', width: "min(420px, 95vw)", border: `1px solid ${colors.border}`, boxShadow: 'var(--so-shadow-lg)' }}>
         <h3 style={{ marginTop: 0 }}>Xuất báo cáo Báo cơm</h3>
 
         <div style={{ marginBottom: 12 }}>
@@ -2165,8 +2165,8 @@ function ExportBaoComModal({ onClose }) {
         </div>
 
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-          <button onClick={onClose} disabled={isGen} style={{ padding: "8px 12px", borderRadius: 6, border: '1px solid #ccc', background: '#eee' }}>Hủy</button>
-          <button onClick={onExport} disabled={isGen || !selectedMonth} style={{ padding: "8px 12px", background: "#1f80e0", color: "#fff", border: "none", borderRadius: 6, opacity: (isGen || !selectedMonth) ? 0.6 : 1 }}>
+          <button onClick={onClose} disabled={isGen} style={{ padding: "8px 12px", borderRadius: 6, border: `1px solid ${colors.border}`, background: colors.backgroundLight }}>Hủy</button>
+          <button onClick={onExport} disabled={isGen || !selectedMonth} style={{ padding: "8px 12px", background: colors.info, color: colors.white, border: "none", borderRadius: 6, opacity: (isGen || !selectedMonth) ? 0.6 : 1 }}>
             {isGen ? "Đang tạo..." : "Xuất Excel"}
           </button>
         </div>
@@ -2263,15 +2263,15 @@ export default function BaoCom({ user, isMobile }) {
     content = (
       <div>
         {/* Admin/EHS Main Tab Switcher */}
-        <div style={{ display: 'flex', gap: 10, marginBottom: 20, borderBottom: '1px solid #ddd', paddingBottom: 10 }}>
+        <div style={{ display: 'flex', gap: 10, marginBottom: 20, borderBottom: `1px solid ${colors.border}`, paddingBottom: 10 }}>
           <button
             onClick={() => setAdminTab('summary')}
             style={{
               padding: '8px 16px',
               border: 'none',
               borderRadius: 20,
-              background: adminTab === 'summary' ? colors.primary : '#f5f5f5',
-              color: adminTab === 'summary' ? '#fff' : '#333',
+              background: adminTab === 'summary' ? colors.primary : colors.backgroundLight,
+              color: adminTab === 'summary' ? colors.white : colors.textPrimary,
               fontWeight: 600,
               cursor: 'pointer'
             }}
@@ -2284,8 +2284,8 @@ export default function BaoCom({ user, isMobile }) {
               padding: '8px 16px',
               border: 'none',
               borderRadius: 20,
-              background: adminTab === 'depts' ? colors.primary : '#f5f5f5',
-              color: adminTab === 'depts' ? '#fff' : '#333',
+              background: adminTab === 'depts' ? colors.primary : colors.backgroundLight,
+              color: adminTab === 'depts' ? colors.white : colors.textPrimary,
               fontWeight: 600,
               cursor: 'pointer'
             }}
@@ -2316,9 +2316,9 @@ export default function BaoCom({ user, isMobile }) {
                   style={{
                     padding: '6px 12px',
                     borderRadius: 16,
-                    border: activeDeptTab === idx ? 'none' : '1px solid #ddd',
-                    background: activeDeptTab === idx ? colors.primary : '#f5f5f5',
-                    color: activeDeptTab === idx ? '#fff' : colors.textPrimary,
+                    border: activeDeptTab === idx ? 'none' : `1px solid ${colors.border}`,
+                    background: activeDeptTab === idx ? colors.primary : colors.backgroundLight,
+                    color: activeDeptTab === idx ? colors.white : colors.textPrimary,
                     fontWeight: activeDeptTab === idx ? 700 : 400,
                     cursor: 'pointer',
                     fontSize: 13,
@@ -2348,15 +2348,15 @@ export default function BaoCom({ user, isMobile }) {
     content = (
       <div>
         {/* Main Tab Switcher cho vai trò Canteen vs Bộ phận */}
-        <div style={{ display: 'flex', gap: 10, marginBottom: 20, borderBottom: '1px solid #ddd', paddingBottom: 10 }}>
+        <div style={{ display: 'flex', gap: 10, marginBottom: 20, borderBottom: `1px solid ${colors.border}`, paddingBottom: 10 }}>
           <button
             onClick={() => setNonAdminMainTab('canteen')}
             style={{
               padding: '8px 16px',
               border: 'none',
               borderRadius: 20,
-              background: nonAdminMainTab === 'canteen' ? colors.primary : '#f5f5f5',
-              color: nonAdminMainTab === 'canteen' ? '#fff' : '#333',
+              background: nonAdminMainTab === 'canteen' ? colors.primary : colors.backgroundLight,
+              color: nonAdminMainTab === 'canteen' ? colors.white : colors.textPrimary,
               fontWeight: 600,
               cursor: 'pointer'
             }}
@@ -2369,8 +2369,8 @@ export default function BaoCom({ user, isMobile }) {
               padding: '8px 16px',
               border: 'none',
               borderRadius: 20,
-              background: nonAdminMainTab === 'dept' ? colors.primary : '#f5f5f5',
-              color: nonAdminMainTab === 'dept' ? '#fff' : '#333',
+              background: nonAdminMainTab === 'dept' ? colors.primary : colors.backgroundLight,
+              color: nonAdminMainTab === 'dept' ? colors.white : colors.textPrimary,
               fontWeight: 600,
               cursor: 'pointer'
             }}
@@ -2398,9 +2398,9 @@ export default function BaoCom({ user, isMobile }) {
                     style={{
                       padding: '6px 12px',
                       borderRadius: 16,
-                      border: activeDeptTab === idx ? 'none' : '1px solid #ddd',
-                      background: activeDeptTab === idx ? colors.primary : '#f5f5f5',
-                      color: activeDeptTab === idx ? '#fff' : colors.textPrimary,
+                      border: activeDeptTab === idx ? 'none' : `1px solid ${colors.border}`,
+                      background: activeDeptTab === idx ? colors.primary : colors.backgroundLight,
+                      color: activeDeptTab === idx ? colors.white : colors.textPrimary,
                       fontWeight: activeDeptTab === idx ? 700 : 400,
                       cursor: 'pointer',
                       fontSize: 13,
@@ -2456,9 +2456,9 @@ export default function BaoCom({ user, isMobile }) {
                 style={{
                   padding: '7px 16px',
                   borderRadius: 20,
-                  border: activeDeptTab === idx ? 'none' : '1px solid #ddd',
-                  background: activeDeptTab === idx ? colors.primary : '#f5f5f5',
-                  color: activeDeptTab === idx ? '#fff' : colors.textPrimary,
+                  border: activeDeptTab === idx ? 'none' : `1px solid ${colors.border}`,
+                  background: activeDeptTab === idx ? colors.primary : colors.backgroundLight,
+                  color: activeDeptTab === idx ? colors.white : colors.textPrimary,
                   fontWeight: activeDeptTab === idx ? 700 : 400,
                   cursor: 'pointer',
                   fontSize: 14,
@@ -2499,7 +2499,9 @@ export default function BaoCom({ user, isMobile }) {
           .date-picker-input {
             padding: 8px;
             border-radius: 8px;
-            border: 1px solid #ddd;
+            border: 1px solid ${colors.border};
+            background: ${colors.surface};
+            color: ${colors.textPrimary};
           }
           .date-picker-wrapper {
             width: 100%;
