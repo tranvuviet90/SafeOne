@@ -3,13 +3,15 @@ import dbService from "../services/dbService";
 import { useI18n } from "../i18n/I18nProvider";
 import { useConfirm } from "./LightboxSwipeOnly";
 import realtimeService from "../services/realtimeService";
+import { colors, alpha } from "../theme";
 
 const DEFAULT_COUNT = 15;
 const MIN_COUNT = 1;
-const orange = "#466E73";
-const orangeLight = "#A9D9D4";
-const dark = "#222";
-const red = "#d9534f";
+// Hằng màu cục bộ giữ tên cũ nhưng giá trị theo token theme.
+const orange = colors.primary;
+const orangeLight = colors.primaryLight;
+const dark = colors.textPrimary;
+const red = colors.error;
 
 const SHIFTS = ["S1", "S2", "S3", "HC", "S8"];
 
@@ -275,18 +277,18 @@ function BoDam({ user, isMobile }) {
         <h2 style={{ fontWeight: 700, color: orange, letterSpacing: 0.5, margin: 0 }}>{t("bodam.title")}</h2>
         {isAdmin && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 13, color: '#888', fontWeight: 500 }}>
+            <span style={{ fontSize: 13, color: colors.textSecondary, fontWeight: 500 }}>
               Tổng: <b style={{ color: orange }}>{bodamCount}</b> bộ đàm
             </span>
             <button
               onClick={handleAddBodam}
               title="Thêm bộ đàm"
-              style={{ background: orange, color: 'white', border: 'none', borderRadius: 7, width: 34, height: 34, fontSize: 20, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}
+              style={{ background: orange, color: colors.white, border: 'none', borderRadius: 7, width: 34, height: 34, fontSize: 20, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}
             >+</button>
             <button
               onClick={handleRemoveBodam}
               title={bodamCount <= MIN_COUNT ? `Tối thiểu ${MIN_COUNT} bộ đàm` : "Bớt bộ đàm cuối"}
-              style={{ background: bodamCount <= MIN_COUNT ? '#ccc' : red, color: 'white', border: 'none', borderRadius: 7, width: 34, height: 34, fontSize: 22, cursor: bodamCount <= MIN_COUNT ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}
+              style={{ background: bodamCount <= MIN_COUNT ? colors.textDisabled : red, color: colors.white, border: 'none', borderRadius: 7, width: 34, height: 34, fontSize: 22, cursor: bodamCount <= MIN_COUNT ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}
               disabled={bodamCount <= MIN_COUNT}
             >−</button>
           </div>
@@ -302,7 +304,7 @@ function BoDam({ user, isMobile }) {
             const hasAssignments = Object.values(assignedShifts).some(u => u !== null);
             const canCheck = !item.unavailable && (!hasAssignments || isUserAssigned);
             return (
-              <div key={idx} style={{ background: idx % 2 ? "#F4FAF9" : "#fff", opacity: item.unavailable ? 0.5 : 1, padding: '15px', border: `1.2px solid ${orangeLight}`, borderRadius: 12, marginBottom: 10, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+              <div key={idx} style={{ background: idx % 2 ? colors.background : colors.surface, opacity: item.unavailable ? 0.5 : 1, padding: '15px', border: `1.2px solid ${orangeLight}`, borderRadius: 12, marginBottom: 10, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
                 <div style={{ fontWeight: 600, color: dark, fontSize: 18, marginBottom: 12 }}>{getBodamName(idx)}</div>
                 <div style={{ marginBottom: 12 }}>
                   <label style={{ display: 'flex', alignItems: 'center', cursor: (!canCheck) ? 'not-allowed' : 'pointer' }}>
@@ -313,24 +315,24 @@ function BoDam({ user, isMobile }) {
                       ) : item.checked ? (
                         <span style={{ color: orange, fontWeight: 700 }}>{item.name} — {t("bodam.inuse")}</span>
                       ) : hasAssignments ? (
-                        <span style={{ color: "#d9534f", fontWeight: 700 }}>
+                        <span style={{ color: colors.error, fontWeight: 700 }}>
                           Chỉ định: {Object.entries(assignedShifts)
                             .filter(([_, u]) => u !== null)
                             .map(([sh, u]) => `${sh}: ${u.name}`)
                             .join(", ")}
                         </span>
                       ) : (
-                        <span style={{ color: "#b0b0b0", fontWeight: 600 }}>{t("bodam.returned")}</span>
+                        <span style={{ color: colors.textDisabled, fontWeight: 600 }}>{t("bodam.returned")}</span>
                       )}
                     </div>
                   </label>
                 </div>
                 {!item.checked && isUserAssigned && (
-                  <button onClick={() => handleAccept(idx)} style={{ background: '#4caf50', color: 'white', border: 'none', padding: '8px 14px', borderRadius: 6, fontWeight: 600, cursor: 'pointer', width: '100%', marginBottom: '8px' }}>Chấp nhận sử dụng</button>
+                  <button onClick={() => handleAccept(idx)} style={{ background: colors.success, color: colors.white, border: 'none', padding: '8px 14px', borderRadius: 6, fontWeight: 600, cursor: 'pointer', width: '100%', marginBottom: '8px' }}>Chấp nhận sử dụng</button>
                 )}
                 {isAdmin && (
                   <>
-                    <button onClick={() => handleToggleUnavailable(idx)} style={{ background: item.unavailable ? '#f0ad4e' : '#6c757d', color: 'white', border: 'none', padding: '8px 14px', borderRadius: 6, fontWeight: 600, cursor: 'pointer', width: '100%', marginTop: '8px', marginBottom: '8px' }}>
+                    <button onClick={() => handleToggleUnavailable(idx)} style={{ background: item.unavailable ? colors.warning : colors.textSecondary, color: colors.white, border: 'none', padding: '8px 14px', borderRadius: 6, fontWeight: 600, cursor: 'pointer', width: '100%', marginTop: '8px', marginBottom: '8px' }}>
                       {item.unavailable ? t("bodam.reopen") : t("bodam.disable")}
                     </button>
                     {!item.unavailable && (
@@ -342,7 +344,7 @@ function BoDam({ user, isMobile }) {
                             <div key={sh} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                               <span style={{ fontSize: 12, fontWeight: 700, width: 30 }}>{sh}:</span>
                               {val ? (
-                                <div style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'space-between', background: '#f1f1f1', padding: '4px 8px', borderRadius: 4, fontSize: 13 }}>
+                                <div style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'space-between', background: colors.backgroundLight, padding: '4px 8px', borderRadius: 4, fontSize: 13 }}>
                                   <span>{val.name}</span>
                                   <button onClick={() => handleCancelAssign(idx, sh, val.uid)} style={{ background: 'none', border: 'none', color: red, cursor: 'pointer', fontWeight: 'bold' }}>✕</button>
                                 </div>
@@ -370,9 +372,9 @@ function BoDam({ user, isMobile }) {
           })}
         </div>
       ) : (
-        <table style={{ borderCollapse: "separate", borderSpacing: 0, width: "100%", background: "#fff", borderRadius: 14, overflow: "hidden", boxShadow: "0 1.5px 9px #E88E2E11", border: `1.2px solid ${orangeLight}` }}>
+        <table style={{ borderCollapse: "separate", borderSpacing: 0, width: "100%", background: colors.surface, borderRadius: 'var(--so-radius-md)', overflow: "hidden", boxShadow: 'var(--so-shadow-sm)', border: `1.2px solid ${colors.border}` }}>
           <thead>
-            <tr style={{ background: orangeLight }}>
+            <tr style={{ background: colors.backgroundLight }}>
               <th style={{ padding: "10px 14px", fontSize: 15, color: dark, textAlign: "left", whiteSpace: "nowrap", width: 110 }}>{t("bodam.col.name")}</th>
               <th style={{ padding: "10px 14px", fontSize: 15, color: dark, textAlign: "left" }}>{t("bodam.col.status")}</th>
               {isAdmin && (
@@ -388,7 +390,7 @@ function BoDam({ user, isMobile }) {
               const hasAssignments = Object.values(assignedShifts).some(u => u !== null);
               const canCheck = !item.unavailable && (!hasAssignments || isUserAssigned);
               return (
-                <tr key={idx} style={{ background: idx % 2 ? "#F4FAF9" : "#fff", opacity: item.unavailable ? 0.5 : 1 }}>
+                <tr key={idx} style={{ background: idx % 2 ? colors.background : colors.surface, opacity: item.unavailable ? 0.5 : 1 }}>
                   <td style={{ padding: "12px 14px", fontWeight: 600, color: dark, whiteSpace: "nowrap" }}>{getBodamName(idx)}</td>
                   <td style={{ padding: "12px 14px" }}>
                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
@@ -399,22 +401,22 @@ function BoDam({ user, isMobile }) {
                         <span style={{ color: orange, fontWeight: 700 }}>{item.name} — {t("bodam.inuse")}</span>
                       ) : hasAssignments ? (
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                          <span style={{ color: "#d9534f", fontWeight: 700 }}>
+                          <span style={{ color: colors.error, fontWeight: 700 }}>
                             Chỉ định: {Object.entries(assignedShifts).filter(([_, u]) => u !== null).map(([sh, u]) => `${sh}: ${u.name}`).join(", ")}
                           </span>
                           {!item.checked && isUserAssigned && (
-                            <button onClick={() => handleAccept(idx)} style={{ background: '#4caf50', color: 'white', border: 'none', padding: '4px 10px', borderRadius: 4, cursor: 'pointer', fontWeight: 'bold' }}>Chấp nhận</button>
+                            <button onClick={() => handleAccept(idx)} style={{ background: colors.success, color: colors.white, border: 'none', padding: '4px 10px', borderRadius: 4, cursor: 'pointer', fontWeight: 'bold' }}>Chấp nhận</button>
                           )}
                         </div>
                       ) : (
-                        <span style={{ color: "#b0b0b0", fontWeight: 600 }}>{t("bodam.returned")}</span>
+                        <span style={{ color: colors.textDisabled, fontWeight: 600 }}>{t("bodam.returned")}</span>
                       )}
                     </div>
                   </td>
                   {isAdmin && (
                     <td style={{ padding: "12px 14px" }}>
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8 }}>
-                      <button onClick={() => handleToggleUnavailable(idx)} style={{ background: item.unavailable ? '#f0ad4e' : '#6c757d', color: 'white', border: 'none', padding: '6px 12px', borderRadius: 6, fontWeight: 600, cursor: 'pointer' }}>
+                      <button onClick={() => handleToggleUnavailable(idx)} style={{ background: item.unavailable ? colors.warning : colors.textSecondary, color: colors.white, border: 'none', padding: '6px 12px', borderRadius: 6, fontWeight: 600, cursor: 'pointer' }}>
                         {item.unavailable ? t("bodam.reopen") : t("bodam.markUnavailable")}
                       </button>
                       {!item.unavailable && (
@@ -425,14 +427,14 @@ function BoDam({ user, isMobile }) {
                               <div key={sh} style={{
                                 display: 'inline-flex',
                                 alignItems: 'center',
-                                background: val ? '#E5F4F2' : '#f5f5f5',
+                                background: val ? colors.backgroundLight : colors.backgroundLight,
                                 padding: '2px 6px',
                                 borderRadius: 6,
                                 border: `1px solid ${val ? orange : orangeLight}`,
                                 fontSize: 12,
                                 whiteSpace: 'nowrap'
                               }}>
-                                <span style={{ fontWeight: 'bold', marginRight: 4, color: val ? orange : '#555' }}>{sh}:</span>
+                                <span style={{ fontWeight: 'bold', marginRight: 4, color: val ? orange : colors.textSecondary }}>{sh}:</span>
                                 {val ? (
                                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                                     <span style={{ fontWeight: 500, maxWidth: 65, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={val.name}>{val.name}</span>
@@ -444,7 +446,7 @@ function BoDam({ user, isMobile }) {
                                   </span>
                                 ) : (
                                   <select 
-                                    style={{ padding: 0, borderRadius: 4, border: 'none', background: 'transparent', fontSize: 11, outline: 'none', cursor: 'pointer', color: '#666', fontWeight: 'bold' }} 
+                                    style={{ padding: 0, borderRadius: 4, border: 'none', background: 'transparent', fontSize: 11, outline: 'none', cursor: 'pointer', color: colors.textSecondary, fontWeight: 'bold' }} 
                                     onChange={(e) => {
                                       if (e.target.value) {
                                         const sel = committeeUsers.find(u => u.uid === e.target.value);
