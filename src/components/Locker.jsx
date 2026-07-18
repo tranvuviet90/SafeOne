@@ -28,7 +28,7 @@ const dbService = {
     return res;
   }
 };
-import { colors } from "../theme";
+import { colors, alpha } from "../theme";
 import { useConfirm, useToast } from "./LightboxSwipeOnly";
 
 const DEPARTMENTS = [
@@ -696,65 +696,38 @@ export default function Locker({ user }) {
   return (
     <div className="locker-container" style={{ padding: "8px 0", background: "transparent", color: "var(--lk-text-primary)", width: "100%", boxSizing: "border-box" }}>
       <style dangerouslySetInnerHTML={{__html: `
+        /* Biến cục bộ --lk-* giờ chỉ là bí danh của token --so-* toàn app.
+           Khối dark riêng cũ (bám prefers-color-scheme của OS) đã bỏ: nó không
+           nghe theo công tắc sáng/tối của app; --so-* tự đổi theo data-theme
+           nên các bí danh này đổi theo, đồng bộ palette teal thay navy cũ. */
         .locker-container {
-          --lk-text-primary: #2b3a3c;
-          --lk-text-secondary: #5a6f72;
-          --lk-text-muted: #8c9fa1;
-          --lk-card-bg: #ffffff;
-          --lk-card-border: #d0e2e0;
-          --lk-border-dashed: rgba(70, 110, 115, 0.3);
-          --lk-input-bg: #ffffff;
-          --lk-input-border: #a9d9d4;
-          --lk-input-text: #2b3a3c;
-          --lk-grid-bg: #f4faf9;
-          --lk-grid-border: #d0e2e0;
-          --lk-block-bg: #ffffff;
-          --lk-block-border: #a9d9d4;
+          --lk-text-primary: var(--so-text-primary);
+          --lk-text-secondary: var(--so-text-secondary);
+          --lk-text-muted: var(--so-text-disabled);
+          --lk-card-bg: var(--so-surface);
+          --lk-card-border: var(--so-border);
+          --lk-border-dashed: rgba(var(--so-primary-rgb), 0.3);
+          --lk-input-bg: var(--so-surface);
+          --lk-input-border: var(--so-border);
+          --lk-input-text: var(--so-text-primary);
+          --lk-grid-bg: var(--so-background);
+          --lk-grid-border: var(--so-border);
+          --lk-block-bg: var(--so-surface);
+          --lk-block-border: var(--so-border);
           --lk-modal-overlay: rgba(8, 16, 36, 0.6);
-          --lk-modal-bg: #ffffff;
-          --lk-modal-border: #a9d9d4;
-          --lk-badge-bg: rgba(70, 110, 115, 0.08);
-          --lk-badge-text: #2c494c;
-          --lk-vacant-bg: #ffffff;
-          --lk-vacant-text: #5a6f72;
-          --lk-occupied-bg: linear-gradient(135deg, #ebf3f5 0%, #dbe8eb 100%);
-          --lk-occupied-border: #a9d9d4;
-          --lk-occupied-text: #466e73;
-          --lk-pending-bg: #fffaf0;
-          --lk-pending-border: #f6ad55;
-          --lk-pending-text: #dd6b20;
-          --lk-header-text: #2b3a3c;
-        }
-        @media (prefers-color-scheme: dark) {
-          .locker-container {
-            --lk-text-primary: #e8f0fe;
-            --lk-text-secondary: #8a9fc8;
-            --lk-text-muted: #688aa6;
-            --lk-card-bg: #111a2e;
-            --lk-card-border: rgba(255, 255, 255, 0.08);
-            --lk-border-dashed: rgba(255, 255, 255, 0.15);
-            --lk-input-bg: #1a243d;
-            --lk-input-border: rgba(255, 255, 255, 0.15);
-            --lk-input-text: #ffffff;
-            --lk-grid-bg: rgba(255, 255, 255, 0.02);
-            --lk-grid-border: rgba(255, 255, 255, 0.06);
-            --lk-block-bg: rgba(255, 255, 255, 0.03);
-            --lk-block-border: rgba(255, 255, 255, 0.05);
-            --lk-modal-overlay: rgba(8, 16, 36, 0.75);
-            --lk-modal-bg: #1a2540;
-            --lk-modal-border: rgba(255, 255, 255, 0.1);
-            --lk-badge-bg: rgba(255, 255, 255, 0.05);
-            --lk-badge-text: #8a9fc8;
-            --lk-vacant-bg: rgba(255, 255, 255, 0.04);
-            --lk-vacant-text: #a0aec0;
-            --lk-occupied-bg: linear-gradient(135deg, #2c3e50 0%, #1a252f 100%);
-            --lk-occupied-border: #34495e;
-            --lk-occupied-text: #63b3ed;
-            --lk-pending-bg: rgba(237, 137, 54, 0.15);
-            --lk-pending-border: #dd6b20;
-            --lk-pending-text: #f6ad55;
-            --lk-header-text: #e8f0fe;
-          }
+          --lk-modal-bg: var(--so-surface);
+          --lk-modal-border: var(--so-border);
+          --lk-badge-bg: rgba(var(--so-primary-rgb), 0.08);
+          --lk-badge-text: var(--so-primary-dark);
+          --lk-vacant-bg: var(--so-surface);
+          --lk-vacant-text: var(--so-text-secondary);
+          --lk-occupied-bg: linear-gradient(135deg, rgba(var(--so-primary-rgb), 0.08) 0%, rgba(var(--so-primary-rgb), 0.2) 100%);
+          --lk-occupied-border: rgba(var(--so-primary-rgb), 0.4);
+          --lk-occupied-text: var(--so-primary);
+          --lk-pending-bg: rgba(var(--so-warning-rgb), 0.12);
+          --lk-pending-border: var(--so-warning);
+          --lk-pending-text: var(--so-warning);
+          --lk-header-text: var(--so-text-primary);
         }
         @keyframes pending-pulse {
           0% { box-shadow: 0 0 0 0 rgba(237, 137, 54, 0.5); }
@@ -783,9 +756,9 @@ export default function Locker({ user }) {
             <div style={{ fontSize: "11px", color: "var(--lk-text-secondary)", fontWeight: "600" }}>TỔNG SỐ TỦ</div>
             <div style={{ fontSize: "18px", fontWeight: "800", color: "var(--lk-text-primary)" }}>{stats.total}</div>
           </div>
-          <div style={{ background: "rgba(229, 62, 62, 0.12)", border: "1px solid rgba(229, 62, 62, 0.2)", padding: "8px 16px", borderRadius: 12, textAlign: "center" }}>
+          <div style={{ background: alpha('error', 0.12), border: "1px solid rgba(229, 62, 62, 0.2)", padding: "8px 16px", borderRadius: 12, textAlign: "center" }}>
             <div style={{ fontSize: "11px", color: "rgba(229, 62, 62, 0.8)", fontWeight: "600" }}>ĐANG SỬ DỤNG</div>
-            <div style={{ fontSize: "18px", fontWeight: "800", color: "#e53e3e" }}>{stats.occupied}</div>
+            <div style={{ fontSize: "18px", fontWeight: "800", color: colors.error }}>{stats.occupied}</div>
           </div>
           <div style={{ background: "rgba(237, 137, 54, 0.12)", border: "1px solid rgba(237, 137, 54, 0.2)", padding: "8px 16px", borderRadius: 12, textAlign: "center" }}>
             <div style={{ fontSize: "11px", color: "var(--lk-pending-text)", fontWeight: "600" }}>CHỜ XÁC NHẬN</div>
@@ -793,7 +766,7 @@ export default function Locker({ user }) {
           </div>
           <div style={{ background: "rgba(72, 187, 120, 0.12)", border: "1px solid rgba(72, 187, 120, 0.2)", padding: "8px 16px", borderRadius: 12, textAlign: "center" }}>
             <div style={{ fontSize: "11px", color: "rgba(72, 187, 120, 0.8)", fontWeight: "600" }}>TỦ CÒN TRỐNG</div>
-            <div style={{ fontSize: "18px", fontWeight: "800", color: "#38a169" }}>{stats.vacant}</div>
+            <div style={{ fontSize: "18px", fontWeight: "800", color: colors.success }}>{stats.vacant}</div>
           </div>
         </div>
       </div>
@@ -802,20 +775,20 @@ export default function Locker({ user }) {
       <div style={{ display: "flex", gap: 10, marginBottom: 16, borderBottom: "1.5px solid var(--lk-card-border)", paddingBottom: 10 }}>
         <button 
           onClick={() => setCurrentViewTab("map")} 
-          style={{ padding: "8px 16px", background: currentViewTab === "map" ? colors.primary : "transparent", border: "none", borderRadius: 8, color: currentViewTab === "map" ? "#fff" : "var(--lk-text-secondary)", fontWeight: "bold", cursor: "pointer", fontSize: "14px" }}
+          style={{ padding: "8px 16px", background: currentViewTab === "map" ? colors.primary : "transparent", border: "none", borderRadius: 8, color: currentViewTab === "map" ? colors.white : "var(--lk-text-secondary)", fontWeight: "bold", cursor: "pointer", fontSize: "14px" }}
         >
           🗺️ Sơ đồ tủ trực quan
         </button>
         <button 
           onClick={() => setCurrentViewTab("list")} 
-          style={{ padding: "8px 16px", background: currentViewTab === "list" ? colors.primary : "transparent", border: "none", borderRadius: 8, color: currentViewTab === "list" ? "#fff" : "var(--lk-text-secondary)", fontWeight: "bold", cursor: "pointer", fontSize: "14px" }}
+          style={{ padding: "8px 16px", background: currentViewTab === "list" ? colors.primary : "transparent", border: "none", borderRadius: 8, color: currentViewTab === "list" ? colors.white : "var(--lk-text-secondary)", fontWeight: "bold", cursor: "pointer", fontSize: "14px" }}
         >
           📋 Danh sách & Tra cứu
         </button>
         {isEhsOrAdmin && (
           <button
             onClick={() => setCurrentViewTab("print")}
-            style={{ padding: "8px 16px", background: currentViewTab === "print" ? colors.primary : "transparent", border: "none", borderRadius: 8, color: currentViewTab === "print" ? "#fff" : "var(--lk-text-secondary)", fontWeight: "bold", cursor: "pointer", fontSize: "14px" }}
+            style={{ padding: "8px 16px", background: currentViewTab === "print" ? colors.primary : "transparent", border: "none", borderRadius: 8, color: currentViewTab === "print" ? colors.white : "var(--lk-text-secondary)", fontWeight: "bold", cursor: "pointer", fontSize: "14px" }}
           >
             🖨️ In mã QR hàng loạt
           </button>
@@ -823,7 +796,7 @@ export default function Locker({ user }) {
         {isEhsOrAdmin && (
           <button 
             onClick={() => setCurrentViewTab("config")} 
-            style={{ padding: "8px 16px", background: currentViewTab === "config" ? colors.primary : "transparent", border: "none", borderRadius: 8, color: currentViewTab === "config" ? "#fff" : "var(--lk-text-secondary)", fontWeight: "bold", cursor: "pointer", fontSize: "14px" }}
+            style={{ padding: "8px 16px", background: currentViewTab === "config" ? colors.primary : "transparent", border: "none", borderRadius: 8, color: currentViewTab === "config" ? colors.white : "var(--lk-text-secondary)", fontWeight: "bold", cursor: "pointer", fontSize: "14px" }}
           >
             ⚙️ Cấu hình tủ đồ
           </button>
@@ -848,7 +821,7 @@ export default function Locker({ user }) {
                       borderRadius: 8,
                       border: "none",
                       background: activeZone === zone ? "linear-gradient(135deg, #1a5c68 0%, #10414a 100%)" : "var(--lk-badge-bg)",
-                      color: activeZone === zone ? "#fff" : "var(--lk-text-secondary)",
+                      color: activeZone === zone ? colors.white : "var(--lk-text-secondary)",
                       fontWeight: "800",
                       cursor: "pointer",
                       transition: "all 0.2s"
@@ -1054,8 +1027,8 @@ export default function Locker({ user }) {
                                             top: "2px", 
                                             right: "2px", 
                                             fontSize: "9px",
-                                            background: damageReport.status === "received" ? "#dd6b20" : "#e53e3e",
-                                            color: "#fff",
+                                            background: damageReport.status === "received" ? colors.warning : colors.error,
+                                            color: colors.white,
                                             borderRadius: "50%",
                                             width: "12px",
                                             height: "12px",
@@ -1110,7 +1083,7 @@ export default function Locker({ user }) {
                   style={{
                     padding: "10px 16px",
                     background: colors.success,
-                    color: "#fff",
+                    color: colors.white,
                     border: "none",
                     borderRadius: "10px",
                     cursor: "pointer",
@@ -1142,7 +1115,7 @@ export default function Locker({ user }) {
                       style={{
                         padding: "10px 16px",
                         background: colors.primary,
-                        color: "#fff",
+                        color: colors.white,
                         border: "none",
                         borderRadius: "10px",
                         cursor: isImporting ? "wait" : "pointer",
@@ -1218,8 +1191,8 @@ export default function Locker({ user }) {
                               <span 
                                 style={{ 
                                   marginLeft: "6px", 
-                                  background: item.damageReport.status === "received" ? "rgba(237, 137, 54, 0.15)" : "rgba(229, 62, 62, 0.15)", 
-                                  color: item.damageReport.status === "received" ? "#dd6b20" : "#e53e3e", 
+                                  background: item.damageReport.status === "received" ? "rgba(237, 137, 54, 0.15)" : alpha('error', 0.15), 
+                                  color: item.damageReport.status === "received" ? colors.warning : colors.error, 
                                   padding: "2px 6px", 
                                   borderRadius: "4px", 
                                   fontSize: "10px",
@@ -1249,14 +1222,14 @@ export default function Locker({ user }) {
                               <div style={{ display: "flex", gap: "8px", justifyContent: "center" }}>
                                 <button
                                   onClick={() => setSelectedLockerId(item.id)}
-                                  style={{ padding: "4px 10px", background: colors.primary, color: "#fff", border: "none", borderRadius: "6px", cursor: "pointer", fontSize: "12px", fontWeight: "700" }}
+                                  style={{ padding: "4px 10px", background: colors.primary, color: colors.white, border: "none", borderRadius: "6px", cursor: "pointer", fontSize: "12px", fontWeight: "700" }}
                                 >
                                   ⚙️ Chi tiết
                                 </button>
                                 {item.name && (
                                   <button
                                     onClick={() => handleReleaseLocker(item.id)}
-                                    style={{ padding: "4px 10px", background: "rgba(229, 62, 62, 0.12)", color: "#fc8181", border: "1px solid rgba(229, 62, 62, 0.3)", borderRadius: "6px", cursor: "pointer", fontSize: "12px", fontWeight: "700" }}
+                                    style={{ padding: "4px 10px", background: alpha('error', 0.12), color: colors.error, border: `1px solid ${alpha('error', 0.3)}`, borderRadius: "6px", cursor: "pointer", fontSize: "12px", fontWeight: "700" }}
                                   >
                                     {item.status === "pending" ? "Từ chối" : "Thu hồi"}
                                   </button>
@@ -1294,17 +1267,19 @@ export default function Locker({ user }) {
 
                 <button 
                   onClick={() => window.print()}
-                  style={{ padding: "8px 20px", background: colors.success, color: "#fff", border: "none", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", fontSize: "14px", boxShadow: "0 4px 10px rgba(72,187,120,0.2)" }}
+                  style={{ padding: "8px 20px", background: colors.success, color: colors.white, border: "none", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", fontSize: "14px", boxShadow: "0 4px 10px rgba(72,187,120,0.2)" }}
                 >
                   🖨️ Tiến hành in trang này
                 </button>
               </div>
 
-              {/* Printable Locker QR Cards Grid */}
-              <div 
+              {/* Printable Locker QR Cards Grid
+                  NGOẠI LỆ THEME: khu này để IN RA GIẤY — giữ trắng/đen cố định
+                  (#fff/#000) bất kể theme màn hình, nếu không bản in sẽ ra nền tối. */}
+              <div
                 className="printable-qr-grid"
-                style={{ 
-                  background: "#fff", 
+                style={{
+                  background: "#fff",
                   padding: "20px", 
                   borderRadius: "16px", 
                   display: "grid", 
@@ -1420,7 +1395,7 @@ export default function Locker({ user }) {
                   style={{ 
                     padding: "12px 24px", 
                     background: colors.primary, 
-                    color: "#fff", 
+                    color: colors.white, 
                     border: "none", 
                     borderRadius: "8px", 
                     fontWeight: "700", 
@@ -1450,11 +1425,11 @@ export default function Locker({ user }) {
             <div style={{ background: "var(--lk-modal-bg)", width: "100%", maxWidth: "480px", borderRadius: "20px", boxShadow: "0 10px 40px rgba(0,0,0,0.25)", overflow: "hidden", border: "1.5px solid var(--lk-modal-border)", color: "var(--lk-text-primary)" }}>
               
               {/* Header */}
-              <div style={{ background: "linear-gradient(135deg, #1a5c68 0%, #10414a 100%)", padding: "18px 24px", color: "#fff", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ background: "linear-gradient(135deg, #1a5c68 0%, #10414a 100%)", padding: "18px 24px", color: colors.white, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div style={{ fontWeight: "800", fontSize: "18px" }}>Tủ đồ cá nhân {id}</div>
                 <button 
                   onClick={() => setSelectedLockerId(null)}
-                  style={{ background: "transparent", border: "none", color: "#fff", fontSize: "18px", cursor: "pointer" }}
+                  style={{ background: "transparent", border: "none", color: colors.white, fontSize: "18px", cursor: "pointer" }}
                 >
                   ✕
                 </button>
@@ -1468,7 +1443,7 @@ export default function Locker({ user }) {
                   <img 
                     src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(window.location.origin + "/?locker=" + id)}`}
                     alt={`QR tủ ${id}`}
-                    style={{ width: "88px", height: "88px", background: "#fff", padding: "4px", borderRadius: "6px" }}
+                    style={{ width: "88px", height: "88px", background: "#fff" /* quiet-zone QR phải trắng để máy quét đọc được */, padding: "4px", borderRadius: "6px" }}
                   />
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: "13px", color: "var(--lk-text-primary)", fontWeight: "700" }}>MÃ QR CỦA TỦ</div>
@@ -1527,13 +1502,13 @@ export default function Locker({ user }) {
                         <>
                           <button
                             onClick={() => handleApproveLocker(id)}
-                            style={{ flex: 1, padding: "10px", background: colors.success, color: "#fff", border: "none", borderRadius: "8px", fontWeight: "700", cursor: "pointer" }}
+                            style={{ flex: 1, padding: "10px", background: colors.success, color: colors.white, border: "none", borderRadius: "8px", fontWeight: "700", cursor: "pointer" }}
                           >
                             ✓ Phê duyệt
                           </button>
                           <button
                             onClick={() => handleReleaseLocker(id)}
-                            style={{ flex: 1, padding: "10px", background: "rgba(229, 62, 62, 0.15)", color: "#fc8181", border: "1px solid rgba(229, 62, 62, 0.3)", borderRadius: "8px", fontWeight: "700", cursor: "pointer" }}
+                            style={{ flex: 1, padding: "10px", background: alpha('error', 0.15), color: colors.error, border: `1px solid ${alpha('error', 0.3)}`, borderRadius: "8px", fontWeight: "700", cursor: "pointer" }}
                           >
                             ✗ Từ chối
                           </button>
@@ -1542,13 +1517,13 @@ export default function Locker({ user }) {
                         <>
                           <button
                             onClick={() => setShowTransferModal(true)}
-                            style={{ flex: 1, padding: "10px", background: colors.primary, color: "#fff", border: "none", borderRadius: "8px", fontWeight: "700", cursor: "pointer" }}
+                            style={{ flex: 1, padding: "10px", background: colors.primary, color: colors.white, border: "none", borderRadius: "8px", fontWeight: "700", cursor: "pointer" }}
                           >
                             🔄 Đổi tủ
                           </button>
                           <button
                             onClick={() => handleReleaseLocker(id)}
-                            style={{ flex: 1, padding: "10px", background: "rgba(229, 62, 62, 0.15)", color: "#fc8181", border: "1px solid rgba(229, 62, 62, 0.3)", borderRadius: "8px", fontWeight: "700", cursor: "pointer" }}
+                            style={{ flex: 1, padding: "10px", background: alpha('error', 0.15), color: colors.error, border: `1px solid ${alpha('error', 0.3)}`, borderRadius: "8px", fontWeight: "700", cursor: "pointer" }}
                           >
                             Thu hồi tủ
                           </button>
@@ -1587,12 +1562,12 @@ export default function Locker({ user }) {
                     <div style={{ 
                       marginTop: "16px", 
                       background: "rgba(229, 62, 62, 0.05)", 
-                      border: `1.5px solid ${rep.status === "received" ? "#dd6b20" : "#e53e3e"}`, 
+                      border: `1.5px solid ${rep.status === "received" ? colors.warning : colors.error}`, 
                       borderRadius: "12px", 
                       padding: "14px",
                       color: "var(--lk-text-primary)"
                     }}>
-                      <div style={{ fontWeight: "800", fontSize: "14px", display: "flex", alignItems: "center", gap: "6px", color: rep.status === "received" ? "#dd6b20" : "#e53e3e", marginBottom: "8px" }}>
+                      <div style={{ fontWeight: "800", fontSize: "14px", display: "flex", alignItems: "center", gap: "6px", color: rep.status === "received" ? colors.warning : colors.error, marginBottom: "8px" }}>
                         <span>{rep.status === "received" ? "🔧 Đang sửa chữa" : "⚠️ Báo cáo hư hỏng tủ"}</span>
                       </div>
                       
@@ -1630,8 +1605,8 @@ export default function Locker({ user }) {
                             style={{ 
                               flex: 1, 
                               padding: "8px 12px", 
-                              background: "#dd6b20", 
-                              color: "#fff", 
+                              background: colors.warning, 
+                              color: colors.white, 
                               border: "none", 
                               borderRadius: "6px", 
                               fontWeight: "700", 
@@ -1648,7 +1623,7 @@ export default function Locker({ user }) {
                             flex: 1, 
                             padding: "8px 12px", 
                             background: colors.success, 
-                            color: "#fff", 
+                            color: colors.white, 
                             border: "none", 
                             borderRadius: "6px", 
                             fontWeight: "700", 
@@ -1707,7 +1682,7 @@ export default function Locker({ user }) {
               </button>
               <button
                 onClick={handleSaveDescription}
-                style={{ padding: "8px 16px", background: colors.primary, border: "none", borderRadius: "8px", color: "#fff", cursor: "pointer", fontWeight: "700" }}
+                style={{ padding: "8px 16px", background: colors.primary, border: "none", borderRadius: "8px", color: colors.white, cursor: "pointer", fontWeight: "700" }}
               >
                 Lưu thay đổi
               </button>
@@ -1822,7 +1797,7 @@ function LockerAssignForm({ lockerId, lockersData, onSuccess }) {
       <button
         type="submit"
         disabled={isSaving}
-        style={{ width: "100%", padding: "11px", background: colors.success, color: "#fff", border: "none", borderRadius: "8px", fontWeight: "700", cursor: "pointer", fontSize: "15px", marginTop: "10px" }}
+        style={{ width: "100%", padding: "11px", background: colors.success, color: colors.white, border: "none", borderRadius: "8px", fontWeight: "700", cursor: "pointer", fontSize: "15px", marginTop: "10px" }}
       >
         {isSaving ? "Đang tiến hành..." : "Xác nhận Bàn giao tủ"}
       </button>
@@ -1916,7 +1891,7 @@ function LockerTransferModal({ lockerId, currentUser, vacantLockers, onClose, on
               {vacantLockers.map(id => <option key={id} value={id}>{id}</option>)}
             </select>
           ) : (
-            <div style={{ color: "#fc8181", fontSize: "14px", fontWeight: "600" }}>⚠️ Không còn tủ trống nào khả dụng.</div>
+            <div style={{ color: colors.error, fontSize: "14px", fontWeight: "600" }}>⚠️ Không còn tủ trống nào khả dụng.</div>
           )}
         </div>
 
@@ -1931,7 +1906,7 @@ function LockerTransferModal({ lockerId, currentUser, vacantLockers, onClose, on
           <button
             onClick={handleTransfer}
             disabled={isTransferring || !targetLockerId}
-            style={{ padding: "8px 16px", background: colors.primary, border: "none", borderRadius: "8px", color: "#fff", cursor: "pointer", fontWeight: "700" }}
+            style={{ padding: "8px 16px", background: colors.primary, border: "none", borderRadius: "8px", color: colors.white, cursor: "pointer", fontWeight: "700" }}
           >
             {isTransferring ? "Đang xử lý..." : "Xác nhận Đổi tủ"}
           </button>
