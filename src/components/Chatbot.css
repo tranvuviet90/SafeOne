@@ -1,15 +1,15 @@
 /* src/components/Chatbot.css */
-#chat-widget { position: fixed; bottom: 20px; right: 20px; width: 370px; height: 500px; background: white; border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.2); display: flex; flex-direction: column; z-index: 1000; }
-#chat-header { background: #466E73; color: white; padding: 15px; border-top-left-radius: 10px; border-top-right-radius: 10px; }
+#chat-widget { position: fixed; bottom: 20px; right: 20px; width: 370px; height: 500px; background: var(--so-surface); border: 1px solid var(--so-border); border-radius: 10px; box-shadow: var(--so-shadow-lg); display: flex; flex-direction: column; z-index: 1000; }
+#chat-header { background: var(--so-primary); color: var(--so-white); padding: 15px; border-top-left-radius: 10px; border-top-right-radius: 10px; }
 #chat-header h2 { margin: 0; font-size: 1.1em; }
 #chat-body { flex-grow: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
 .message { max-width: 80%; padding: 10px 15px; border-radius: 18px; line-height: 1.4; }
-.message.ai { background-color: #f1f0f0; color: #333; align-self: flex-start; }
-.message.user { background-color: #466E73; color: white; align-self: flex-end; }
-#chat-footer { padding: 10px; display: flex; border-top: 1px solid #ddd; }
-#chat-footer input { flex-grow: 1; border: 1px solid #ccc; border-radius: 20px; padding: 10px 15px; font-size: 1em; }
-#chat-footer button { background: #466E73; color: white; border: none; border-radius: 20px; padding: 0 15px; margin-left: 10px; cursor: pointer; font-weight: bold; }
-.loading span { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: #aaa; margin: 0 2px; animation: bounce 1.4s infinite ease-in-out both; }
+.message.ai { background-color: var(--so-background-light); color: var(--so-text-primary); align-self: flex-start; }
+.message.user { background-color: var(--so-primary); color: var(--so-white); align-self: flex-end; }
+#chat-footer { padding: 10px; display: flex; border-top: 1px solid var(--so-border); }
+#chat-footer input { flex-grow: 1; border: 1px solid var(--so-border); background: var(--so-surface); color: var(--so-text-primary); border-radius: 20px; padding: 10px 15px; font-size: 1em; }
+#chat-footer button { background: var(--so-primary); color: var(--so-white); border: none; border-radius: 20px; padding: 0 15px; margin-left: 10px; cursor: pointer; font-weight: bold; }
+.loading span { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: var(--so-text-disabled); margin: 0 2px; animation: bounce 1.4s infinite ease-in-out both; }
 .loading span:nth-child(1) { animation-delay: -0.32s; } .loading span:nth-child(2) { animation-delay: -0.16s; }
 @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1.0); } }
 
@@ -65,7 +65,7 @@
 .close-btn {
     background: none;
     border: none;
-    color: white;
+    color: var(--so-white);
     font-size: 24px;
     font-weight: bold;
     cursor: pointer;
@@ -92,7 +92,7 @@
   word-wrap: break-word;
 }
 .message.ai strong {
-  color: #111;
+  color: var(--so-text-primary);
   font-weight: 700;
 }
 
@@ -101,12 +101,12 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: white;
-  border: 1px solid #e0e0e0;
+  background: var(--so-surface);
+  border: 1px solid var(--so-border);
   border-radius: 8px;
   padding: 8px 12px;
   margin-top: 8px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+  box-shadow: var(--so-shadow-sm);
 }
 .chat-file-attachment .file-info {
   display: flex;
@@ -122,14 +122,14 @@
 .chat-file-attachment .file-name {
   font-size: 0.9em;
   font-weight: 500;
-  color: #333;
+  color: var(--so-text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .chat-file-attachment .file-download-btn {
-  background: #466E73;
-  color: white !important;
+  background: var(--so-primary);
+  color: var(--so-white) !important;
   text-decoration: none !important;
   font-size: 0.85em;
   font-weight: bold;
@@ -139,5 +139,5 @@
   transition: background 0.2s ease-in-out;
 }
 .chat-file-attachment .file-download-btn:hover {
-  background: #365559;
+  background: var(--so-primary-dark);
 }

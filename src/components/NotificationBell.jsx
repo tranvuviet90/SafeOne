@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo } from "react";
-import { colors } from "../theme";
+import { colors, alpha } from "../theme";
 import { useToast } from "./LightboxSwipeOnly";
 import { DEPARTMENT_ROLES } from "../constants/roles";
 import { getWeekNumber, formatRelativeTime, normalizeRole } from "../utils/string";
@@ -178,7 +178,7 @@ function ToastPopup({ toast, onDismiss, onNavigate }) {
         bottom: 24,
         right: 24,
         width: 320,
-        background: "white",
+        background: colors.surface,
         borderRadius: 12,
         boxShadow: "0 8px 32px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.10)",
         display: "flex",
@@ -187,7 +187,7 @@ function ToastPopup({ toast, onDismiss, onNavigate }) {
         padding: "14px 16px",
         cursor: "pointer",
         zIndex: 9999,
-        borderLeft: "4px solid #E88E2E",
+        borderLeft: `4px solid ${colors.primary}`,
         opacity: visible && !hiding ? 1 : 0,
         transform: visible && !hiding ? "translateY(0)" : "translateY(16px)",
         transition: "opacity 0.35s ease, transform 0.35s ease",
@@ -200,12 +200,12 @@ function ToastPopup({ toast, onDismiss, onNavigate }) {
       </div>
 
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: "#222", marginBottom: 3, lineHeight: 1.4 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: colors.textPrimary, marginBottom: 3, lineHeight: 1.4 }}>
           Thông báo mới
         </div>
         <div style={{
           fontSize: 13,
-          color: "#444",
+          color: colors.textSecondary,
           lineHeight: 1.45,
           overflow: "hidden",
           display: "-webkit-box",
@@ -214,7 +214,7 @@ function ToastPopup({ toast, onDismiss, onNavigate }) {
         }}>
           {toast.message}
         </div>
-        <div style={{ fontSize: 11, color: "#E88E2E", marginTop: 5, fontWeight: 500 }}>
+        <div style={{ fontSize: 11, color: colors.primary, marginTop: 5, fontWeight: 500 }}>
           {formatRelativeTime(toast.timestamp)}
         </div>
       </div>
@@ -222,7 +222,7 @@ function ToastPopup({ toast, onDismiss, onNavigate }) {
       <button
         onClick={handleClose}
         style={{
-          background: "#f0f0f0",
+          background: colors.backgroundLight,
           border: "none",
           borderRadius: "50%",
           width: 22,
@@ -233,7 +233,7 @@ function ToastPopup({ toast, onDismiss, onNavigate }) {
           alignItems: "center",
           justifyContent: "center",
           flexShrink: 0,
-          color: "#666",
+          color: colors.textSecondary,
           marginTop: 1,
         }}
       >
@@ -246,7 +246,7 @@ function ToastPopup({ toast, onDismiss, onNavigate }) {
         left: 0,
         height: 3,
         borderRadius: "0 0 0 12px",
-        background: "#E88E2E",
+        background: colors.primary,
         width: visible && !hiding ? "0%" : "100%",
         transition: visible && !hiding ? "width 5s linear" : "none",
       }} />
@@ -614,8 +614,8 @@ export default function NotificationBell({ user, setActiveTab }) {
             position: "absolute",
             top: 0,
             right: 0,
-            background: "red",
-            color: "white",
+            background: colors.error,
+            color: colors.white,
             fontSize: 11,
             fontWeight: "bold",
             borderRadius: "50%",
@@ -635,7 +635,7 @@ export default function NotificationBell({ user, setActiveTab }) {
           position: "absolute",
           top: "100%",
           right: 0,
-          background: "white",
+          background: colors.surface,
           width: 320,
           boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
           borderRadius: 12,
@@ -644,7 +644,7 @@ export default function NotificationBell({ user, setActiveTab }) {
           display: "flex",
           flexDirection: "column"
         }}>
-          <div style={{ padding: "5px 15px 10px", borderBottom: "1px solid #eee", display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ padding: "5px 15px 10px", borderBottom: `1px solid ${colors.border}`, display: "flex", flexDirection: "column", gap: 6 }}>
             <div style={{ fontWeight: "bold", fontSize: 18, color: colors.primary, marginBottom: 4 }}>Thông báo</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
               <button
@@ -654,7 +654,7 @@ export default function NotificationBell({ user, setActiveTab }) {
                   alignItems: "center",
                   gap: 10,
                   fontSize: 13.5,
-                  color: "#333",
+                  color: colors.textPrimary,
                   background: "transparent",
                   border: "none",
                   padding: "6px 8px",
@@ -665,8 +665,8 @@ export default function NotificationBell({ user, setActiveTab }) {
                   fontWeight: 500,
                   transition: "all 0.15s"
                 }}
-                onMouseOver={(e) => { e.currentTarget.style.background = "#f5f5f5"; e.currentTarget.style.color = colors.primary; }}
-                onMouseOut={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#333"; }}
+                onMouseOver={(e) => { e.currentTarget.style.background = colors.backgroundLight; e.currentTarget.style.color = colors.primary; }}
+                onMouseOut={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = colors.textPrimary; }}
               >
                 <span style={{ fontSize: 15, fontWeight: "bold", color: colors.primary }}>✓</span> Đánh dấu tất cả là đã đọc
               </button>
@@ -678,7 +678,7 @@ export default function NotificationBell({ user, setActiveTab }) {
                   alignItems: "center",
                   gap: 10,
                   fontSize: 13.5,
-                  color: "#333",
+                  color: colors.textPrimary,
                   background: "transparent",
                   border: "none",
                   padding: "6px 8px",
@@ -689,8 +689,8 @@ export default function NotificationBell({ user, setActiveTab }) {
                   fontWeight: 500,
                   transition: "all 0.15s"
                 }}
-                onMouseOver={(e) => { e.currentTarget.style.background = "#f5f5f5"; e.currentTarget.style.color = colors.primary; }}
-                onMouseOut={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#333"; }}
+                onMouseOver={(e) => { e.currentTarget.style.background = colors.backgroundLight; e.currentTarget.style.color = colors.primary; }}
+                onMouseOut={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = colors.textPrimary; }}
               >
                 <span style={{ fontSize: 15, color: colors.primary }}>⚙️</span> Cài đặt thông báo
               </button>
@@ -698,7 +698,7 @@ export default function NotificationBell({ user, setActiveTab }) {
           </div>
           <div style={{ maxHeight: 280, overflowY: "auto" }}>
             {allNotifications.length === 0 ? (
-              <div style={{ padding: 20, textAlign: "center", color: "#888" }}>Không có thông báo nào</div>
+              <div style={{ padding: 20, textAlign: "center", color: colors.textDisabled }}>Không có thông báo nào</div>
             ) : (
               allNotifications.map(n => {
                 const isUnread = !(n.readBy || []).includes(user.uid);
@@ -708,16 +708,16 @@ export default function NotificationBell({ user, setActiveTab }) {
                     onClick={() => markAsReadAndNavigate(n)}
                     style={{
                       padding: "12px 15px",
-                      borderBottom: "1px solid #f5f5f5",
-                      background: isUnread ? "#fff6ea" : "white",
+                      borderBottom: `1px solid ${colors.border}`,
+                      background: isUnread ? alpha('primary', 0.08) : colors.surface,
                       cursor: "pointer",
                       display: "flex",
                       alignItems: "flex-start",
                       gap: 12,
                       transition: "background 0.2s"
                     }}
-                    onMouseOver={(e) => { if (!isUnread) e.currentTarget.style.background = "#f9f9f9"; }}
-                    onMouseOut={(e) => { if (!isUnread) e.currentTarget.style.background = "white"; }}
+                    onMouseOver={(e) => { if (!isUnread) e.currentTarget.style.background = colors.backgroundLight; }}
+                    onMouseOut={(e) => { if (!isUnread) e.currentTarget.style.background = colors.surface; }}
                   >
                     <div style={{ fontSize: 24, flexShrink: 0, marginTop: 2 }}>
                       {getNotificationIcon(n.type)}
@@ -725,7 +725,7 @@ export default function NotificationBell({ user, setActiveTab }) {
                     <div style={{ flexGrow: 1 }}>
                       <div style={{ 
                         fontSize: 14, 
-                        color: isUnread ? "#222" : "#555", 
+                        color: isUnread ? colors.textPrimary : colors.textSecondary, 
                         fontWeight: isUnread ? "600" : "400",
                         lineHeight: "1.4"
                       }}>
@@ -733,7 +733,7 @@ export default function NotificationBell({ user, setActiveTab }) {
                       </div>
                       <div style={{ 
                         fontSize: 12, 
-                        color: isUnread ? colors.primary : "#999", 
+                        color: isUnread ? colors.primary : colors.textDisabled, 
                         marginTop: 4,
                         fontWeight: isUnread ? "500" : "400" 
                       }}>
@@ -748,7 +748,7 @@ export default function NotificationBell({ user, setActiveTab }) {
               })
             )}
           </div>
-          <div style={{ borderTop: "1px solid #eee", padding: "8px 15px 0", display: "flex", justifyContent: "center" }}>
+          <div style={{ borderTop: `1px solid ${colors.border}`, padding: "8px 15px 0", display: "flex", justifyContent: "center" }}>
             <button
               onClick={() => { setShowAllModal(true); setIsOpen(false); }}
               style={{
@@ -797,11 +797,11 @@ export default function NotificationBell({ user, setActiveTab }) {
         display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10000
       }}>
         <div style={{
-          background: "#fff", padding: 24, borderRadius: 16,
+          background: colors.surface, padding: 24, borderRadius: 16,
           width: "min(460px, 95vw)", boxShadow: "0 10px 40px rgba(0,0,0,.2)",
           display: "flex", flexDirection: "column", gap: 18
         }}>
-          <h3 style={{ margin: 0, color: colors.primary, display: "flex", alignItems: "center", gap: 8, borderBottom: "1.5px solid #eee", paddingBottom: 10 }}>
+          <h3 style={{ margin: 0, color: colors.primary, display: "flex", alignItems: "center", gap: 8, borderBottom: `1.5px solid ${colors.border}`, paddingBottom: 10 }}>
             <span>⚙️</span> Cài đặt thông báo
           </h3>
 
@@ -815,7 +815,7 @@ export default function NotificationBell({ user, setActiveTab }) {
               });
 
               if (applicableTypes.length === 0) {
-                return <p style={{ margin: 0, color: "#666", fontSize: 14 }}>Chức vụ của bạn không có cấu hình thông báo nào áp dụng.</p>;
+                return <p style={{ margin: 0, color: colors.textSecondary, fontSize: 14 }}>Chức vụ của bạn không có cấu hình thông báo nào áp dụng.</p>;
               }
 
               return applicableTypes.map(cfg => {
@@ -825,8 +825,8 @@ export default function NotificationBell({ user, setActiveTab }) {
                     key={cfg.type}
                     style={{
                       display: "flex", alignItems: "flex-start", gap: 12,
-                      padding: "10px 12px", borderRadius: 8, background: "#f8fafc",
-                      border: "1px solid #e2e8f0"
+                      padding: "10px 12px", borderRadius: 8, background: colors.backgroundLight,
+                      border: `1px solid ${colors.border}`
                     }}
                   >
                     <input
@@ -840,8 +840,8 @@ export default function NotificationBell({ user, setActiveTab }) {
                       style={{ width: 18, height: 18, marginTop: 3, cursor: "pointer", accentColor: colors.primary }}
                     />
                     <label htmlFor={`chk-${cfg.type}`} style={{ cursor: "pointer", flex: 1 }}>
-                      <div style={{ fontWeight: 700, fontSize: 14, color: "#1e293b", marginBottom: 2 }}>{cfg.label}</div>
-                      <div style={{ fontSize: 12.5, color: "#64748b", lineHeight: 1.4 }}>{cfg.desc}</div>
+                      <div style={{ fontWeight: 700, fontSize: 14, color: colors.textPrimary, marginBottom: 2 }}>{cfg.label}</div>
+                      <div style={{ fontSize: 12.5, color: colors.textSecondary, lineHeight: 1.4 }}>{cfg.desc}</div>
                     </label>
                   </div>
                 );
@@ -849,7 +849,7 @@ export default function NotificationBell({ user, setActiveTab }) {
             })()}
           </div>
 
-          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", borderTop: "1.5px solid #eee", paddingTop: 14 }}>
+          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", borderTop: `1.5px solid ${colors.border}`, paddingTop: 14 }}>
             <button
               onClick={() => {
                 // Hủy: khôi phục từ localStorage
@@ -859,7 +859,7 @@ export default function NotificationBell({ user, setActiveTab }) {
                 } catch { /* ignore */ }
                 setShowSettings(false);
               }}
-              style={{ padding: "8px 16px", borderRadius: 8, border: "1.5px solid #ccc", background: "#eee", fontWeight: 600, cursor: "pointer" }}
+              style={{ padding: "8px 16px", borderRadius: 8, border: `1.5px solid ${colors.border}`, background: colors.backgroundLight, color: colors.textPrimary, fontWeight: 600, cursor: "pointer" }}
             >
               Hủy
             </button>
@@ -886,7 +886,7 @@ export default function NotificationBell({ user, setActiveTab }) {
                   setShowSettings(false);
                 }
               }}
-              style={{ padding: "8px 20px", background: colors.primary, color: "#fff", border: "none", borderRadius: 8, fontWeight: 700, cursor: "pointer" }}
+              style={{ padding: "8px 20px", background: colors.primary, color: colors.white, border: "none", borderRadius: 8, fontWeight: 700, cursor: "pointer" }}
             >
               Lưu thay đổi
             </button>
@@ -902,7 +902,7 @@ export default function NotificationBell({ user, setActiveTab }) {
         display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10000
       }}>
         <div style={{
-          background: "#fff", borderRadius: 16,
+          background: colors.surface, borderRadius: 16,
           width: "min(600px, 95vw)", maxHeight: "80vh",
           boxShadow: "0 10px 40px rgba(0,0,0,.25)",
           display: "flex", flexDirection: "column", overflow: "hidden"
@@ -910,11 +910,11 @@ export default function NotificationBell({ user, setActiveTab }) {
           {/* Header */}
           <div style={{
             padding: "16px 20px",
-            borderBottom: "1.5px solid #eee",
+            borderBottom: `1.5px solid ${colors.border}`,
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            background: "#fafafa"
+            background: colors.backgroundLight
           }}>
             <h3 style={{ margin: 0, color: colors.primary, display: "flex", alignItems: "center", gap: 8 }}>
               <span>🔔</span> Tất cả thông báo ({filteredNotifications.length})
@@ -939,7 +939,7 @@ export default function NotificationBell({ user, setActiveTab }) {
               <button
                 onClick={() => setShowAllModal(false)}
                 style={{
-                  background: "#eee",
+                  background: colors.backgroundLight,
                   border: "none",
                   borderRadius: "50%",
                   width: 28,
@@ -949,7 +949,7 @@ export default function NotificationBell({ user, setActiveTab }) {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  color: "#666"
+                  color: colors.textSecondary
                 }}
               >
                 ✕
@@ -960,7 +960,7 @@ export default function NotificationBell({ user, setActiveTab }) {
           {/* Body */}
           <div style={{ flex: 1, overflowY: "auto", padding: "10px 0" }}>
             {filteredNotifications.length === 0 ? (
-              <div style={{ padding: 40, textAlign: "center", color: "#888" }}>Không có thông báo nào</div>
+              <div style={{ padding: 40, textAlign: "center", color: colors.textDisabled }}>Không có thông báo nào</div>
             ) : (
               filteredNotifications.map(n => {
                 const isUnread = !(n.readBy || []).includes(user.uid);
@@ -973,16 +973,16 @@ export default function NotificationBell({ user, setActiveTab }) {
                     }}
                     style={{
                       padding: "14px 20px",
-                      borderBottom: "1px solid #f0f0f0",
-                      background: isUnread ? "#fff6ea" : "white",
+                      borderBottom: `1px solid ${colors.border}`,
+                      background: isUnread ? alpha('primary', 0.08) : colors.surface,
                       cursor: "pointer",
                       display: "flex",
                       alignItems: "flex-start",
                       gap: 14,
                       transition: "background 0.2s"
                     }}
-                    onMouseOver={(e) => { if (!isUnread) e.currentTarget.style.background = "#f9f9f9"; }}
-                    onMouseOut={(e) => { if (!isUnread) e.currentTarget.style.background = "white"; }}
+                    onMouseOver={(e) => { if (!isUnread) e.currentTarget.style.background = colors.backgroundLight; }}
+                    onMouseOut={(e) => { if (!isUnread) e.currentTarget.style.background = colors.surface; }}
                   >
                     <div style={{ fontSize: 28, flexShrink: 0, marginTop: 2 }}>
                       {getNotificationIcon(n.type)}
@@ -990,7 +990,7 @@ export default function NotificationBell({ user, setActiveTab }) {
                     <div style={{ flexGrow: 1 }}>
                       <div style={{ 
                         fontSize: 14.5, 
-                        color: isUnread ? "#111" : "#444", 
+                        color: isUnread ? colors.textPrimary : colors.textSecondary, 
                         fontWeight: isUnread ? "600" : "400",
                         lineHeight: "1.45"
                       }}>
@@ -998,7 +998,7 @@ export default function NotificationBell({ user, setActiveTab }) {
                       </div>
                       <div style={{ 
                         fontSize: 12.5, 
-                        color: isUnread ? colors.primary : "#888", 
+                        color: isUnread ? colors.primary : colors.textDisabled, 
                         marginTop: 6,
                         fontWeight: isUnread ? "500" : "400" 
                       }}>
@@ -1017,17 +1017,17 @@ export default function NotificationBell({ user, setActiveTab }) {
           {/* Footer */}
           <div style={{
             padding: "12px 20px",
-            borderTop: "1.5px solid #eee",
+            borderTop: `1.5px solid ${colors.border}`,
             display: "flex",
             justifyContent: "flex-end",
-            background: "#fafafa"
+            background: colors.backgroundLight
           }}>
             <button
               onClick={() => setShowAllModal(false)}
               style={{
                 padding: "8px 20px",
                 background: colors.primary,
-                color: "#fff",
+                color: colors.white,
                 border: "none",
                 borderRadius: 8,
                 fontWeight: 700,

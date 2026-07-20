@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import originalDbService from "../services/dbService";
 import apiClient from "../services/apiClient";
 import realtimeService from "../services/realtimeService";
+import { colors, alpha } from "../theme";
 
 let globalRefreshCallback = null;
 const dbService = {
@@ -543,11 +544,11 @@ export default function PublicLockerView({ lockerId: initialLockerId }) {
 
   if (loading) {
     return (
-      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", background: "#f3f6fa", fontFamily: "sans-serif" }}>
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", background: colors.background, fontFamily: "sans-serif" }}>
         <div style={{ textAlign: "center" }}>
-          <div style={{ border: "4px solid rgba(0,0,0,0.1)", borderLeft: "4px solid #1a5c68", borderRadius: "50%", width: 40, height: 40, animation: "spin 1s linear infinite" }} />
+          <div style={{ border: "4px solid rgba(0,0,0,0.1)", borderLeft: `4px solid ${colors.primary}`, borderRadius: "50%", width: 40, height: 40, animation: "spin 1s linear infinite" }} />
           <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
-          <p style={{ marginTop: 12, color: "#666", fontWeight: "600" }}>Đang kiểm tra thông tin tủ đồ...</p>
+          <p style={{ marginTop: 12, color: colors.textSecondary, fontWeight: "600" }}>Đang kiểm tra thông tin tủ đồ...</p>
         </div>
       </div>
     );
@@ -564,37 +565,24 @@ export default function PublicLockerView({ lockerId: initialLockerId }) {
   return (
     <div className="public-locker-container" style={{ minHeight: "100vh", background: "var(--pl-bg-grad)", display: "flex", justifyContent: "center", alignItems: "center", padding: "16px", fontFamily: "system-ui, -apple-system, sans-serif" }}>
       <style dangerouslySetInnerHTML={{__html: `
+        /* Biến cục bộ --pl-* là bí danh của token --so-* toàn app. Trang này vẫn
+           render trong ThemeProvider (xem App.jsx) nên nghe công tắc sáng/tối
+           của app; khối dark riêng cũ bám prefers-color-scheme của OS đã bỏ
+           (cùng bug và cách sửa như Locker/Knife). */
         .public-locker-container {
-          --pl-bg-grad: linear-gradient(135deg, #eef2f7 0%, #dbe4ee 100%);
-          --pl-card-bg: #ffffff;
-          --pl-text-primary: #1a202c;
-          --pl-text-secondary: #4a5568;
-          --pl-text-muted: #718096;
-          --pl-border: rgba(0, 0, 0, 0.08);
-          --pl-input-bg: #ffffff;
-          --pl-input-border: #cbd5e0;
-          --pl-input-text: #1a202c;
-          --pl-info-bg: #f8fafc;
-          --pl-info-border: #e2e8f0;
-          --pl-success-bg: #e8f5e9;
-          --pl-success-text: #2e7d32;
-        }
-        @media (prefers-color-scheme: dark) {
-          .public-locker-container {
-            --pl-bg-grad: linear-gradient(135deg, #0f172a 0%, #020617 100%);
-            --pl-card-bg: #1e293b;
-            --pl-text-primary: #f8fafc;
-            --pl-text-secondary: #cbd5e1;
-            --pl-text-muted: #94a3b8;
-            --pl-border: rgba(255, 255, 255, 0.08);
-            --pl-input-bg: #0f172a;
-            --pl-input-border: #334155;
-            --pl-input-text: #f8fafc;
-            --pl-info-bg: #0f172a;
-            --pl-info-border: #334155;
-            --pl-success-bg: rgba(46, 125, 50, 0.15);
-            --pl-success-text: #81c784;
-          }
+          --pl-bg-grad: var(--so-login-bg);
+          --pl-card-bg: var(--so-surface);
+          --pl-text-primary: var(--so-text-primary);
+          --pl-text-secondary: var(--so-text-secondary);
+          --pl-text-muted: var(--so-text-disabled);
+          --pl-border: var(--so-border);
+          --pl-input-bg: var(--so-surface);
+          --pl-input-border: var(--so-border);
+          --pl-input-text: var(--so-text-primary);
+          --pl-info-bg: var(--so-background-light);
+          --pl-info-border: var(--so-border);
+          --pl-success-bg: rgba(var(--so-success-rgb), 0.15);
+          --pl-success-text: var(--so-success);
         }
         @keyframes blink-dot {
           0%, 100% { opacity: 0.2; }
@@ -662,8 +650,8 @@ export default function PublicLockerView({ lockerId: initialLockerId }) {
           border: 1px solid var(--pl-border);
         }
         .public-map-zone-btn.active {
-          background: linear-gradient(135deg, #1a5c68 0%, #10414a 100%);
-          color: #fff;
+          background: linear-gradient(135deg, ${colors.primary} 0%, ${colors.primaryDark} 100%);
+          color: ${colors.white};
           border: 1px solid transparent;
         }
         .public-map-grid-container {
@@ -699,7 +687,7 @@ export default function PublicLockerView({ lockerId: initialLockerId }) {
       <div style={{ background: "var(--pl-card-bg)", borderRadius: "24px", width: "100%", maxWidth: "480px", boxShadow: "0 10px 30px rgba(0, 0, 0, 0.15)", overflow: "hidden", border: "1px solid var(--pl-border)" }}>
         
         {/* Top header (Symmetrical Flex layout, no absolute overlap) */}
-        <div style={{ background: "linear-gradient(135deg, #1a5c68 0%, #10414a 100%)", padding: "20px 24px 24px", color: "#ffffff", display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
+        <div style={{ background: `linear-gradient(135deg, ${colors.primary} 0%, ${colors.primaryDark} 100%)`, padding: "20px 24px 24px", color: colors.white, display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
           {/* Top row for badge & button */}
           <div style={{ display: "flex", width: "100%", justifyContent: "space-between", alignItems: "center", minHeight: "32px", gap: "10px" }}>
             <div style={{ background: "rgba(255,255,255,0.15)", padding: "4px 12px", borderRadius: "20px", fontSize: "11px", fontWeight: "700", letterSpacing: "1px" }}>
@@ -708,7 +696,7 @@ export default function PublicLockerView({ lockerId: initialLockerId }) {
             {(isOccupied || isPending) && (
               <button 
                 onClick={() => setShowVacantMap(true)}
-                style={{ background: "#f59e0b", border: "none", color: "#fff", padding: "6px 14px", borderRadius: "20px", fontSize: "11px", fontWeight: "800", cursor: "pointer", boxShadow: "0 2px 8px rgba(0,0,0,0.15)", transition: "all 0.2s", display: "flex", alignItems: "center", gap: "4px" }}
+                style={{ background: colors.warning, border: "none", color: colors.white, padding: "6px 14px", borderRadius: "20px", fontSize: "11px", fontWeight: "800", cursor: "pointer", boxShadow: "0 2px 8px rgba(0,0,0,0.15)", transition: "all 0.2s", display: "flex", alignItems: "center", gap: "4px" }}
                 onMouseOver={(e) => e.currentTarget.style.transform = "scale(1.05)"}
                 onMouseOut={(e) => e.currentTarget.style.transform = "scale(1)"}
               >
@@ -776,8 +764,8 @@ export default function PublicLockerView({ lockerId: initialLockerId }) {
           ) : isPending ? (
             // LOCKER PENDING APPROVAL VIEW (PREVENTS OTHER SIGNUPS)
             <div>
-              <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "20px", background: "rgba(237, 137, 54, 0.15)", color: "#dd6b20", padding: "12px 16px", borderRadius: "12px", fontSize: "14px", fontWeight: "700" }}>
-                <span className="pl-blink-dot" style={{ width: "10px", height: "10px", background: "#dd6b20", borderRadius: "50%", display: "inline-block" }}></span>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "20px", background: alpha('warning', 0.15), color: colors.warning, padding: "12px 16px", borderRadius: "12px", fontSize: "14px", fontWeight: "700" }}>
+                <span className="pl-blink-dot" style={{ width: "10px", height: "10px", background: colors.warning, borderRadius: "50%", display: "inline-block" }}></span>
                 Tủ đang ở trạng thái chờ xác nhận duyệt
               </div>
 
@@ -823,7 +811,7 @@ export default function PublicLockerView({ lockerId: initialLockerId }) {
           ) : (
             // LOCKER VACANT REGISTRATION FORM
             <div>
-              <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "20px", background: "rgba(26, 92, 104, 0.1)", color: "#1a5c68", padding: "12px 16px", borderRadius: "12px", fontSize: "14px", fontWeight: "700" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "20px", background: "alpha('primary', 0.1)", color: colors.primary, padding: "12px 16px", borderRadius: "12px", fontSize: "14px", fontWeight: "700" }}>
                 <span style={{ fontSize: "18px" }}>🔓</span>
                 Tủ trống - Đăng ký sử dụng tủ này
               </div>
@@ -909,7 +897,7 @@ export default function PublicLockerView({ lockerId: initialLockerId }) {
                 <button 
                   type="submit" 
                   disabled={isSubmitting}
-                  style={{ width: "100%", padding: "12px", border: "none", borderRadius: "10px", background: "#1a5c68", color: "#fff", fontSize: "16px", fontWeight: "700", cursor: "pointer", transition: "background 0.2s", marginTop: "8px", boxShadow: "0 4px 10px rgba(26, 92, 104, 0.2)" }}
+                  style={{ width: "100%", padding: "12px", border: "none", borderRadius: "10px", background: colors.primary, color: colors.white, fontSize: "16px", fontWeight: "700", cursor: "pointer", transition: "background 0.2s", marginTop: "8px", boxShadow: "0 4px 10px alpha('primary', 0.2)" }}
                 >
                   {isSubmitting ? "Đang xử lý đăng ký..." : "Gửi thông tin đăng ký"}
                 </button>
@@ -926,7 +914,7 @@ export default function PublicLockerView({ lockerId: initialLockerId }) {
                 width: "100%",
                 padding: "11px",
                 background: "rgba(229, 62, 62, 0.06)",
-                color: "#e53e3e",
+                color: colors.error,
                 border: "1.5px dashed rgba(229, 62, 62, 0.3)",
                 borderRadius: "10px",
                 cursor: "pointer",
@@ -959,7 +947,7 @@ export default function PublicLockerView({ lockerId: initialLockerId }) {
               fontSize: "13px",
               color: "var(--pl-text-primary)"
             }}>
-              <div style={{ fontWeight: "800", display: "flex", alignItems: "center", gap: "6px", color: lockerData.damageReport.status === "received" ? "#dd6b20" : "#e53e3e" }}>
+              <div style={{ fontWeight: "800", display: "flex", alignItems: "center", gap: "6px", color: lockerData.damageReport.status === "received" ? colors.warning : colors.error }}>
                 <span>{lockerData.damageReport.status === "received" ? "🔧 Thiết bị đang được sửa chữa" : "⚠️ Đã ghi nhận báo hỏng"}</span>
               </div>
               <div style={{ marginTop: "6px", color: "var(--pl-text-secondary)", lineHeight: "1.4" }}>
@@ -967,7 +955,7 @@ export default function PublicLockerView({ lockerId: initialLockerId }) {
               </div>
               {lockerData.damageReport.imageUrl && (
                 <div style={{ marginTop: "10px" }}>
-                  <a href={lockerData.damageReport.imageUrl} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: "4px", color: "#1a5c68", fontWeight: "800", textDecoration: "underline" }}>
+                  <a href={lockerData.damageReport.imageUrl} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: "4px", color: colors.primary, fontWeight: "800", textDecoration: "underline" }}>
                     📷 Xem ảnh hiện trạng
                   </a>
                 </div>
@@ -1010,7 +998,7 @@ export default function PublicLockerView({ lockerId: initialLockerId }) {
                 setRegistrationSuccess(false);
                 fetchLockerData();
               }}
-              style={{ width: "100%", padding: "12px", border: "none", borderRadius: "10px", background: "#1a5c68", color: "#fff", fontSize: "16px", fontWeight: "700", cursor: "pointer", boxShadow: "0 4px 12px rgba(26, 92, 104, 0.2)" }}
+              style={{ width: "100%", padding: "12px", border: "none", borderRadius: "10px", background: colors.primary, color: colors.white, fontSize: "16px", fontWeight: "700", cursor: "pointer", boxShadow: "0 4px 12px alpha('primary', 0.2)" }}
             >
               Xác nhận & Đóng
             </button>
@@ -1022,7 +1010,7 @@ export default function PublicLockerView({ lockerId: initialLockerId }) {
       {showTransferConfirm && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(8, 16, 36, 0.65)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2000, padding: "16px", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)" }}>
           <div style={{ background: "var(--pl-card-bg)", width: "100%", maxWidth: "440px", borderRadius: "24px", boxShadow: "0 10px 40px rgba(0,0,0,0.3)", padding: "32px 28px", border: "1.5px solid var(--pl-border)", color: "var(--pl-text-primary)", textAlign: "center" }}>
-            <div style={{ width: "72px", height: "72px", background: "rgba(237, 137, 54, 0.15)", color: "#dd6b20", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", fontSize: "40px" }}>
+            <div style={{ width: "72px", height: "72px", background: alpha('warning', 0.15), color: colors.warning, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", fontSize: "40px" }}>
               ⚠️
             </div>
             
@@ -1050,7 +1038,7 @@ export default function PublicLockerView({ lockerId: initialLockerId }) {
               <button 
                 onClick={handleTransfer}
                 disabled={isSubmitting}
-                style={{ flex: 1, padding: "12px", border: "none", borderRadius: "10px", background: "#1a5c68", color: "#fff", fontSize: "15px", fontWeight: "700", cursor: "pointer", boxShadow: "0 4px 12px rgba(26, 92, 104, 0.2)" }}
+                style={{ flex: 1, padding: "12px", border: "none", borderRadius: "10px", background: colors.primary, color: colors.white, fontSize: "15px", fontWeight: "700", cursor: "pointer", boxShadow: "0 4px 12px alpha('primary', 0.2)" }}
               >
                 {isSubmitting ? "Đang xử lý..." : "Di dời tủ đồ"}
               </button>
@@ -1114,7 +1102,7 @@ export default function PublicLockerView({ lockerId: initialLockerId }) {
 
               {loadingMap ? (
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "40px 0" }}>
-                  <div style={{ border: "3px solid rgba(0,0,0,0.1)", borderLeft: "3px solid #1a5c68", borderRadius: "50%", width: 24, height: 24, animation: "spin 1s linear infinite" }} />
+                  <div style={{ border: "3px solid rgba(0,0,0,0.1)", borderLeft: `3px solid ${colors.primary}`, borderRadius: "50%", width: 24, height: 24, animation: "spin 1s linear infinite" }} />
                   <p style={{ marginTop: 8, fontSize: "13px", color: "var(--pl-text-muted)" }}>Đang tải sơ đồ tủ đồ...</p>
                 </div>
               ) : (
@@ -1166,7 +1154,7 @@ export default function PublicLockerView({ lockerId: initialLockerId }) {
                                     
                                     let bg = "rgba(16, 185, 129, 0.08)";
                                     let border = "1.5px dashed rgba(16, 185, 129, 0.4)";
-                                    let color = "#10b981";
+                                    let color = colors.success;
                                     let cursor = "pointer";
                                     let titleText = `Tủ ${id}: Trống (Nhấp để đăng ký)`;
 
@@ -1179,7 +1167,7 @@ export default function PublicLockerView({ lockerId: initialLockerId }) {
                                     } else if (isLockerPending) {
                                       bg = "rgba(245, 158, 11, 0.08)";
                                       border = "1.5px solid rgba(245, 158, 11, 0.15)";
-                                      color = "#f59e0b";
+                                      color = colors.warning;
                                       cursor = "not-allowed";
                                       titleText = `Tủ ${id}: Chờ xác nhận duyệt`;
                                     }
@@ -1307,7 +1295,7 @@ export default function PublicLockerView({ lockerId: initialLockerId }) {
                 <button 
                   type="submit"
                   disabled={isReportingDamage || !damageDesc.trim()}
-                  style={{ flex: 1, padding: "12px", border: "none", borderRadius: "10px", background: "#e53e3e", color: "#fff", fontSize: "15px", fontWeight: "700", cursor: "pointer", boxShadow: "0 4px 12px rgba(229, 62, 62, 0.2)" }}
+                  style={{ flex: 1, padding: "12px", border: "none", borderRadius: "10px", background: colors.error, color: colors.white, fontSize: "15px", fontWeight: "700", cursor: "pointer", boxShadow: "0 4px 12px alpha('error', 0.2)" }}
                 >
                   {isReportingDamage ? "Đang gửi báo cáo..." : "Gửi báo cáo"}
                 </button>
