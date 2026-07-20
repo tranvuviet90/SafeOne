@@ -88,7 +88,7 @@ const writeBatch = () => {
   };
 };
 import { useI18n } from "../i18n/I18nProvider";
-import { colors } from "../theme";
+import { colors, alpha } from "../theme";
 import { 
   FaSearch, FaPlus, FaFileExcel, FaDownload, FaUpload, 
   FaEdit, FaTrash, FaCheck, FaTimes, FaCamera, FaImage 
@@ -174,6 +174,9 @@ const TRAINING_ITEMS = {
   ]
 };
 
+// NGOẠI LỆ FACELIFT: bảng màu phân loại cho 9 bộ phận trên biểu đồ/chú giải —
+// cần 9 tông phân biệt rõ ràng, không quy về token trạng thái (success/error/…)
+// được. Giữ hex cố định, hiển thị ổn ở cả hai theme.
 const CHART_COLORS = {
   G_Cutting: "#e056fd",
   G_Rolling: "#f0932b",
@@ -1315,39 +1318,26 @@ export default function License({ user }) {
   return (
     <div className="license-container">
       <style dangerouslySetInnerHTML={{ __html: `
+        /* Biến cục bộ --cn-* là bí danh của token --so-* toàn app. Khối dark
+           riêng cũ (bám prefers-color-scheme của OS) đã bỏ — cùng bug và cách
+           sửa như Locker/Knife/PublicLockerView (lượt 7, 8, 13). */
         .license-container {
-          --cn-bg: #F4FAF9;
-          --cn-surface: #ffffff;
-          --cn-text-primary: #2B3A3C;
-          --cn-text-secondary: #5A6F72;
-          --cn-border: #D0E2E0;
-          --cn-input-bg: #ffffff;
-          --cn-input-text: #2B3A3C;
-          --cn-input-border: #D0E2E0;
-          --cn-table-header: #EBF5F4;
-          --cn-modal-bg: #ffffff;
-          --cn-modal-overlay: rgba(0, 0, 0, 0.45);
-          --cn-card-hover: rgba(70, 110, 115, 0.05);
+          --cn-bg: var(--so-background);
+          --cn-surface: var(--so-surface);
+          --cn-text-primary: var(--so-text-primary);
+          --cn-text-secondary: var(--so-text-secondary);
+          --cn-border: var(--so-border);
+          --cn-input-bg: var(--so-surface);
+          --cn-input-text: var(--so-text-primary);
+          --cn-input-border: var(--so-border);
+          --cn-table-header: var(--so-background-light);
+          --cn-modal-bg: var(--so-surface);
+          --cn-modal-overlay: rgba(8, 16, 36, 0.6);
+          --cn-card-hover: rgba(var(--so-primary-rgb), 0.05);
           display: flex;
           flex-direction: column;
           gap: 24px;
           width: 100%;
-        }
-        @media (prefers-color-scheme: dark) {
-          .license-container {
-            --cn-bg: #0b1329;
-            --cn-surface: #111a2e;
-            --cn-text-primary: #e8f0fe;
-            --cn-text-secondary: #8a9fc8;
-            --cn-border: rgba(255, 255, 255, 0.08);
-            --cn-input-bg: #1a243d;
-            --cn-input-text: #ffffff;
-            --cn-input-border: rgba(255, 255, 255, 0.15);
-            --cn-table-header: #1a2540;
-            --cn-modal-bg: #1a2540;
-            --cn-modal-overlay: rgba(8, 16, 36, 0.75);
-            --cn-card-hover: rgba(255, 255, 255, 0.03);
-          }
         }
         .license-title-main {
           font-size: 20px;
@@ -1673,15 +1663,15 @@ export default function License({ user }) {
         <>
           {/* Top summary cards (distinct employees) */}
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-            <div style={{ flex: "1 1 160px", background: "rgba(72, 187, 120, 0.12)", border: "1px solid rgba(72, 187, 120, 0.2)", padding: "12px 16px", borderRadius: 12, textAlign: "center" }}>
-              <div style={{ fontSize: "11px", color: "rgba(72, 187, 120, 0.9)", fontWeight: "600" }}>ĐÃ CÓ CNVH</div>
-              <div style={{ fontSize: "22px", fontWeight: "800", color: "#38a169" }}>{summaryStats.certified}</div>
+            <div style={{ flex: "1 1 160px", background: alpha('success', 0.12), border: `1px solid ${alpha('success', 0.3)}`, padding: "12px 16px", borderRadius: 12, textAlign: "center" }}>
+              <div style={{ fontSize: "11px", color: colors.success, fontWeight: "600" }}>ĐÃ CÓ CNVH</div>
+              <div style={{ fontSize: "22px", fontWeight: "800", color: colors.success }}>{summaryStats.certified}</div>
             </div>
-            <div style={{ flex: "1 1 160px", background: "rgba(237, 137, 54, 0.12)", border: "1px solid rgba(237, 137, 54, 0.2)", padding: "12px 16px", borderRadius: 12, textAlign: "center" }}>
+            <div style={{ flex: "1 1 160px", background: alpha('warning', 0.12), border: `1px solid ${alpha('warning', 0.3)}`, padding: "12px 16px", borderRadius: 12, textAlign: "center" }}>
               <div style={{ fontSize: "11px", color: "var(--cn-text-secondary)", fontWeight: "600" }}>ĐANG ĐÀO TẠO</div>
               <div style={{ fontSize: "22px", fontWeight: "800", color: colors.warning }}>{summaryStats.inTraining}</div>
             </div>
-            <div style={{ flex: "1 1 160px", background: "rgba(70, 110, 115, 0.10)", border: "1px solid rgba(70, 110, 115, 0.2)", padding: "12px 16px", borderRadius: 12, textAlign: "center" }}>
+            <div style={{ flex: "1 1 160px", background: alpha('primary', 0.1), border: `1px solid ${alpha('primary', 0.25)}`, padding: "12px 16px", borderRadius: 12, textAlign: "center" }}>
               <div style={{ fontSize: "11px", color: "var(--cn-text-secondary)", fontWeight: "600" }}>CHỜ ĐÁNH GIÁ</div>
               <div style={{ fontSize: "22px", fontWeight: "800", color: colors.primary }}>{summaryStats.waitingEval}</div>
             </div>
@@ -1788,13 +1778,14 @@ export default function License({ user }) {
                     })}
                   </svg>
 
-                  {/* Tooltip detail box */}
+                  {/* Tooltip detail box — nền tối cố định (ngoại lệ facelift,
+                      đọc tốt cả hai theme, cùng kiểu với tooltip Calamviec) */}
                   {hoveredBar && (
-                    <div style={{ 
-                      marginTop: "10px", 
-                      padding: "8px 12px", 
-                      background: "rgba(0,0,0,0.8)", 
-                      color: "#fff", 
+                    <div style={{
+                      marginTop: "10px",
+                      padding: "8px 12px",
+                      background: "rgba(0,0,0,0.8)",
+                      color: colors.white,
                       borderRadius: "6px", 
                       fontSize: "11px", 
                       display: "flex", 
@@ -2274,7 +2265,7 @@ export default function License({ user }) {
               </div>
 
               {!isPrivileged && !editingRecord && (
-                <div style={{ color: "#eb4d4b", fontSize: "12px", fontWeight: "600", padding: "10px", background: "rgba(235, 77, 75, 0.08)", borderRadius: "8px", borderLeft: "4px solid #eb4d4b" }}>
+                <div style={{ color: colors.error, fontSize: "12px", fontWeight: "600", padding: "10px", background: alpha('error', 0.08), borderRadius: "8px", borderLeft: `4px solid ${colors.error}` }}>
                   ⚠️ Thời gian đào tạo tối đa 7 ngày, hệ thống sẽ tự động gửi yêu cầu đánh giá cho EHS khi hết thời gian đào tạo.
                 </div>
               )}
@@ -2356,7 +2347,7 @@ export default function License({ user }) {
                       {Object.keys(modalForm.trainingItems).filter(k => modalForm.trainingItems[k]).map(k => (
                         <span
                           key={k}
-                          style={{ display: "inline-flex", alignItems: "center", gap: "6px", background: colors.primary, color: "white", padding: "3px 10px", borderRadius: "16px", fontSize: "11px", fontWeight: 600 }}
+                          style={{ display: "inline-flex", alignItems: "center", gap: "6px", background: colors.primary, color: colors.white, padding: "3px 10px", borderRadius: "16px", fontSize: "11px", fontWeight: 600 }}
                         >
                           {k}
                           <span
