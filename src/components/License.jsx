@@ -496,11 +496,11 @@ export default function License({ user }) {
           batch.set(notifRef, {
             type: "operation_cert_eval",
             message: `Nhân viên ${r.name} (${r.msnv}) đã hoàn thành 7 ngày đào tạo tại bộ phận ${r.department || r.deptCode}. Yêu cầu EHS tiến hành đánh giá.`,
-            targetRole: "ehs",
+            targetRoles: ["ehs"],
             createdBy: "system",
             readBy: [],
             relatedId: notifId,
-            timestamp: Date.now()
+            timestamp: new Date().toISOString()
           });
 
           const recordRef = doc(db, "operation_certifications", `${r.deptCode}_${r.msnv}`);
@@ -522,11 +522,11 @@ export default function License({ user }) {
           batch.set(notifRef, {
             type: "operation_cert_eval",
             message: `Hồ sơ chứng nhận vận hành của ${r.name} (${r.msnv}) đã hết hạn 1 năm. Yêu cầu EHS tiến hành tái đánh giá.`,
-            targetRole: "ehs",
+            targetRoles: ["ehs"],
             createdBy: "system",
             readBy: [],
             relatedId: notifId,
-            timestamp: Date.now()
+            timestamp: new Date().toISOString()
           });
 
           const recordRef = doc(db, "operation_certifications", `${r.deptCode}_${r.msnv}`);
