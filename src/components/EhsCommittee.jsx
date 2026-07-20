@@ -1,6 +1,6 @@
 import React, { Suspense, useEffect } from "react";
 import { useI18n } from "../i18n/I18nProvider";
-import { colors } from "../theme";
+import { colors, alpha } from "../theme";
 import { FaWalkieTalkie, FaLock, FaCertificate, FaScissors } from "react-icons/fa6";
 import { IoCalendarClearOutline, IoCafeOutline, IoTrash } from "react-icons/io5";
 import { MdSmokingRooms } from "react-icons/md";
@@ -117,7 +117,7 @@ export default function EhsCommittee({ user, isMobile, activeSubTab, setActiveSu
           .ehs-subtab-btn.active {
             color: ${colors.white};
             background: ${colors.primary};
-            box-shadow: 0 4px 12px rgba(70, 110, 115, 0.3);
+            box-shadow: 0 4px 12px ${alpha('primary', 0.3)};
           }
           .ehs-subtab-btn svg {
             font-size: ${isMobile ? "15px" : "18px"};
