@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { dbService } from "../services/dbService";
 import apiClient from "../services/apiClient";
-import { colors } from "../theme";
+import { colors, alpha } from "../theme";
 import LightboxSwipeOnly, { useConfirm } from "./LightboxSwipeOnly";
 import { useI18n } from "../i18n/I18nProvider";
 import realtimeService from "../services/realtimeService";
@@ -16,7 +16,7 @@ const SHIFT_OPTIONS = ["S1", "S2", "S3", "S8"];
 function RedXIcon({ size = 14 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M18 6L6 18M6 6l12 12" stroke="#F02828" strokeWidth="3" strokeLinecap="round"/>
+      <path d="M18 6L6 18M6 6l12 12" stroke={colors.error} strokeWidth="3" strokeLinecap="round"/>
     </svg>
   );
 }
@@ -29,7 +29,7 @@ function CheckIcon({ size = 20 }) {
 }
 function UndoIcon({ size = 20 }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#666" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={colors.textSecondary} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
         <path d="M21 13v-2a4 4 0 0 0-4-4H8L12 3" />
         <path d="M3 13v2a4 4 0 0 0 4 4h9" />
         <path d="m5 11 4 4-4 4" />
@@ -243,25 +243,25 @@ function GiamSatHutThuoc({ user }) {
             type="button"
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
             style={{
-              width: '100%', background: '#fff', padding: "7px 12px", borderRadius: 8,
+              width: '100%', background: colors.surface, padding: "7px 12px", borderRadius: 8,
               border: `1.2px solid ${orangeLight}`, textAlign: 'left', cursor: 'pointer',
               display: 'flex', justifyContent: 'space-between', alignItems: 'center',
               fontSize: 15, boxSizing: 'border-box'
             }}
           >
-            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: selected.length ? dark : '#888' }}>
+            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: selected.length ? dark : colors.textSecondary }}>
               {selectedNames}
             </span>
             <span>▼</span>
           </button>
           {isDropdownOpen && (
             <div style={{
-              position: 'absolute', top: '100%', left: 0, right: 0, background: 'white',
+              position: 'absolute', top: '100%', left: 0, right: 0, background: colors.surface,
               border: `1.2px solid ${orangeLight}`, borderRadius: 8, marginTop: 4, zIndex: 10, maxHeight: 200,
               overflowY: 'auto', boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
             }}>
               {committeeUsers.map(u => (
-                <label key={u.id} style={{ display: 'flex', alignItems: 'center', padding: '10px 12px', cursor: 'pointer', borderBottom: '1px solid #f0f0f0' }}>
+                <label key={u.id} style={{ display: 'flex', alignItems: 'center', padding: '10px 12px', cursor: 'pointer', borderBottom: `1px solid ${colors.border}` }}>
                   <input
                      type="checkbox"
                      checked={selected.includes(u.name)}
@@ -276,11 +276,11 @@ function GiamSatHutThuoc({ user }) {
         </div>
 
         <div style={{ marginBottom: 12, maxWidth: 220 }}>
-          <div style={{ fontSize: 15, color: dark, marginBottom: 4 }}>Ca làm việc: <span style={{ color: '#d9534f' }}>*</span></div>
+          <div style={{ fontSize: 15, color: dark, marginBottom: 4 }}>Ca làm việc: <span style={{ color: colors.error }}>*</span></div>
           <select
             value={shift}
             onChange={e => setShift(e.target.value)}
-            style={{ width: '100%', padding: "8px 12px", borderRadius: 8, border: `1.2px solid ${orangeLight}`, color: dark, background: "#fff", fontSize: 15 }}
+            style={{ width: '100%', padding: "8px 12px", borderRadius: 8, border: `1.2px solid ${orangeLight}`, color: dark, background: colors.surface, fontSize: 15 }}
           >
             <option value="">-- Chọn ca --</option>
             {SHIFT_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
@@ -294,16 +294,16 @@ function GiamSatHutThuoc({ user }) {
             value={note}
             onChange={e => setNote(e.target.value)}
             placeholder={t("smoking.note.label")}
-            style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: `1.2px solid ${orangeLight}`, color: dark, background: "#fff", minWidth: 200 }}
+            style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: `1.2px solid ${orangeLight}`, color: dark, background: colors.surface, minWidth: 200 }}
           />
           <div style={{display: 'flex', alignItems: 'center', gap: 10}}>
             <input type="file" accept="image/jpeg, image/png, image/jpg" ref={fileRef} id="imageUploadHutThuoc" multiple onChange={handleImageChange} style={{ display: 'none' }} />
-            <label htmlFor="imageUploadHutThuoc" style={{ background: 'white', color: orange, border: `1.2px solid ${orangeLight}`, borderRadius: 8, padding: '8px 15px', cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap' }}>{t("common.attach")}</label>
-            <span style={{fontStyle: 'italic', fontSize: 14, color: '#555'}}>
+            <label htmlFor="imageUploadHutThuoc" style={{ background: colors.surface, color: orange, border: `1.2px solid ${orangeLight}`, borderRadius: 8, padding: '8px 15px', cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap' }}>{t("common.attach")}</label>
+            <span style={{fontStyle: 'italic', fontSize: 14, color: colors.textSecondary}}>
               {fileNames.length ? `${fileNames.length} ảnh` : t("common.noImage")}
             </span>
           </div>
-          <button onClick={handleSave} style={{ background: orange, color: "#fff", border: "none", padding: "10px 22px", borderRadius: 8, fontWeight: 700, fontSize: 15, cursor: "pointer", marginLeft: 'auto' }}>
+          <button onClick={handleSave} style={{ background: orange, color: colors.white, border: "none", padding: "10px 22px", borderRadius: 8, fontWeight: 700, fontSize: 15, cursor: "pointer", marginLeft: 'auto' }}>
             {t("common.save")}
           </button>
         </div>
@@ -314,9 +314,9 @@ function GiamSatHutThuoc({ user }) {
       {clippedHistory.map((l) => {
         const canInitiateDelete = userRole === 'admin' || userRole === 'ehs' || user.uid === l.userId;
         return (
-          <div key={l.id} className="card" style={{ marginBottom: 8, padding: 10, border: `1px solid ${l.pendingDeletion ? '#f00' : orangeLight}`, borderRadius: 10, background: l.pendingDeletion ? '#fff0f0' : "#fff6ea", opacity: l.pendingDeletion && userRole !== 'admin' && userRole !== 'ehs' ? 0.5 : 1 }}>
+          <div key={l.id} className="card" style={{ marginBottom: 8, padding: 10, border: `1px solid ${l.pendingDeletion ? colors.error : orangeLight}`, borderRadius: 10, background: l.pendingDeletion ? alpha('error', 0.08) : alpha('primary', 0.06), opacity: l.pendingDeletion && userRole !== 'admin' && userRole !== 'ehs' ? 0.5 : 1 }}>
             <div className="row between" style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-              <div className="bold">{l.by} — {l.time} {l.pendingDeletion && <span style={{color: 'red', fontWeight:'bold'}}>{t("common.pendingDelete")}</span>}</div>
+              <div className="bold">{l.by} — {l.time} {l.pendingDeletion && <span style={{color: colors.error, fontWeight:'bold'}}>{t("common.pendingDelete")}</span>}</div>
               <div>
                 {l.pendingDeletion && (userRole === 'admin' || userRole === 'ehs') ? (
                   <div style={{display: 'flex', gap: '8px'}}>
@@ -336,7 +336,7 @@ function GiamSatHutThuoc({ user }) {
             {!!l.images?.length && (
               <div style={{ display: 'flex', gap: 6, flexWrap:'wrap', marginTop: 6 }}>
                 {l.images.map((u, idx) => (
-                  <img key={idx} src={u} alt={`ảnh ${idx+1}`} onClick={()=> openViewer(l.images, idx)} style={{ width: 88, height: 88, objectFit:'cover', borderRadius:6, border:'1px solid #eee', cursor:'pointer' }}/>
+                  <img key={idx} src={u} alt={`ảnh ${idx+1}`} onClick={()=> openViewer(l.images, idx)} style={{ width: 88, height: 88, objectFit:'cover', borderRadius:6, border: `1px solid ${colors.border}`, cursor:'pointer' }}/>
                 ))}
               </div>
             )}
@@ -353,8 +353,8 @@ function GiamSatHutThuoc({ user }) {
             style={{
               padding: '8px 16px',
               borderRadius: 6,
-              border: '1px solid #ccc',
-              background: '#f0f0f0',
+              border: `1px solid ${colors.border}`,
+              background: colors.backgroundLight,
               cursor: 'pointer',
               fontWeight: 600
             }}

@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import dbService from "../services/dbService";
 import apiClient from "../services/apiClient";
 import imageCompression from 'browser-image-compression';
-import { colors } from "../theme";
+import { colors, alpha } from "../theme";
 import LightboxSwipeOnly, { useConfirm } from "./LightboxSwipeOnly";
 import { useI18n } from "../i18n/I18nProvider";
 import realtimeService from "../services/realtimeService";
@@ -18,7 +18,7 @@ const TIMES_OPTIONS = ["Đầu ca", "Lần 1", "Lần 2", "Lần 3", "Lần 4", 
 function RedXIcon({ size = 14 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M18 6L6 18M6 6l12 12" stroke="#F02828" strokeWidth="3" strokeLinecap="round"/>
+      <path d="M18 6L6 18M6 6l12 12" stroke={colors.error} strokeWidth="3" strokeLinecap="round"/>
     </svg>
   );
 }
@@ -31,7 +31,7 @@ function CheckIcon({ size = 20 }) {
 }
 function UndoIcon({ size = 20 }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#666" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={colors.textSecondary} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
         <path d="M21 13v-2a4 4 0 0 0-4-4H8L12 3" />
         <path d="M3 13v2a4 4 0 0 0 4 4h9" />
         <path d="m5 11 4 4-4 4" />
@@ -245,15 +245,15 @@ function GiamSatGiaiLao({ user }) {
       <form onSubmit={handleSend} style={{ display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0, marginBottom: 16 }}>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <div style={{ flex: '1 1 140px' }}>
-            <div style={{ fontSize: 13, color: dark, marginBottom: 4 }}>Ca <span style={{ color: '#d9534f' }}>*</span></div>
-            <select value={shift} onChange={e => setShift(e.target.value)} style={{ width: '100%', padding: "7px 12px", borderRadius: 6, border: `1.2px solid ${orangeLight}`, color: dark, background: "#fff" }}>
+            <div style={{ fontSize: 13, color: dark, marginBottom: 4 }}>Ca <span style={{ color: colors.error }}>*</span></div>
+            <select value={shift} onChange={e => setShift(e.target.value)} style={{ width: '100%', padding: "7px 12px", borderRadius: 6, border: `1.2px solid ${orangeLight}`, color: dark, background: colors.surface }}>
               <option value="">-- Chọn ca --</option>
               {SHIFT_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
           <div style={{ flex: '1 1 140px' }}>
-            <div style={{ fontSize: 13, color: dark, marginBottom: 4 }}>Lần <span style={{ color: '#d9534f' }}>*</span></div>
-            <select value={times} onChange={e => setTimes(e.target.value)} style={{ width: '100%', padding: "7px 12px", borderRadius: 6, border: `1.2px solid ${orangeLight}`, color: dark, background: "#fff" }}>
+            <div style={{ fontSize: 13, color: dark, marginBottom: 4 }}>Lần <span style={{ color: colors.error }}>*</span></div>
+            <select value={times} onChange={e => setTimes(e.target.value)} style={{ width: '100%', padding: "7px 12px", borderRadius: 6, border: `1.2px solid ${orangeLight}`, color: dark, background: colors.surface }}>
               <option value="">-- Chọn lần --</option>
               {TIMES_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
@@ -261,30 +261,30 @@ function GiamSatGiaiLao({ user }) {
         </div>
         <textarea
           value={text} onChange={e => setText(e.target.value)} placeholder={t("chat.placeholder")}
-          rows={2} style={{ width: '100%', padding: "7px 12px", borderRadius: 6, boxSizing: 'border-box', border: `1.2px solid ${orangeLight}`, color: dark, background: "#fff" }}
+          rows={2} style={{ width: '100%', padding: "7px 12px", borderRadius: 6, boxSizing: 'border-box', border: `1.2px solid ${orangeLight}`, color: dark, background: colors.surface }}
         />
         <div style={{display: 'flex', alignItems: 'center', gap: 10}}>
           <input id="imageUploadChat" type="file" accept="image/*" onChange={handleImageChange} ref={fileRef} multiple style={{ display: 'none' }} />
-          <label htmlFor="imageUploadChat" style={{background: 'white', color: orange, border: `1.2px solid ${orangeLight}`, borderRadius: 8, padding: '8px 15px', cursor: 'pointer', fontWeight: 600}}>
+          <label htmlFor="imageUploadChat" style={{background: colors.surface, color: orange, border: `1.2px solid ${orangeLight}`, borderRadius: 8, padding: '8px 15px', cursor: 'pointer', fontWeight: 600}}>
             {t("common.attach")}
           </label>
-          <span style={{fontStyle: 'italic', fontSize: 14, color: '#555', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
+          <span style={{fontStyle: 'italic', fontSize: 14, color: colors.textSecondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
             {fileNames.length ? fileNames.join(', ') : t("common.noImage")}
           </span>
-          <button type="submit" disabled={isUploading} style={{ background: orange, color: "#fff", border: "none", padding: "8px 22px", borderRadius: 8, fontWeight: 700, fontSize: 15, boxShadow: "0 1px 8px #e88e2e22", cursor: "pointer", marginLeft: 'auto', opacity: isUploading ? 0.7 : 1 }}>
+          <button type="submit" disabled={isUploading} style={{ background: orange, color: colors.white, border: "none", padding: "8px 22px", borderRadius: 8, fontWeight: 700, fontSize: 15, boxShadow: 'var(--so-shadow-sm)', cursor: "pointer", marginLeft: 'auto', opacity: isUploading ? 0.7 : 1 }}>
             {isUploading ? t('common.sending') : t('common.send')}
           </button>
         </div>
       </form>
 
-      <div style={{ flexGrow: 1, background: "#fff6ea", borderRadius: 8, padding: 10, overflowY: 'auto', border: `1px solid ${orangeLight}` }}>
+      <div style={{ flexGrow: 1, background: alpha('primary', 0.06), borderRadius: 8, padding: 10, overflowY: 'auto', border: `1px solid ${orangeLight}` }}>
         {clippedChat.map((msg) => {
           const canInitiateDelete = userRole === 'admin' || userRole === 'ehs' || user.uid === msg.userId;
           return (
             <div key={msg.id} style={{ marginBottom: 10, display: 'flex', flexDirection: 'column', alignItems: msg.userId === user.uid ? 'flex-end' : 'flex-start' }}>
-              <div style={{ maxWidth: '80%', borderRadius: 12, padding: '8px 12px', position: 'relative', border: `1px solid ${msg.pendingDeletion ? 'red' : '#f0e2cf'}`, background: msg.pendingDeletion ? '#fff0f0' : (msg.userId === user.uid ? orangeLight : 'white') }}>
+              <div style={{ maxWidth: '80%', borderRadius: 12, padding: '8px 12px', position: 'relative', border: `1px solid ${msg.pendingDeletion ? colors.error : alpha('primary', 0.25)}`, background: msg.pendingDeletion ? alpha('error', 0.08) : (msg.userId === user.uid ? orangeLight : colors.surface) }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <b style={{ color: orange, fontSize: 14 }}>{msg.user} {msg.pendingDeletion && <span style={{color: 'red'}}>{t("common.pendingDelete")}</span>}</b>
+                  <b style={{ color: orange, fontSize: 14 }}>{msg.user} {msg.pendingDeletion && <span style={{color: colors.error}}>{t("common.pendingDelete")}</span>}</b>
                   
                   <div>
                     {msg.pendingDeletion && (userRole === 'admin' || userRole === 'ehs') ? (
@@ -309,11 +309,11 @@ function GiamSatGiaiLao({ user }) {
                 {!!msg.images?.length && (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
                     {msg.images.map((imgUrl, index) => (
-                      <img key={index} src={imgUrl} alt={`ảnh ${index + 1}`} onClick={() => openViewer(msg.images, index)} style={{ maxWidth: 90, maxHeight: 65, borderRadius: 4, cursor: "pointer", border: '1px solid #eee' }} />
+                      <img key={index} src={imgUrl} alt={`ảnh ${index + 1}`} onClick={() => openViewer(msg.images, index)} style={{ maxWidth: 90, maxHeight: 65, borderRadius: 4, cursor: "pointer", border: `1px solid ${colors.border}` }} />
                     ))}
                   </div>
                 )}
-                <div style={{ fontSize: 11, color: "#666", marginTop: 5, textAlign: 'right' }}>
+                <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 5, textAlign: 'right' }}>
                   {formatTimestamp(msg.timestamp)}
                 </div>
               </div>
@@ -325,7 +325,7 @@ function GiamSatGiaiLao({ user }) {
 
       {hasMore && (
         <div className="row" style={{justifyContent:"center", display:'flex', marginTop:8}}>
-          <button className="btn" onClick={()=>setVisiblePosts(v=>v+2)} style={{ padding: '8px 16px', borderRadius: 6, border: '1px solid #ccc', background: '#f0f0f0', cursor: 'pointer', fontWeight: 600 }}>{t("common.loadMore")}</button>
+          <button className="btn" onClick={()=>setVisiblePosts(v=>v+2)} style={{ padding: '8px 16px', borderRadius: 6, border: `1px solid ${colors.border}`, background: colors.backgroundLight, cursor: 'pointer', fontWeight: 600 }}>{t("common.loadMore")}</button>
         </div>
       )}
 

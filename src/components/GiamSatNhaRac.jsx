@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import dbService from "../services/dbService";
 import apiClient from "../services/apiClient";
 import imageCompression from "browser-image-compression";
-import { colors } from "../theme.js";
+import { colors, alpha } from "../theme.js";
 import LightboxSwipeOnly, { useConfirm } from "./LightboxSwipeOnly";
 import { useI18n } from "../i18n/I18nProvider";
 import realtimeService from "../services/realtimeService";
@@ -21,7 +21,7 @@ function RedXIcon({ size = 14 }) {
     <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
       <path
         d="M18 6L6 18M6 6l12 12"
-        stroke="#F02828"
+        stroke={colors.error}
         strokeWidth="3"
         strokeLinecap="round"
       />
@@ -51,7 +51,7 @@ function UndoIcon({ size = 20 }) {
       height={size}
       viewBox="0 0 24 24"
       fill="none"
-      stroke="#666"
+      stroke={colors.textSecondary}
       strokeWidth="2.5"
       strokeLinecap="round"
       strokeLinejoin="round"
@@ -299,15 +299,15 @@ function GiamSatNhaRac({ user }) {
       >
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           <div style={{ flex: "1 1 140px" }}>
-            <div style={{ fontSize: 13, color: dark, marginBottom: 4 }}>Ca <span style={{ color: "#d9534f" }}>*</span></div>
-            <select value={shift} onChange={(e) => setShift(e.target.value)} style={{ width: "100%", padding: "7px 12px", borderRadius: 6, border: `1.2px solid ${orangeLight}`, color: dark, background: "#fff" }}>
+            <div style={{ fontSize: 13, color: dark, marginBottom: 4 }}>Ca <span style={{ color: colors.error }}>*</span></div>
+            <select value={shift} onChange={(e) => setShift(e.target.value)} style={{ width: "100%", padding: "7px 12px", borderRadius: 6, border: `1.2px solid ${orangeLight}`, color: dark, background: colors.surface }}>
               <option value="">-- Chọn ca --</option>
               {SHIFT_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
           <div style={{ flex: "1 1 140px" }}>
-            <div style={{ fontSize: 13, color: dark, marginBottom: 4 }}>Lần <span style={{ color: "#d9534f" }}>*</span></div>
-            <select value={times} onChange={(e) => setTimes(e.target.value)} style={{ width: "100%", padding: "7px 12px", borderRadius: 6, border: `1.2px solid ${orangeLight}`, color: dark, background: "#fff" }}>
+            <div style={{ fontSize: 13, color: dark, marginBottom: 4 }}>Lần <span style={{ color: colors.error }}>*</span></div>
+            <select value={times} onChange={(e) => setTimes(e.target.value)} style={{ width: "100%", padding: "7px 12px", borderRadius: 6, border: `1.2px solid ${orangeLight}`, color: dark, background: colors.surface }}>
               <option value="">-- Chọn lần --</option>
               {TIMES_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
@@ -325,7 +325,7 @@ function GiamSatNhaRac({ user }) {
             boxSizing: "border-box",
             border: `1.2px solid ${orangeLight}`,
             color: dark,
-            background: "#fff",
+            background: colors.surface,
           }}
         />
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -341,7 +341,7 @@ function GiamSatNhaRac({ user }) {
           <label
             htmlFor="imageUploadNhaRac"
             style={{
-              background: "white",
+              background: colors.surface,
               color: orange,
               border: `1.2px solid ${orangeLight}`,
               borderRadius: 8,
@@ -356,7 +356,7 @@ function GiamSatNhaRac({ user }) {
             style={{
               fontStyle: "italic",
               fontSize: 14,
-              color: "#555",
+              color: colors.textSecondary,
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
@@ -369,13 +369,13 @@ function GiamSatNhaRac({ user }) {
             disabled={isUploading}
             style={{
               background: orange,
-              color: "#fff",
+              color: colors.surface,
               border: "none",
               padding: "8px 22px",
               borderRadius: 8,
               fontWeight: 700,
               fontSize: 15,
-              boxShadow: "0 1px 8px #e88e2e22",
+              boxShadow: "var(--so-shadow-sm)",
               cursor: "pointer",
               marginLeft: "auto",
               opacity: isUploading ? 0.7 : 1,
@@ -389,7 +389,7 @@ function GiamSatNhaRac({ user }) {
       <div
         style={{
           flexGrow: 1,
-          background: "#fff6ea",
+          background: alpha('primary', 0.06),
           borderRadius: 8,
           padding: 10,
           overflowY: "auto",
@@ -415,12 +415,12 @@ function GiamSatNhaRac({ user }) {
                   borderRadius: 12,
                   padding: "8px 12px",
                   position: "relative",
-                  border: `1px solid ${msg.pendingDeletion ? "red" : "#f0e2cf"}`,
+                  border: `1px solid ${msg.pendingDeletion ? colors.error : alpha('primary', 0.25)}`,
                   background: msg.pendingDeletion
-                    ? "#fff0f0"
+                    ? alpha('error', 0.08)
                     : msg.userId === user.uid
                     ? orangeLight
-                    : "white",
+                    : colors.surface,
                 }}
               >
                 <div
@@ -432,7 +432,7 @@ function GiamSatNhaRac({ user }) {
                 >
                   <b style={{ color: orange, fontSize: 14 }}>
                     {msg.user}{" "}
-                    {msg.pendingDeletion && (<span style={{ color: "red" }}>{t("common.pendingDelete")}</span>)}
+                    {msg.pendingDeletion && (<span style={{ color: colors.error }}>{t("common.pendingDelete")}</span>)}
                   </b>
 
                   <div>
@@ -490,14 +490,14 @@ function GiamSatNhaRac({ user }) {
                           maxHeight: 65,
                           borderRadius: 4,
                           cursor: "pointer",
-                          border: "1px solid #eee",
+                          border: `1px solid ${colors.border}`,
                         }}
                       />
                     ))}
                   </div>
                 )}
 
-                <div style={{ fontSize: 11, color: "#666", marginTop: 5, textAlign: "right" }}>
+                <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 5, textAlign: "right" }}>
                   {formatTimestamp(msg.timestamp)}
                 </div>
               </div>
@@ -515,8 +515,8 @@ function GiamSatNhaRac({ user }) {
             style={{
               padding: "8px 16px",
               borderRadius: 6,
-              border: "1px solid #ccc",
-              background: "#f0f0f0",
+              border: `1px solid ${colors.border}`,
+              background: colors.backgroundLight,
               cursor: "pointer",
               fontWeight: 600,
             }}
