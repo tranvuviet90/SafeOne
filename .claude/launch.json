@@ -7,6 +7,17 @@
       "runtimeArgs": ["run", "dev:all"],
       "port": 5173,
       "autoPort": true
+    },
+    {
+      "name": "camai",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m", "uvicorn", "app:app",
+        "--app-dir", "C:/Users/tranv/CamAI",
+        "--host", "127.0.0.1",
+        "--port", "8088"
+      ],
+      "port": 8088
     }
   ]
 }
